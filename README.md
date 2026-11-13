@@ -36,7 +36,7 @@ DataCo (CSV) → Bronze → Silver → Gold → Dashboard (gestão)
 | Nome | Papel | Entrega | Pasta |
 |---|---|---|---|
 | Stephanie Lopes | Gestão de Projetos | Relatório Ágil, riscos, organização do GitHub | `docs/` |
-| Mateus Maciel | Engenharia de Dados | Pipeline Bronze, Silver e Gold | `pipeline/` |
+| Mateus Maciel | Engenharia de Dados | Pipeline Bronze, Silver e Gold | `pipeline/`, `bases/` |
 | Marco Aurélio | Engenharia de IA | Assistente de rastreio (ADK) | `agent/` |
 | Matheus van Deursen | FullStack | Portal de rastreamento com chat | `portal/` |
 | Marcelo Pimenta | BI | Dashboard logístico | `dashboard/` |
