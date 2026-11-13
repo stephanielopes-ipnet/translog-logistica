@@ -1,0 +1,26 @@
+# Segredos
+.env
+*.env
+secrets/
+*token*
+
+# Dados (CSV completo do Kaggle não vai para o Git)
+data/raw/
+*.zip
+chroma_db/
+*.duckdb
+*.sqlite
+
+# Python
+__pycache__/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+dist/
+
+# SO
+.DS_Store
+pipeline/export/*.csv

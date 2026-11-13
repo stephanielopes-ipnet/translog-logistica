@@ -1,0 +1,29 @@
+name: Tarefa
+description: Item de trabalho do backlog
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options: [dados, agente, portal, bi, pm]
+    validations:
+      required: true
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição
+      description: O que precisa ser feito
+    validations:
+      required: true
+  - type: textarea
+    id: aceite
+    attributes:
+      label: Critério de aceite
+      value: "- [ ] "
+    validations:
+      required: true
+  - type: input
+    id: dependencias
+    attributes:
+      label: Depende de
+      placeholder: "#12"
