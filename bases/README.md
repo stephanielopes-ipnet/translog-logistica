@@ -1,13 +1,16 @@
 # Bases
 
-Tabelas exportadas do Databricks para o time usar localmente. Responsável: Mateus.
+Responsável: Mateus.
 
-| Pasta | Conteúdo | Quem usa |
+| Camada | Onde fica | Quem usa |
 |---|---|---|
-| `bronze/` | Dado bruto do DataCo | Mateus |
-| `silver/` | Dado limpo, sem dados pessoais, com `atraso_dias` | Marcelo (exploração) |
-| `gold/` | `gold_entregas`, `gold_kpi_rota`, `gold_eventos_rastreio` | Marco, Matheus e Marcelo |
+| Bronze | Só no Databricks | Mateus |
+| Silver | Só no Databricks | Mateus e Marcelo |
+| Gold | Databricks e `gold/` (exportada) | Marco, Matheus e Marcelo |
+| Amostra | `amostra/` | Marco e Matheus, até a Gold sair |
 
-Salvar em Parquet sempre que possível: o arquivo fica menor e mantém os tipos das colunas. O GitHub não aceita arquivos acima de 100 MB.
+Bronze e Silver não vão para o GitHub: são grandes e só são usadas dentro do Databricks.
 
-Formato das tabelas: [docs/arquitetura.md](../docs/arquitetura.md)
+Na exportação da Gold:
+- salvar em Parquet, só com as colunas do contrato ([docs/arquitetura.md](../docs/arquitetura.md));
+- se algum arquivo passar de 100 MB, anexar numa Release do repositório.
