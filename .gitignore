@@ -6,6 +6,7 @@ secrets/
 
 # Dados (CSV completo do Kaggle não vai para o Git)
 data/raw/
+DataCoSupplyChainDataset*.csv
 *.zip
 chroma_db/
 *.duckdb
@@ -23,4 +24,3 @@ dist/
 
 # SO
 .DS_Store
-pipeline/export/*.csv

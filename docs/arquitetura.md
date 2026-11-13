@@ -9,7 +9,7 @@
 | Assistente | Google ADK, DuckDB e Chroma | Marco |
 | Portal | Aplicação web local | Matheus |
 
-A Gold é exportada do Databricks e lida localmente pelo assistente e pelo portal.
+A Gold é exportada do Databricks para `pipeline/export/` (Parquet) e lida localmente pelo assistente e pelo portal.
 
 ## Contratos de dados
 
