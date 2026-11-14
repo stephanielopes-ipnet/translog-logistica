@@ -9,6 +9,13 @@ Agente Google ADK para consultar pedidos e buscar FAQ e políticas.
 - Banco definitivo e adaptação à Silver aguardam alinhamento do grupo.
 - FAQ e políticas oficiais aguardam conteúdo revisado; exemplos demo não são regras oficiais.
 
+## Integração com o portal
+
+- [Guia do Matheus FullStack](docs/guia-matheus-fullstack.md): instalação, configuração da chave já criada para os testes, execução e primeiro teste.
+- [Contrato da API](docs/api-chat.md): sessões, mensagens HTTP, retorno em eventos e tratamento de erros.
+
+O código está na branch `feat/agente-integracao`, no PR #30 em rascunho. O primeiro teste usa a amostra fictícia; a execução conjunta com o portal ainda precisa ser validada na máquina de Matheus.
+
 ## Preparação no Windows
 
 Requisito: Python 3.12 com o comando `py` disponível.
