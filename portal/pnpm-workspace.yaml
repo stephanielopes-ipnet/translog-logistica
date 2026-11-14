@@ -1,0 +1,13 @@
+packages:
+  - api
+  - contracts
+
+# Versões compartilhadas entre pacotes (use "catalog:" no package.json).
+catalog:
+  "@types/node": 24.19.2
+  typescript: 7.0.2
+  vitest: 5.1.0
+  zod: 4.6.7
+
+# Versões exatas, sem "^".
+savePrefix: ""
