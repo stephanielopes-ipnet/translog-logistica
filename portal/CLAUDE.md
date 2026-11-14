@@ -24,18 +24,19 @@ Contexto detalhado, decisões e pendências ficam em `portal/_contexto/` (local,
 
 ```bash
 pnpm install                     # Node 24 (nvm use) e corepack enable
-pnpm dev                         # API em localhost:3333, recarrega ao salvar
-pnpm test                        # testes (Vitest)
+pnpm dev                         # API em localhost:3333 e Web em localhost:5173 (recarregam ao salvar)
+pnpm build                       # bundle de produção do frontend em web/dist/
+pnpm test                        # testes (Vitest) na API e no Web
 pnpm lint                        # Biome: lint, formatação e ordem dos imports (só verifica)
 pnpm format                      # Biome corrigindo o que for possível
 pnpm typecheck                   # tsc em todos os pacotes
-pnpm --filter @translog/api test # um pacote só
-docker compose up --build        # forma oficial de rodar (fixtures)
+pnpm --filter @translog/api test # um pacote só (api ou web)
+docker compose up --build        # forma oficial de rodar a API (fixtures)
 docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build  # com a Silver
 docker compose down
 ```
 
-Pacotes: `@translog/api` (`api/`) e `@translog/contracts` (`contracts/`). Documentação da API em `http://localhost:3333/docs`.
+Pacotes: `@translog/api` (`api/`), `@translog/contracts` (`contracts/`) e `@translog/web` (`web/`). Tela em `http://localhost:5173`; documentação da API em `http://localhost:3333/docs`.
 
 ## Arquitetura
 

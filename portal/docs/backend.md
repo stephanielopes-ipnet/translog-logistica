@@ -1,8 +1,8 @@
-# Backend do portal: documentação técnica
+# Portal TransLog: documentação técnica (Backend e Frontend)
 
 Para quem vai rodar, revisar ou mudar o código do portal. A visão geral, sem detalhes técnicos, está no [README](../README.md).
 
-Estado em 14/11/2026: fases 0 e 1 concluídas (fundação, contrato e API de pedidos). Chat, agente de IA e tela ainda não existem. Checklist em [tasks.md](../tasks.md).
+Estado em 14/11/2026: fases 0, 1 e 3 concluídas (fundação, contrato `@translog/contracts`, API de pedidos `@translog/api` e interface frontend `@translog/web` seguindo a Direção D). A integração HTTP de chat com o agente ADK (Fase 2) aguarda o acordo de contrato com o Marco. Checklist em [tasks.md](../tasks.md).
 
 ## Sumário
 
@@ -11,48 +11,59 @@ Estado em 14/11/2026: fases 0 e 1 concluídas (fundação, contrato e API de ped
 3. [Como rodar](#3-como-rodar)
 4. [Fluxo: da inicialização à resposta](#4-fluxo-da-inicialização-à-resposta)
 5. [Contrato (`@translog/contracts`)](#5-contrato-translogcontracts)
-6. [API](#6-api)
+6. [API (`@translog/api`)](#6-api-translogapi)
 7. [Configuração](#7-configuração)
 8. [Fontes de dados](#8-fontes-de-dados)
 9. [Mapeamento Silver → `Order`](#9-mapeamento-silver--order)
 10. [Privacidade em camadas](#10-privacidade-em-camadas)
 11. [Tratamento de erros](#11-tratamento-de-erros)
-12. [Testes](#12-testes)
-13. [Docker](#13-docker)
-14. [Como fazer mudanças comuns](#14-como-fazer-mudanças-comuns)
-15. [Convenções](#15-convenções)
-16. [Decisões técnicas](#16-decisões-técnicas)
-17. [Limitações e próximos passos](#17-limitações-e-próximos-passos)
+12. [Frontend (`@translog/web`)](#12-frontend-translogweb)
+13. [Testes](#13-testes)
+14. [Docker](#14-docker)
+15. [Como fazer mudanças comuns](#15-como-fazer-mudanças-comuns)
+16. [Convenções](#16-convenções)
+17. [Decisões técnicas](#17-decisões-técnicas)
+18. [Limitações e próximos passos](#18-limitações-e-próximos-passos)
 
 ## 1. Visão geral
 
-API HTTP que entrega à tela o pedido pronto para exibir (o tipo `Order`, ou view model). Os pedidos vêm de uma de duas fontes, escolhida por configuração: 11 pedidos de exemplo versionados no código (`fixtures`) ou a Silver em CSV (`file`). Nos dois casos, tudo é carregado uma vez ao subir e consultado em memória.
+O portal é um monorepo pnpm dividido em três pacotes:
+
+- **`@translog/contracts` (`contracts/`)**: esquemas Zod compartilhados que definem o contrato HTTP, geram o OpenAPI em `/docs` e tipam tanto o backend quanto o frontend.
+- **`@translog/api` (`api/`)**: API HTTP em Fastify que entrega à tela o pedido pronto para exibir (view model `Order`), lendo de 11 pedidos de exemplo versionados (`fixtures`) ou da base Silver em CSV (`file`). Tudo é carregado uma vez na inicialização e consultado em memória em $O(1)$.
+- **`@translog/web` (`web/`)**: Single-Page Application em React 19 + Vite 8 + Tailwind CSS v4 que implementa o design da **Direção D** (estética de manifesto de carga internacional combinada com rota e linha do tempo de 4 etapas integradas) e consome a API real via `@tanstack/react-query`, validando todas as respostas no cliente com os esquemas de `@translog/contracts`.
 
 ```
-Navegador (tela, futura)  ──►  API do portal (este backend)  ──►  Silver CSV / fixtures
-                                       │
-                                       └──►  Agente ADK do Marco (fase futura)
+Navegador (@translog/web, :5173)  ──►  API do portal (@translog/api, :3333)  ──►  Silver CSV / fixtures
+        │                                       │
+        └── Assistente local (mock Fase 3)      └──►  Agente ADK do Marco (Fase 2, futura)
 ```
 
-A tela fala só com esta API, nunca direto com o agente. A chave do Gemini fica no processo do agente.
+A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento), nunca direto com o agente. A chave do Gemini fica restrita ao processo do agente.
 
 ### Stack
 
-| Peça | Versão | Observação |
-|---|---|---|
-| Node.js | 24 (`engines` `>=24.11.0 <25`; imagem `node:24.22.3-alpine3.24`) | Executa o TypeScript direto, sem etapa de build |
-| pnpm | 12.18.0 (via corepack) | Workspace com `catalog` de versões compartilhadas |
-| TypeScript | 7.0.2 | `strict`, `noUncheckedIndexedAccess`, `erasableSyntaxOnly` |
-| Fastify | 5.12.8 | Servidor HTTP |
-| Zod | 4.6.7 | Esquemas do contrato, validação e tipos |
-| fastify-type-provider-zod | 7.0.0 | Liga Zod ao Fastify (validação, serialização, OpenAPI) |
-| @fastify/swagger + swagger-ui | 9.9.3 + 6.1.3 | OpenAPI em `/docs` |
-| csv-parse | 7.0.3 | Leitura da Silver em streaming |
-| Vitest | 5.1.0 | Testes |
-| Biome | 2.6.7 | Lint, formatação e ordem dos imports |
-| pino-pretty | 13.2.0 | Log legível em desenvolvimento (não vai para a imagem) |
+| Peça | Versão | Pacote | Observação |
+|---|---|---|---|
+| Node.js | 24 (`engines` `>=24.11.0 <25`; imagem `node:24.22.3-alpine3.24`) | todos | Executa o TypeScript direto na API, sem etapa de build |
+| pnpm | 12.18.0 (via corepack) | todos | Workspace com `catalog` de versões compartilhadas |
+| TypeScript | 7.0.2 | todos | `strict`, `noUncheckedIndexedAccess`, `erasableSyntaxOnly` |
+| Zod | 4.6.7 | `contracts`, `api`, `web` | Esquemas do contrato, validação na API e no cliente HTTP |
+| Fastify | 5.12.8 | `api` | Servidor HTTP |
+| fastify-type-provider-zod | 7.0.0 | `api` | Liga Zod ao Fastify (validação, serialização, OpenAPI) |
+| @fastify/swagger + swagger-ui | 9.9.3 + 6.1.3 | `api` | OpenAPI em `/docs` |
+| csv-parse | 7.0.3 | `api` | Leitura da Silver em streaming |
+| pino-pretty | 13.2.0 | `api` | Log legível em desenvolvimento (não vai para a imagem) |
+| React + React DOM | 19.3.1 | `web` | Interface declarativa com hooks |
+| Vite + @vitejs/plugin-react | 8.3.8 + 6.2.1 | `web` | Dev server com proxy `/api` e bundler de produção |
+| Tailwind CSS + @tailwindcss/vite | 4.3.5 | `web` | Estilização utility-first com `@theme inline` e `@custom-variant dark` |
+| @tanstack/react-query | 5.107.1 | `web` | Cache, estado assíncrono, retentativas e sincronização com a API |
+| lucide-react | 1.72.0 | `web` | Ícones consistentes com os protótipos |
+| @fontsource-variable/inter | 5.3.0 | `web` | Fonte `Inter Variable` empacotada localmente |
+| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (129 testes no total) |
+| Biome | 2.6.7 | todos | Lint, formatação, acessibilidade e ordem dos imports |
 
-Tamanho: ~950 linhas de código e ~1.050 de testes (105 testes).
+Tamanho aproximado: ~950 linhas de código na API + ~2.200 linhas no frontend, cobertos por **129 testes automatizados** (105 na API + 24 no frontend).
 
 ## 2. Estrutura de pastas
 
@@ -60,11 +71,11 @@ Tamanho: ~950 linhas de código e ~1.050 de testes (105 testes).
 
 ```
 portal/
-├── package.json             # scripts do workspace (dev, start, test, lint, format, typecheck)
-├── pnpm-workspace.yaml      # pacotes (api, contracts), catalog de versões, savePrefix ""
+├── package.json             # scripts do workspace (dev, start, build, test, lint, format, typecheck)
+├── pnpm-workspace.yaml      # pacotes (api, contracts, web), catalog de versões, savePrefix ""
 ├── pnpm-lock.yaml
 ├── tsconfig.base.json       # opções de TypeScript compartilhadas
-├── biome.json               # ignora _contexto/, dados/, prototipos/ e *.md
+├── biome.json               # regras de lint/format; ignora _contexto/, dados/, prototipos/, dist/ e *.md
 ├── .nvmrc                   # 24
 ├── .env.example             # todas as variáveis, comentadas
 ├── .dockerignore
@@ -73,8 +84,8 @@ portal/
 ├── README.md                # visão geral (não técnica)
 ├── CLAUDE.md                # regras e comandos para o assistente de código
 ├── tasks.md                 # checklist por fase
-├── docs/backend.md          # este documento
-├── prototipos/              # protótipos HTML da tela (referência de design)
+├── docs/backend.md          # este documento técnico (backend + frontend)
+├── prototipos/              # protótipos HTML da tela (A, B, C e Direção D escolhida)
 ├── dados/                   # cópia local da Silver (no .gitignore; nunca versionar)
 ├── contracts/               # @translog/contracts
 │   └── src/
@@ -82,30 +93,64 @@ portal/
 │       ├── orders.ts        # Order, enums, params e resposta de samples
 │       ├── health.ts        # resposta do health, DataSource
 │       └── errors.ts        # formato padrão de erro
-└── api/                     # @translog/api
-    ├── Dockerfile
-    ├── vitest.config.ts     # isolate: false, TZ=America/Sao_Paulo
+├── api/                     # @translog/api
+│   ├── Dockerfile
+│   ├── vitest.config.ts     # isolate: false, TZ=America/Sao_Paulo
+│   └── src/
+│       ├── main.ts          # bootstrap: .env → config → servidor → listen
+│       ├── server.ts        # Fastify, swagger, error handler, container, rotas (health inline)
+│       ├── config.ts        # variáveis de ambiente validadas
+│       ├── container.ts     # único lugar que escolhe o adapter de dados
+│       ├── http/
+│       │   └── errors.ts    # único lugar que transforma erros em resposta HTTP
+│       ├── privacy.test.ts  # varredura de chaves e valores proibidos em todas as respostas
+│       └── orders/
+│           ├── routes.ts              # GET /api/orders/samples e /api/orders/:orderId
+│           ├── order-service.ts       # regras de consulta + OrderNotFoundError
+│           ├── order-repository.ts    # porta OrderRepository + repositório em memória
+│           ├── fixtures-repository.ts # adapter fixtures
+│           ├── file-repository.ts     # adapter file (Silver CSV em streaming)
+│           ├── silver-mapper.ts       # linhas da Silver → Order (único arquivo que conhece a Silver)
+│           └── fixtures/
+│               ├── orders.json        # 11 pedidos de exemplo (vão para a imagem)
+│               └── silver-amostra.csv # amostra da Silver para testes (não vai para a imagem)
+└── web/                     # @translog/web (React 19 + Vite 8 + Tailwind v4)
+    ├── index.html           # ponto de entrada HTML (pt-BR, título e fontes IBM Plex Mono)
+    ├── package.json
+    ├── tsconfig.json        # bundler resolution, jsx: react-jsx, noEmit
+    ├── vite.config.ts       # plugin React + Tailwind, proxy /api → http://127.0.0.1:3333
     └── src/
-        ├── main.ts          # bootstrap: .env → config → servidor → listen
-        ├── server.ts        # Fastify, swagger, error handler, container, rotas (health inline)
-        ├── config.ts        # variáveis de ambiente validadas
-        ├── container.ts     # único lugar que escolhe o adapter de dados
-        ├── http/
-        │   └── errors.ts    # único lugar que transforma erros em resposta HTTP
-        ├── privacy.test.ts  # varredura de chaves e valores proibidos em todas as respostas
-        └── orders/
-            ├── routes.ts              # GET /api/orders/samples e /api/orders/:orderId
-            ├── order-service.ts       # regras de consulta + OrderNotFoundError
-            ├── order-repository.ts    # porta OrderRepository + repositório em memória
-            ├── fixtures-repository.ts # adapter fixtures
-            ├── file-repository.ts     # adapter file (Silver CSV em streaming)
-            ├── silver-mapper.ts       # linhas da Silver → Order (único arquivo que conhece a Silver)
-            └── fixtures/
-                ├── orders.json        # 11 pedidos de exemplo (vão para a imagem)
-                └── silver-amostra.csv # amostra da Silver para testes (não vai para a imagem)
+        ├── main.tsx         # QueryClientProvider + montagem do App
+        ├── app.tsx          # composição geral: URL state, queries, troca de pedido, atalhos e chat
+        ├── index.css        # @theme inline, @custom-variant dark, classes .label-mono, .perf-t, .route-line
+        ├── api/
+        │   ├── client.ts    # fetch + validação Zod com @translog/contracts + classe ApiError
+        │   ├── fixtures.ts  # espelho dos 11 pedidos de exemplo para simulação offline via ProtoBar
+        │   └── queries.ts   # hooks useHealth, useOrderSamples, useOrderQuery e política shouldRetry
+        ├── lib/
+        │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD), formatManifestCode
+        │   ├── url-state.ts # leitura e escrita de ?pedido= e presets de apresentação (?t, ?c, ?s, ?r, ?n, ?bar)
+        │   └── utils.ts     # utilitário cn() para classes condicionais
+        ├── components/
+        │   └── app-header.tsx # cabeçalho com marca TransLog, manifesto e badge de status da API
+        └── features/
+            ├── tracking/
+            │   ├── timeline.ts            # máquina de estados pura das 4 etapas (buildTimelineSteps)
+            │   ├── order-search-form.tsx  # input numérico (1..10 dígitos), validação inline e chips de amostra
+            │   ├── tracking-states.tsx    # estados vazio, skeleton, não encontrado, erro de servidor e sem conexão
+            │   ├── order-manifest-card.tsx# manifesto principal, grade de 4 colunas, alerta de causa e rota + 4 etapas
+            │   ├── order-items-table.tsx  # tabela de itens declarados e rodapé perfurado (.perf-t) com total em USD
+            │   └── tracking-panel.tsx     # orquestração da coluna esquerda (60%)
+            ├── chat/
+            │   ├── mock-chat-service.ts   # motor determinístico do assistente (quando chega, por que atrasou, resumo)
+            │   ├── chat-messages.tsx      # despachos numerados (#01), divisor de troca, typing e parser seguro de **negrito**
+            │   ├── chat-input.tsx         # chips de sugestão contextual + textarea com Enter / Shift+Enter
+            │   └── chat-panel.tsx         # coluna direita fixa (400 px) com contexto do pedido ativo
+            └── dev-bar/
+                └── proto-bar.tsx          # barra inferior recolhível para simular estados, decisões em aberto e tema
 ```
 
-Testes ficam ao lado do arquivo testado (`*.test.ts`).
+Testes ficam ao lado do arquivo testado (`*.test.ts`) tanto em `api/src/` quanto em `web/src/`.
 
 ## 3. Como rodar
 
@@ -114,15 +159,19 @@ Testes ficam ao lado do arquivo testado (`*.test.ts`).
 - Node 24 (`nvm use` lê o `.nvmrc`) e `corepack enable` (ativa o pnpm 12.18.0 fixado no `package.json`).
 - Para Docker: Docker Engine 25 ou mais novo, com Compose (o healthcheck usa `start_interval`).
 
-### Desenvolvimento
+### Desenvolvimento (API + Frontend simultâneos)
 
 ```bash
 cd portal
 pnpm install
-pnpm dev            # node --watch: recarrega ao salvar; API em http://localhost:3333
+pnpm dev            # sobe API (http://localhost:3333) e Web (http://localhost:5173) em paralelo
 ```
 
-Sem `.env`, sobe com os `fixtures`. Para usar a Silver, copie o arquivo para `portal/dados/silver_pedidos_rastreio.csv` e:
+O comando `pnpm dev` usa `pnpm --parallel --stream -r --filter @translog/api --filter @translog/web dev`:
+- `@translog/api` roda com `node --watch` na porta `3333`;
+- `@translog/web` roda o servidor do Vite na porta `5173`, fazendo proxy automático de qualquer requisição `/api/*` para `http://127.0.0.1:3333` (ou para `VITE_API_TARGET`, se definida).
+
+Sem `.env`, a API sobe com os `fixtures` (11 pedidos). Para usar a Silver real (65.752 pedidos), copie o arquivo para `portal/dados/silver_pedidos_rastreio.csv` e:
 
 ```bash
 cp .env.example .env
@@ -132,7 +181,7 @@ cp .env.example .env
 pnpm dev
 ```
 
-Com `file`, cada recarga do `--watch` relê a Silver (~10 s).
+Com `file`, cada recarga do `--watch` na API relê a Silver (~10 s).
 
 ### Docker
 
@@ -148,17 +197,19 @@ Para não repetir os `-f`, defina `COMPOSE_FILE=docker-compose.yml:docker-compos
 
 | Comando | O que faz |
 |---|---|
-| `pnpm dev` | API com `node --watch` |
-| `pnpm start` | API sem watch |
-| `pnpm test` | Vitest em todos os pacotes |
-| `pnpm lint` | Biome (só verifica) |
-| `pnpm format` | Biome corrigindo |
-| `pnpm typecheck` | `tsc` em todos os pacotes |
-| `pnpm --filter @translog/api <script>` | Um pacote só |
+| `pnpm dev` | Sobe API (`:3333`) e frontend Web (`:5173`) em paralelo com hot reload |
+| `pnpm start` | Sobe apenas a API sem watch |
+| `pnpm build` | Gera o bundle de produção do frontend em `web/dist/` |
+| `pnpm test` | Roda o Vitest em todos os pacotes (129 testes: 105 na API + 24 no Web) |
+| `pnpm lint` | Biome em todos os pacotes (só verifica) |
+| `pnpm format` | Biome corrigindo formatação e imports |
+| `pnpm typecheck` | `tsc` em todos os pacotes (`contracts`, `api` e `web`) |
+| `pnpm --filter @translog/api <script>` | Executa um script apenas na API |
+| `pnpm --filter @translog/web <script>` | Executa um script apenas no frontend |
 
 ## 4. Fluxo: da inicialização à resposta
 
-### Inicialização
+### Inicialização da API
 
 ```
 main.ts
@@ -174,22 +225,27 @@ main.ts
  └─ app.listen(0.0.0.0:API_PORT)         só depois de tudo carregado
 ```
 
-Qualquer falha até o `listen` (variável inválida, arquivo ausente, porta ocupada) cai no `catch` do `bootstrap()`: a mensagem vai para o stderr e o processo sai com código 1. Como a carga acontece antes do `listen`, `/api/health` nunca responde antes de os pedidos estarem prontos. Não existe estado "carregando".
+Qualquer falha até o `listen` (variável inválida, arquivo ausente, porta ocupada) cai no `catch` do `bootstrap()`: a mensagem vai para o stderr e o processo sai com código 1. Como a carga acontece antes do `listen`, `/api/health` nunca responde antes de os pedidos estarem prontos. Não existe estado "carregando" no backend.
 
 `SIGINT` e `SIGTERM` fecham o Fastify e saem com código 0.
 
-### Consulta de um pedido
+### Consulta de um pedido (Ponta a Ponta)
 
 ```
-GET /api/orders/375
- ├─ params validados por orderIdParamsSchema ─────── falha → 400 VALIDATION_ERROR
- ├─ orderService.getOrder(375)
- │   └─ orders.findById(375)                         Map em memória, O(1)
- │       └─ null → throw OrderNotFoundError ──────── http/errors.ts → 404 ORDER_NOT_FOUND
- └─ resposta serializada por orderSchema             campos fora do contrato são descartados → 200
+Usuário digita "375" ou clica no atalho #375 em @translog/web
+ ├─ OrderSearchForm valida formato (/^[1-9]\d{0,9}$/) no cliente
+ ├─ App atualiza activeOrderId=375 e sincroniza ?pedido=375 via history.replaceState
+ ├─ useOrderQuery(375) dispara GET /api/orders/375
+ │   ├─ Fastify valida params por orderIdParamsSchema ── falha → 400 VALIDATION_ERROR
+ │   ├─ orderService.getOrder(375)
+ │   │   └─ orders.findById(375)                         Map em memória, O(1)
+ │   │       └─ null → throw OrderNotFoundError ──────── http/errors.ts → 404 ORDER_NOT_FOUND
+ │   └─ resposta serializada por orderSchema             campos fora do contrato são descartados → 200
+ └─ getJson() valida o JSON no cliente contra orderSchema (@translog/contracts)
+     └─ TrackingPanel renderiza OrderManifestCard + OrderItemsTable e sincroniza contexto do ChatPanel
 ```
 
-### Camadas (portas e adapters)
+### Camadas do backend (portas e adapters)
 
 | Camada | Arquivo | Depende de |
 |---|---|---|
@@ -200,7 +256,7 @@ GET /api/orders/375
 | Composição | `container.ts` | Config e adapters: **único** lugar que escolhe a fonte |
 | Erros → HTTP | `http/errors.ts` | Erros de domínio: **único** lugar que decide status e mensagem |
 
-Padrão de código: funções fábrica (`createOrderService(deps)`), sem classes de serviço. Classes só para erros de domínio.
+Padrão de código: funções fábrica (`createOrderService(deps)`), sem classes de serviço. Classes só para erros de domínio (`OrderNotFoundError` na API e `ApiError` no cliente HTTP do frontend).
 
 ## 5. Contrato (`@translog/contracts`)
 
@@ -208,7 +264,7 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 
 - validam a entrada da API (params) e a saída (serialização);
 - geram o OpenAPI de `/docs`, com as descrições em pt-BR que estão nos `.describe()`;
-- geram os tipos TypeScript (`z.infer`), que a tela vai importar quando existir.
+- validam as respostas recebidas pelo frontend em `web/src/api/client.ts` e fornecem os tipos TypeScript (`z.infer`) para toda a interface React.
 
 | Esquema | Uso |
 |---|---|
@@ -243,7 +299,7 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 
 `delayWindow`, `region`, `origin` e `destination` são texto livre de propósito (podem mudar com a Silver nova). O contrato não tem regras entre campos (por exemplo, "`actualDeliveryDate` só se Entregue"): quem garante é o mapper, com testes.
 
-## 6. API
+## 6. API (`@translog/api`)
 
 | Rota | Sucesso | Erros |
 |---|---|---|
@@ -295,11 +351,12 @@ curl localhost:3333/api/orders/abc
 
 | Variável | Padrão | Uso |
 |---|---|---|
-| `API_PORT` | `3333` | Porta (1 a 65535) |
+| `API_PORT` | `3333` | Porta da API (1 a 65535) |
 | `DATA_SOURCE` | `fixtures` | `fixtures` ou `file` |
 | `ORDERS_FILE` | vazio | CSV da Silver; obrigatório com `file`. Caminho relativo parte de `portal/` |
 | `SAMPLE_ORDER_IDS` | `15,375,562,1002` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
 | `NODE_ENV` | vazio | `production` = log em JSON; ausente = legível (pino-pretty) |
+| `VITE_API_TARGET` | `http://127.0.0.1:3333` | Alvo do proxy `/api` no Vite dev server (opcional, apenas para o frontend em dev) |
 
 Regras (`api/src/config.ts`):
 
@@ -313,7 +370,7 @@ Regras (`api/src/config.ts`):
     - ORDERS_FILE é obrigatória com DATA_SOURCE=file: caminho do CSV da Silver (não definida)
   ```
 
-- No Docker, `DATA_SOURCE` e `ORDERS_FILE` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 13).
+- No Docker, `DATA_SOURCE` e `ORDERS_FILE` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 14).
 
 ## 8. Fontes de dados
 
@@ -431,7 +488,7 @@ Regra do projeto: nenhuma resposta traz dados do cliente, de pagamento ou financ
    - varre todas as chaves, em qualquer nível, de todas as respostas (sucesso, erros, `/docs/json`), nas duas fontes;
    - confere que nenhuma resposta contém os valores fictícios das colunas proibidas (`FICTICIO-*`) e sem uso (`SEM-USO`) da amostra;
    - usa um repositório que devolve `id_cliente`, `lucro_item` etc. para provar a camada 3.
-5. **Logs sem conteúdo.** Linhas e pedidos inválidos são logados só com número do registro, número do pedido e nome dos campos.
+5. **Logs sem conteúdo.** Linhas e pedidos inválidos são logados só com número do registro, número do pedido e o nome dos campos.
 6. **Silver fora do Git e da imagem.** `portal/dados/` está no `.gitignore` da raiz; o `.dockerignore` tira `dados/` e qualquer `*.csv`. No Docker, a Silver entra por volume somente leitura.
 
 ## 11. Tratamento de erros
@@ -449,12 +506,103 @@ Tudo em `http/errors.ts`. Rotas e serviços não têm `try/catch` para montar re
 
 As mensagens de validação do Zod saem em pt-BR (`z.config(z.locales.ptBR())` no `server.ts`); um esquema pode trazer mensagem própria, como a do `orderId`.
 
-## 12. Testes
+## 12. Frontend (`@translog/web`)
+
+A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implementando fielmente o protótipo **Direção D** (`portal/prototipos/translog-prototipo-direcao-d.html`).
+
+### 12.1. Identidade visual e Design System (`src/index.css`)
+
+- **Tipografia técnica dupla:**
+  - `Inter Variable` (`--font-sans`, via `@fontsource-variable/inter`) para leitura fluida de títulos, rótulos principais e mensagens do assistente;
+  - `IBM Plex Mono` (`--font-mono`) para códigos de manifesto (`TL-LATAM-000375`), datas, contagens de dias, preços em dólar e cabeçalhos rotulados (`.label-mono`).
+  - Números tabulares forçados com `.tabular { font-variant-numeric: tabular-nums; }` para evitar deslocamento horizontal ao alternar pedidos.
+- **Paleta e tokens (`@theme inline`):**
+  - Azul-petróleo `#0F4C81` (`brand-800`) como cor primária de autoridade e foco;
+  - Âmbar `#F59E0B` / `#D97706` reservado exclusivamente para atenção ("Motivo provável" e "Aguardando Liberação");
+  - Vermelho (`red-600` / `red-50`) exclusivo para `deadlineStatus === "Atrasado"`;
+  - Verde (`emerald-700` / `emerald-50`) para pedidos entregues, no prazo ou adiantados;
+  - Neutros `slate` (tema claro padrão `#F8FAFC`, suporte opcional a tema escuro via `@custom-variant dark (&:where(.dark, .dark *))`).
+- **Detalhes gráficos de manifesto internacional:**
+  - `.perf-t`: divisor horizontal com serrilhado de manifesto logístico no rodapé de total da fatura;
+  - `.route-line`: conector horizontal tracejado ligando a cidade de origem à cidade de destino no cabeçalho da rota.
+
+### 12.2. Layout e estrutura de tela (`src/app.tsx`)
+
+- **Desktop-first (`min-w-[1280px]`):**
+  - **Cabeçalho (`AppHeader`, `h-14`):** marca TransLog, subtítulo técnico `INTERNATIONAL FREIGHT & WAYBILL TRACKING` e indicador de conexão que reflete `GET /api/health` (exibindo `Sistema online` ou `Sem conexão`).
+  - **Coluna esquerda (`TrackingPanel`, `flex-1` ~60%):** área rolável com formulário de busca (`OrderSearchForm`), pílulas de pedidos de exemplo vindas de `GET /api/orders/samples` e o conteúdo do pedido (ou estados de vazio, skeleton, 404, 500 e offline).
+  - **Coluna direita (`ChatPanel`, `w-[400px]` fixa na altura da viewport):** assistente TransLog como canal de atendimento oficial da operação, mostrando o badge do pedido ativo (`#375 · Em Trânsito` ou `Nenhum pedido aberto`), despachos numerados (`DESPACHO #01 · ASSISTENTE TRANSLOG`), chips de perguntas contextuais e caixa de envio.
+
+### 12.3. Cliente HTTP, validação Zod e cache (`src/api/`)
+
+- **`client.ts`:**
+  - Toda chamada HTTP passa por `getJson(path, schema)`.
+  - Se o `fetch` falhar na rede (`TypeError`), lança `ApiError` com `status: 0` e `code: "NETWORK_ERROR"`, ativando automaticamente o card de **Sem conexão com o servidor** na tela.
+  - Se a resposta não for `2xx`, tenta decodificar o envelope `errorResponseSchema` (`@translog/contracts`) para preservar `code` (`ORDER_NOT_FOUND`, `VALIDATION_ERROR`, etc.) e `message` vindos do Fastify.
+  - Se for `200 OK`, valida o corpo com `schema.safeParse(body)` usando o próprio esquema Zod de `@translog/contracts` (`orderSchema`, `orderSamplesResponseSchema`, `healthResponseSchema`). Respostas fora do contrato lançam `INVALID_RESPONSE`.
+- **`queries.ts` (`@tanstack/react-query`):**
+  - `useHealth()`: consulta `/api/health` com `staleTime: 30_000`.
+  - `useOrderSamples()`: consulta `/api/orders/samples` e usa fallback `[15, 375, 562, 1002]` caso a API ainda não tenha respondido.
+  - `useOrderQuery(orderId)`: consulta `/api/orders/:orderId` apenas quando `orderId !== null`.
+  - `shouldRetry(failureCount, error)`: política testada unitariamente que **nunca repete erros 4xx** (`404 ORDER_NOT_FOUND` ou `400 VALIDATION_ERROR` falham na hora) e faz **1 retentativa rápida** em erros de rede (`status: 0`) ou `5xx`.
+
+### 12.4. Formatação segura de datas e valores (`src/lib/format.ts`)
+
+- **`formatDate(isoDate)`:** converte `"2015-01-08"` em `"08/01/2015"` operando exclusivamente por regex e corte de string (`/^(\d{4})-(\d{2})-(\d{2})/`), **sem jamais instanciar `new Date()`**. Isso garante que o frontend preserve a mesma regra de calendário do backend em qualquer fuso horário do navegador.
+- **`formatCurrency(value)`:** usa `Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" })` para produzir `US$ 91,34`.
+- **`formatManifestCode(order)`:** gera o código de etiqueta internacional no formato `TL-<MARKET>-<ORDER_ID_6_DIGITOS>` (ex.: `TL-LATAM-000375`, `TL-PAC-000562`).
+
+### 12.5. Máquina de estados da linha do tempo (`src/features/tracking/timeline.ts`)
+
+`buildTimelineSteps(order, releaseLabel)` recebe um `Order` e a variante de rótulo (`"waiting"` ou `"payment"`) e devolve as 4 etapas da jornada sem efeitos colaterais:
+
+| Situação (`trackingStatus`) | Etapa 1 | Etapa 2 | Etapa 3 | Etapa 4 |
+|---|---|---|---|---|
+| **Aguardando Liberação** | Pedido recebido (`done`, `orderDate`) | Aguardando liberação / Pagamento pendente (`warn`, `Em análise`) | Em trânsito (`todo`, `Aguardando`) | Entregue (`todo`, `Prev. DD/MM/AAAA`) |
+| **Em Trânsito** (no prazo) | Pedido recebido (`done`, `orderDate`) | Liberado e despachado (`done`, `Concluído`) | Em trânsito (`current`, `Rota ativa`) | Entregue (`todo`, `Prev. DD/MM/AAAA`) |
+| **Em Trânsito** (atrasado) | Pedido recebido (`done`, `orderDate`) | Liberado e despachado (`done`, `Concluído`) | Em trânsito (`late`, `+N d atraso`) | Entregue (`todo`, `Prev. DD/MM/AAAA`) |
+| **Entregue** | Pedido recebido (`done`, `orderDate`) | Liberado e despachado (`done`, `Concluído`) | Em trânsito (`done`, `Concluído`) | Entregue (`done`, `actualDeliveryDate`) |
+| **Cancelado** | Pedido recebido (`done`, `orderDate`) | Liberado (`cancel`, `Interrompido`) | Em trânsito (`cancel`, `—`) | Cancelado (`cancel`, `Encerrado`) |
+
+Quando `trackingStatus === "Cancelado"`, a quarta etapa muda o rótulo de `"Entregue"` para `"Cancelado"` e exibe um banner neutro informando que o envio foi encerrado sem previsão de entrega.
+
+### 12.6. Assistente de IA e integração entre as duas colunas (`src/features/chat/`)
+
+Enquanto o endpoint `POST /api/chat` (Fase 2) aguarda definição do contrato com o agente ADK, o frontend inclui o serviço determinístico `mock-chat-service.ts` com todas as regras de negócio e voz da TransLog:
+
+- **Detecção automática de pedido no texto:** se o cliente digitar `"Onde está o pedido 375?"` (ou apenas `"375"`), `extractOrderNumberFromText` identifica o número; se o pedido existir na API ou nos fixtures, o portal abre automaticamente o pedido na coluna esquerda e responde já contextualizado.
+- **Respostas contextuais (`buildAssistantReply`, `buildWhenReply`, `buildWhyReply`):**
+  - Perguntas sobre **prazo** (`"quando chega"`, `"prazo"`, `"data"`): informa data prevista, data real (se entregue) e dias de atraso/adiantamento.
+  - Perguntas sobre **causa de atraso** (`"por que atrasou"`, `"motivo"`, `"causa"`): explica o `probableCause` sempre como **motivo provável** (por exemplo, em `Promessa irreal`, detalha que o prazo estimado na modalidade `Second Class` foi curto para a rota internacional `San Benito → Saltillo`). Nunca afirma causa comprovada nem sugere rastreio em tempo real.
+  - Botão **"Perguntar ao assistente"** dentro do alerta âmbar de Motivo Provável no `OrderManifestCard`: envia imediatamente a pergunta `"Por que o pedido #375 atrasou?"` para a coluna direita.
+- **Renderização segura de formatação (`chat-messages.tsx`):** as respostas usam `**negrito**` apenas no dado principal; o componente `renderRichText` converte os segmentos em nós React `<strong>` sem usar `dangerouslySetInnerHTML`.
+- **Três modos de histórico ao trocar de pedido (`chatOnSwitch`):**
+  - `divider` (padrão recomendado): mantém o histórico da conversa e insere um divisor visual (`Agora falando sobre o pedido #375 · Em Trânsito`);
+  - `keep`: mantém todas as mensagens sem divisor;
+  - `clear`: limpa a conversa e cria uma saudação nova para o pedido selecionado.
+
+### 12.7. Estado na URL e Barra de Apresentação (`src/lib/url-state.ts` e `ProtoBar`)
+
+- **URL limpa por padrão:** ao abrir `http://localhost:5173`, a URL permanece limpa (`/`) e a tela abre no estado inicial vazio. Ao buscar um pedido, apenas `?pedido=<id>` é gravado via `window.history.replaceState` (se for o pedido padrão ou se limpar a busca, o parâmetro é removido).
+- **Presets de demonstração por query string:** para testes ou apresentações guiadas, a URL também lê opcionalmente:
+  - `?pedido=375` (ou `?order=375`): abre direto o pedido informado;
+  - `?t=empty|loading|notfound|neterr|375`: força um estado de rastreamento;
+  - `?c=normal|typing|err|empty`: força um estado do assistente;
+  - `?s=keep|divider|clear`: escolhe o comportamento do chat ao trocar de pedido;
+  - `?r=waiting|payment`: alterna o rótulo de `"Aguardando liberação"` vs `"Pagamento pendente"`;
+  - `?n=on|off`: alterna tema claro/escuro;
+  - `?bar=off`: oculta completamente a barra inferior.
+- **Barra de demonstração (`ProtoBar`):** barra fixa no rodapé que permite testar ao vivo todos os estados de tela, alternar as 2 decisões de produto em aberto com o time e recolher a barra durante a apresentação para a banca.
+
+## 13. Testes
 
 ```bash
-pnpm test                         # todos (~12 s com a Silver presente: o teste de integração lê o arquivo inteiro)
-pnpm --filter @translog/api test  # só a API
+pnpm test                         # todos os 129 testes (~12 s com a Silver presente)
+pnpm --filter @translog/api test  # só a API (105 testes)
+pnpm --filter @translog/web test  # só o frontend (24 testes, ~250 ms)
 ```
+
+### Testes do Backend (`@translog/api` — 105 testes)
 
 | Arquivo | Cobre |
 |---|---|
@@ -466,7 +614,17 @@ pnpm --filter @translog/api test  # só a API
 | `orders/file-repository.test.ts` | Amostra igual aos mocks, log, descarte de colunas, linhas inválidas sem conteúdo no log, limite de avisos, itens fora de sequência, BOM, erros fatais; **integração com a Silver real** |
 | `privacy.test.ts` | Seção 10 |
 
-**Fixtures de teste**
+### Testes do Frontend (`@translog/web` — 24 testes)
+
+| Arquivo | Cobre |
+|---|---|
+| `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-LATAM-000375`) e pluralização de dias |
+| `lib/url-state.test.ts` | Leitura de `?pedido=375`, rejeição de IDs inválidos (`0`, `abc`), presets da `ProtoBar` e atualização limpa da query string |
+| `api/client.test.ts` | `shouldRetry` (não repete 4xx, repete 1 vez em erro de rede ou 500) e tratamento de `ApiError` |
+| `features/tracking/timeline.test.ts` | Máquina de estados das 4 etapas em todas as situações (`Entregue`, `Em Trânsito` atrasado/no prazo, `Aguardando Liberação` com variantes `waiting`/`payment`, e `Cancelado`) |
+| `features/chat/mock-chat-service.test.ts` | Extração de número de pedido no texto, explicação de motivo provável sem certeza absoluta, resposta de prazo e sugestões contextuais |
+
+**Fixtures de teste da API**
 
 - `orders/fixtures/orders.json`: os 11 pedidos no formato `Order`.
 - `orders/fixtures/silver-amostra.csv`: 15 linhas reais da Silver (pedidos 15, 375, 552, 562, 1002) com as 41 colunas. Valores reais só nas 21 colunas lidas; as proibidas têm `FICTICIO-<coluna>-<n>` e as sem uso, `SEM-USO`. O 552 está lá porque tem hora antes de 03:00Z (teste do fuso).
@@ -475,7 +633,7 @@ pnpm --filter @translog/api test  # só a API
 
 **Configuração do Vitest:** `isolate: false` (os testes não compartilham estado global) e `TZ=America/Sao_Paulo`. Rotas são testadas com `app.inject` (sem abrir porta). `buildServer(config, { logger: false, overrides })` aceita `overrides.orderRepository` para injetar um repositório nos testes.
 
-## 13. Docker
+## 14. Docker
 
 ### Imagem (`api/Dockerfile`, contexto `portal/`)
 
@@ -496,7 +654,7 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 
 **Por que dois arquivos:** com o volume no `docker-compose.yml`, o Docker cria `portal/dados/` **como root** no host quando a pasta não existe (testado em 14/11). Em um clone novo no Linux, copiar a Silver para lá passaria a exigir `sudo`. A sobreposição só monta o volume quando a Silver é usada.
 
-## 14. Como fazer mudanças comuns
+## 15. Como fazer mudanças comuns
 
 **A Silver mudou (coluna renomeada, nova ou removida)**
 1. `orders/silver-mapper.ts`: ajustar `SILVER_COLUMNS` e `mapSilverOrder`.
@@ -506,37 +664,45 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 **Campo novo no `Order`** (ex.: `probableCause` passa a vir da base)
 1. `contracts/src/orders.ts`: campo com `.describe()` em pt-BR.
 2. `silver-mapper.ts`: preencher o campo.
-3. `orders/fixtures/orders.json`: incluir o campo nos 11 pedidos (a carga dos fixtures falha sem ele).
+3. `orders/fixtures/orders.json` e `web/src/api/fixtures.ts`: incluir o campo nos 11 pedidos.
 4. Testes: `routes.test.ts` compara o pedido 15 campo a campo; ajustar.
 5. Conferir se o campo não é sensível (seção 10).
+
+**Conectar o chat do frontend ao endpoint real `POST /api/chat` (quando a Fase 2 estiver pronta)**
+1. Definir `chatRequestSchema` e `chatResponseSchema` em `contracts/src/chat.ts` e reexportar em `contracts/src/index.ts`.
+2. Adicionar `postJson("/api/chat", body, chatResponseSchema)` em `web/src/api/client.ts` e uma `useMutation` em `web/src/api/queries.ts`.
+3. Em `web/src/app.tsx` (`sendQuestion`), substituir o timer local de `buildAssistantReply` pela mutação HTTP, mantendo `mock-chat-service.ts` apenas para os modos de simulação da `ProtoBar`.
 
 **Fonte de dados nova** (ex.: Gold em Parquet)
 1. Novo adapter em `orders/` que devolve um `OrderRepository`.
 2. Novo valor em `dataSourceSchema` (`contracts/src/health.ts`) e variáveis em `config.ts` e `.env.example`.
 3. Novo `case` em `createOrderRepository` (`container.ts`). Serviço e rotas não mudam.
 
-**Rota ou módulo novo** (ex.: chat)
+**Rota ou módulo novo na API** (ex.: chat)
 1. Pasta própria em `api/src/` (`chat/`), com `routes.ts`, serviço e porta.
 2. Esquemas em `contracts/src/` e reexportação no `index.ts`.
 3. Registro no `server.ts` e composição no `container.ts`.
 4. Erros de domínio novos: classe no módulo e mapeamento em `http/errors.ts`.
 
-## 15. Convenções
+## 16. Convenções
 
-- Código, identificadores, arquivos e rotas em inglês. Mensagens da API, documentação e commits em pt-BR.
+- Código, identificadores, arquivos e rotas em inglês. Mensagens da API, interface da tela, documentação e commits em pt-BR.
 - Valores de dados como vêm da base, sem tradução (`Em Trânsito`, `Standard Class`, `LATAM`).
-- TypeScript `strict`, sem `any` (Biome com `noExplicitAny: error`). Imports relativos com extensão `.ts`; sem `enum` e `namespace`.
+- TypeScript `strict`, sem `any` (Biome com `noExplicitAny: error`). Imports relativos com extensão `.ts`/`.tsx`; sem `enum` e `namespace`.
 - Versões exatas (`savePrefix: ""`); versões compartilhadas no `catalog` do `pnpm-workspace.yaml`. O pnpm 12 só aceita versões publicadas há pelo menos 1 dia (`minimumReleaseAge`).
 - Commits: `tipo(portal): descrição` (`feat`, `fix`, `test`, `docs`, `chore`). Comandos git só pelo responsável pelo portal.
 - Antes de commitar: `pnpm lint`, `pnpm typecheck`, `pnpm test`.
 - Nada de abstração especulativa: só o que a fase atual usa.
 
-## 16. Decisões técnicas
+## 17. Decisões técnicas
 
 | Decisão | Motivo |
 |---|---|
-| Node 24 executando TypeScript, sem build | Dispensa `tsx`, bundler e `dist/` |
+| Node 24 executando TypeScript na API, sem build | Dispensa `tsx`, bundler e `dist/` no backend |
 | A API devolve o view model `Order` pronto | A conversão Silver → `Order` fica num arquivo só (`silver-mapper.ts`); a tela só exibe |
+| Validação Zod também no cliente (`web/src/api/client.ts`) | Garante em tempo de execução que qualquer resposta recebida pela SPA respeita `@translog/contracts` |
+| Formatação de datas por corte de texto na API e no Web | Evita `new Date(string)`, que em UTC-3 deslocaria 22.723 linhas da Silver para o dia anterior |
+| Máquina de estados pura para a linha do tempo (`timeline.ts`) | Separa a regra das 4 etapas e das variantes (`Cancelado`, `releaseLabel`) do JSX, permitindo testes unitários diretos |
 | Carga completa antes do `listen` | Health honesto sem estado "carregando"; consulta O(1) em memória |
 | Erros de domínio mapeados só em `http/errors.ts` | Status e mensagens num lugar; rotas sem `try/catch` |
 | `orderId` como texto de 1 a 10 dígitos | Mesma regra do campo da tela; recusa `1e3` e `0x1F`, que `Number()` aceitaria |
@@ -545,11 +711,14 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | `Object.fromEntries`, grupos liberados e pool de textos | Memória da carga de 230 para 47 MB de heap (seção 8) |
 | Docker em dois arquivos de compose | Evita a pasta `dados/` criada como root em clones novos |
 | `probableCause` sempre `null` vindo da Silver | A coluna não existe; nada de regra inventada no backend |
+| URL limpa por padrão no frontend (`/` sem query string inicial) | Evita poluir a barra de endereços ao abrir o portal; grava `?pedido=` apenas quando o cliente consulta um pedido |
 
-## 17. Limitações e próximos passos
+## 18. Limitações e próximos passos
 
-- **Motivo provável:** com `DATA_SOURCE=file`, nenhum pedido tem `probableCause` (só os `fixtures` têm o exemplo do 375). Depende do Mateus e do Marcelo; quando a coluna existir, a mudança é em `silver-mapper.ts`.
-- **Chat:** contrato de `POST /api/chat` depende do acordo com o Marco (sessões do ADK, como o `orderId` chega ao agente, se o agente devolve o pedido citado). Plano: `ChatService` com uma mensagem por vez por sessão (`409`), histórico em memória com limite, agente mock com as regras do protótipo e, depois, adapter ADK.
-- **Tela React** (`portal/web`): depois do design fechado no protótipo HTML. Vai importar os tipos de `@translog/contracts`.
+- **Motivo provável na Silver:** com `DATA_SOURCE=file`, nenhum pedido tem `probableCause` (só os `fixtures` têm os motivos preenchidos, como `"Promessa irreal"` no pedido 375). Depende do Mateus e do Marcelo; quando a coluna existir, a mudança é apenas em `silver-mapper.ts`.
+- **Chat no Backend (Fase 2):** contrato de `POST /api/chat` depende do acordo com o Marco (sessões do ADK, como o `orderId` chega ao agente, se o agente devolve o pedido citado). Quando fechado, o `ChatService` da API e a mutação HTTP em `@translog/web` substituirão o `mock-chat-service.ts`.
+- **Duas decisões de produto em aberto (simuláveis na `ProtoBar`):**
+  1. Comportamento do chat ao trocar de pedido (`divider` vs `keep` vs `clear`);
+  2. Rótulo de pedidos com pagamento pendente (`Aguardando liberação` vs `Pagamento pendente`).
+- **Docker do Frontend (Fase 4):** adicionar Dockerfile multi-stage de `@translog/web` (ou servir o `web/dist` pelo Fastify/Nginx) no `docker-compose.yml` para entrega final containerizada.
 - **Fonte final:** Silver ou Gold (possivelmente Parquet) ainda não definida pelo grupo. Para Parquet, avaliar DuckDB no mesmo adapter. Sem banco de dados até o grupo decidir.
-- **Boot com a Silver** em ~10 s e RSS em ~350 MB: aceitáveis para a demo; `papaparse` é a opção medida se for preciso melhorar (seção 8).
