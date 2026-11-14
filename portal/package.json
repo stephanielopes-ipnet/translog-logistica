@@ -6,8 +6,9 @@
     "node": ">=24.11.0 <25"
   },
   "scripts": {
-    "dev": "pnpm --filter @translog/api dev",
+    "dev": "pnpm --parallel -r --if-present dev",
     "start": "pnpm --filter @translog/api start",
+    "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
     "lint": "biome check .",
     "format": "biome check --write .",

@@ -14,4 +14,4 @@ Checklist por fase. Plano completo em `portal/_contexto/backend-analise.md` (loc
 
 - [ ] **2. Chat com mock**: contrato do chat, `ChatService` com trava por sessão (`409`), histórico com limite, agente mock com as regras do protótipo, `502`. Depende do acordo com o Marco.
 - [ ] **3. Agente ADK**: adapter `adk`, extração da resposta final, timeout, recriação de sessão; agente no compose. Depende do acordo com o Marco.
-- [ ] **Tela React** (`portal/web`): depois do design fechado no protótipo HTML.
+- [x] **Tela React** (`portal/web`): pacote `@translog/web` com o design da Direção D (`translog-prototipo-direcao-d.html`), integrado ao `@translog/contracts` e consultando `/api/health`, `/api/orders/samples` e `/api/orders/:orderId` reais, chat com mock (`mock-chat-service`) e barra de controle (`ProtoBar`) com as variantes das pendências.

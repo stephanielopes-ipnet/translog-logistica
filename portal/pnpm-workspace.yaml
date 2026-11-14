@@ -1,6 +1,7 @@
 packages:
   - api
   - contracts
+  - web
 
 # Versões compartilhadas entre pacotes (use "catalog:" no package.json).
 catalog:

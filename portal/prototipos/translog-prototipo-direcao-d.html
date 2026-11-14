@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TransLog · Direção D: Manifesto &amp; Rota Integrada (MVP)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace']
+        },
+        colors: {
+          primary: {
+            DEFAULT: '#0F4C81',
+            50: '#EEF4FA',
+            100: '#D7E5F2',
+            200: '#AFCAE4',
+            700: '#0C3E6A',
+            800: '#0A3256',
+            900: '#082641'
+          },
+          accent: {
+            DEFAULT: '#F59E0B',
+            50: '#FFFBEB',
+            100: '#FEF3C7',
+            200: '#FDE68A',
+            700: '#B45309',
+            800: '#92400E',
+            900: '#78350F'
+          }
+        }
+      }
+    }
+  };
+</script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { font-feature-settings: 'cv11', 'ss01'; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .label-mono {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #64748B;
+  }
+  .perf-t { border-top: 1.5px dashed #CBD5E1; }
+  .perf-b { border-bottom: 1.5px dashed #CBD5E1; }
+  .route-line {
+    background-image: repeating-linear-gradient(to right, #94A3B8 0, #94A3B8 6px, transparent 6px, transparent 12px);
+    height: 1.5px;
+  }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
+  .scroll-thin::-webkit-scrollbar { width: 8px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  .typing { display: inline-flex; gap: 3px; }
+  .typing span { width: 5px; height: 5px; border-radius: 9999px; background: #0F4C81; animation: typing 1.2s infinite ease-in-out; }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-3px); opacity: 1; } }
+  .fade-in { animation: fadeIn .2s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body class="flex flex-col min-w-[1280px] bg-slate-100/80 text-slate-900 antialiased overflow-hidden">
+
+  <!-- ============ BARRA DE CONTROLE DO PROTÓTIPO (não faz parte do produto) ============ -->
+  <div id="protoBar" class="shrink-0 bg-slate-900 text-[11px] text-slate-400 border-b border-slate-800">
+    <div class="flex items-center gap-2.5 px-4 h-9 overflow-x-auto scroll-thin">
+      <span class="flex items-center gap-1.5 font-mono font-semibold uppercase tracking-wider text-amber-400 shrink-0">
+        <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>Direção D
+      </span>
+      <div id="protoGroups" class="flex items-center gap-2.5 shrink-0"></div>
+      <button id="protoHide" class="ml-auto flex items-center gap-1 px-2 h-6 rounded text-slate-500 hover:text-white hover:bg-white/5 shrink-0">
+        <i data-lucide="eye-off" class="w-3.5 h-3.5"></i>Ocultar
+      </button>
+    </div>
+  </div>
+  <button id="protoShow" class="hidden fixed bottom-3 left-3 z-50 items-center gap-1.5 px-3 h-7 rounded-full bg-slate-900/90 text-[11px] font-medium text-slate-300 shadow-lg hover:text-white">
+    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>Controles do protótipo
+  </button>
+
+  <!-- ============ CABEÇALHO ============ -->
+  <header class="shrink-0 bg-white border-b border-slate-200">
+    <div class="mx-auto max-w-[1440px] px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3.5">
+        <!-- Marca: etiqueta de remessa + rota internacional com ponto âmbar -->
+        <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true" class="shrink-0">
+          <rect width="38" height="38" rx="6" fill="#0F4C81"/>
+          <path d="M9 12h13l7 7-7 7H9V12z" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+          <circle cx="14" cy="19" r="2" fill="#ffffff"/>
+          <path d="M16 19h6" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 2"/>
+          <circle cx="29" cy="19" r="3" fill="#F59E0B"/>
+        </svg>
+        <div class="leading-none">
+          <div class="flex items-center gap-2">
+            <span class="text-[17px] font-bold tracking-tight text-slate-900">TransLog</span>
+            <span class="hidden sm:inline-block h-3.5 w-px bg-slate-300"></span>
+            <span class="label-mono !text-primary font-semibold">International Logistics</span>
+          </div>
+          <div class="text-xs text-slate-500 mt-1">Rastreamento de pedidos</div>
+        </div>
+      </div>
+      <div id="conn"></div>
+    </div>
+    <!-- Fita institucional discreta: âncora visual de manifesto internacional -->
+    <div class="flex h-[3px]">
+      <div class="w-20 bg-accent"></div>
+      <div class="flex-1 bg-primary"></div>
+    </div>
+  </header>
+
+  <!-- ============ ÁREA PRINCIPAL ============ -->
+  <main class="flex-1 min-h-0">
+    <div class="mx-auto max-w-[1440px] h-full px-6 py-5 grid grid-cols-[minmax(0,1fr)_400px] grid-rows-[minmax(0,1fr)] gap-6">
+
+      <!-- Coluna Principal: Busca + Manifesto do Pedido -->
+      <section class="min-h-0 overflow-y-auto scroll-thin -mr-2 pr-2 pb-2 space-y-4">
+
+        <!-- 1. Busca pelo número do pedido -->
+        <div class="bg-white border border-slate-300/90 rounded-lg shadow-sm px-5 py-4">
+          <form id="searchForm" class="flex items-end gap-3" novalidate>
+            <div class="flex-1">
+              <label for="orderInput" class="label-mono block mb-1.5">Número do pedido</label>
+              <div class="relative">
+                <i data-lucide="scan-barcode" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                <input id="orderInput" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="Ex.: 375"
+                  class="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 pl-10 pr-3 font-mono text-[15px] font-medium text-slate-900 tabular placeholder:font-sans placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+              </div>
+            </div>
+            <button type="submit" id="searchBtn"
+              class="h-10 px-5 rounded-md bg-primary text-white text-sm font-semibold shadow-sm hover:bg-primary-700 inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed transition">
+              <span>Rastrear</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </form>
+          <p id="searchHint" class="hidden mt-2 text-xs text-red-600 font-medium">Informe o número do pedido para consultar.</p>
+          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+            <span class="label-mono mr-1">Exemplos rápidos:</span>
+            <div id="examples" class="flex items-center gap-1.5 flex-wrap"></div>
+          </div>
+        </div>
+
+        <!-- Resultado do Rastreio -->
+        <div id="trackResult" class="space-y-4"></div>
+      </section>
+
+      <!-- Coluna do Assistente (400 px fixa) -->
+      <aside class="min-h-0 flex flex-col bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden">
+        <!-- Topo do Assistente -->
+        <div class="shrink-0 px-5 py-3.5 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-md bg-primary text-white grid place-items-center shadow-sm relative">
+              <i data-lucide="message-square-text" class="w-4 h-4"></i>
+              <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-white"></span>
+            </div>
+            <div class="leading-tight">
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold text-slate-900">Assistente TransLog</h2>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">Atendimento automático sobre sua entrega</p>
+            </div>
+          </div>
+          <button id="newChat" class="h-8 px-2.5 rounded border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 inline-flex items-center gap-1.5 transition">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>Nova conversa
+          </button>
+        </div>
+
+        <!-- Contexto do pedido ativo no chat -->
+        <div id="chatContext" class="shrink-0"></div>
+
+        <!-- Mensagens -->
+        <div id="chatMessages" class="flex-1 min-h-0 overflow-y-auto scroll-thin px-5 py-4"></div>
+
+        <!-- Campo de envio -->
+        <div class="shrink-0 border-t border-slate-200 bg-slate-50/40 p-3">
+          <form id="chatForm" class="flex items-end gap-2 rounded-md border border-slate-300 bg-white p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition">
+            <textarea id="chatInput" rows="1" placeholder="Pergunte quando chega, por que atrasou…"
+              class="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm leading-5 placeholder:text-slate-400 focus:outline-none max-h-32 scroll-thin"></textarea>
+            <button type="submit" id="chatSend" aria-label="Enviar"
+              class="w-8 h-8 shrink-0 rounded bg-primary text-white grid place-items-center hover:bg-primary-700 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition">
+              <i data-lucide="send-horizontal" class="w-4 h-4"></i>
+            </button>
+          </form>
+          <div class="mt-1.5 px-1 flex items-center justify-between">
+            <p class="font-mono text-[10.5px] text-slate-400">Enter envia · Shift+Enter quebra linha</p>
+            <span class="font-mono text-[10px] uppercase tracking-wider text-slate-400">Canal oficial</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+<script>
+/* =====================================================================
+   DADOS DE EXEMPLO (11 pedidos extraídos da Silver + caso 375 da banca)
+   ===================================================================== */
+const ORDERS = [
+  {"orderId":15,"orderDate":"2015-01-01","shippingMode":"Standard Class","trackingStatus":"Entregue","deadlineStatus":"Atrasado","delayDays":2,"delayWindow":"Atraso Leve (1 a 2 dias)","estimatedDeliveryDate":"2015-01-05","actualDeliveryDate":"2015-01-07","origin":"Memphis, Tennessee, Estados Unidos","destination":"Brasília, Distrito Federal, Brasil","region":"América do Sul","market":"LATAM","items":[{"productName":"Nike Men's Dri-FIT Victory Golf Polo","category":"Women's Apparel","quantity":1,"total":37.5},{"productName":"Pelican Sunstream 100 Kayak","category":"Water Sports","quantity":1,"total":163.99},{"productName":"Bridgestone e6 Straight Distance NFL San Dieg","category":"Electronics","quantity":3,"total":89.25},{"productName":"Perfect Fitness Perfect Rip Deck","category":"Cleats","quantity":3,"total":151.17},{"productName":"Field & Stream Sportsman 16 Gun Fire Safe","category":"Fishing","quantity":1,"total":331.98}],"total":773.89,"probableCause":null},
+  {"orderId":375,"orderDate":"2015-01-06","shippingMode":"Second Class","trackingStatus":"Em Trânsito","deadlineStatus":"Atrasado","delayDays":4,"delayWindow":"Atraso Crítico (3+ dias)","estimatedDeliveryDate":"2015-01-08","actualDeliveryDate":null,"origin":"San Benito, Texas, Estados Unidos","destination":"Saltillo, Coahuila, México","region":"América Central","market":"LATAM","items":[{"productName":"adidas Youth Germany Black/Red Away Match Soc","category":"Girls' Apparel","quantity":1,"total":68.6},{"productName":"Under Armour Men's Tech II T-Shirt","category":"Lacrosse","quantity":1,"total":22.74}],"total":91.34,"probableCause":"Promessa irreal"},
+  {"orderId":562,"orderDate":"2015-01-09","shippingMode":"Standard Class","trackingStatus":"Aguardando Liberação","deadlineStatus":"Não Avaliado","delayDays":null,"delayWindow":"Não Avaliado (Aguardando Liberação)","estimatedDeliveryDate":"2015-01-13","actualDeliveryDate":null,"origin":"Dallas, Texas, Estados Unidos","destination":"Belo Horizonte, Minas Gerais, Brasil","region":"América do Sul","market":"LATAM","items":[{"productName":"Nike Men's CJ Elite 2 TD Football Cleat","category":"Men's Footwear","quantity":1,"total":109.19},{"productName":"Nike Men's Dri-FIT Victory Golf Polo","category":"Women's Apparel","quantity":3,"total":144.0},{"productName":"Field & Stream Sportsman 16 Gun Fire Safe","category":"Fishing","quantity":1,"total":387.98}],"total":641.17,"probableCause":null},
+  {"orderId":1002,"orderDate":"2015-01-15","shippingMode":"Second Class","trackingStatus":"Cancelado","deadlineStatus":"Cancelado","delayDays":null,"delayWindow":"Envios Cancelados","estimatedDeliveryDate":"2015-01-17","actualDeliveryDate":null,"origin":"Lynwood, Califórnia, Estados Unidos","destination":"San Lorenzo, Central, Paraguai","region":"América do Sul","market":"LATAM","items":[{"productName":"Diamondback Women's Serene Classic Comfort Bi","category":"Camping & Hiking","quantity":1,"total":287.98},{"productName":"Pelican Sunstream 100 Kayak","category":"Water Sports","quantity":1,"total":189.99},{"productName":"Nike Men's Dri-FIT Victory Golf Polo","category":"Women's Apparel","quantity":5,"total":200.0},{"productName":"Under Armour Girls' Toddler Spine Surge Runni","category":"Shop By Sport","quantity":5,"total":173.96}],"total":851.93,"probableCause":null},
+  {"orderId":10453,"orderDate":"2015-06-02","shippingMode":"Standard Class","trackingStatus":"Entregue","deadlineStatus":"No Prazo","delayDays":0,"delayWindow":"No Prazo (0 dias)","estimatedDeliveryDate":"2015-06-06","actualDeliveryDate":"2015-06-06","origin":"Marietta, Geórgia, Estados Unidos","destination":"London, Inglaterra, Reino Unido","region":"Norte da Europa","market":"Europe","items":[{"productName":"Field & Stream Sportsman 16 Gun Fire Safe","category":"Fishing","quantity":1,"total":335.98}],"total":335.98,"probableCause":null},
+  {"orderId":20322,"orderDate":"2015-10-24","shippingMode":"Standard Class","trackingStatus":"Entregue","deadlineStatus":"Adiantado","delayDays":-1,"delayWindow":"Adiantado (< 0 dias)","estimatedDeliveryDate":"2015-10-28","actualDeliveryDate":"2015-10-27","origin":"Caguas, Porto Rico, Porto Rico","destination":"Las Pinas, Região da Capital Nacional, Filipinas","region":"Sudeste Asiático","market":"Pacific Asia","items":[{"productName":"Perfect Fitness Perfect Rip Deck","category":"Cleats","quantity":1,"total":49.79},{"productName":"O'Brien Men's Neoprene Life Vest","category":"Indoor/Outdoor Games","quantity":2,"total":74.97}],"total":124.76,"probableCause":null},
+  {"orderId":31398,"orderDate":"2016-04-03","shippingMode":"Standard Class","trackingStatus":"Em Trânsito","deadlineStatus":"No Prazo","delayDays":0,"delayWindow":"No Prazo (0 dias)","estimatedDeliveryDate":"2016-04-07","actualDeliveryDate":null,"origin":"Atlanta, Geórgia, Estados Unidos","destination":"Chicago, Illinois, Estados Unidos","region":"Centro dos EUA","market":"USCA","items":[{"productName":"Under Armour Women's Ignite Slide","category":"Electronics","quantity":2,"total":63.34},{"productName":"Nike Men's Free 5.0+ Running Shoe","category":"Cardio Equipment","quantity":2,"total":191.98},{"productName":"O'Brien Men's Neoprene Life Vest","category":"Indoor/Outdoor Games","quantity":5,"total":207.42},{"productName":"Nike Men's Free 5.0+ Running Shoe","category":"Cardio Equipment","quantity":3,"total":290.97}],"total":753.71,"probableCause":null},
+  {"orderId":225,"orderDate":"2015-01-04","shippingMode":"First Class","trackingStatus":"Entregue","deadlineStatus":"Atrasado","delayDays":1,"delayWindow":"Atraso Leve (1 a 2 dias)","estimatedDeliveryDate":"2015-01-05","actualDeliveryDate":"2015-01-06","origin":"Webster, Nova York, Estados Unidos","destination":"Toluca, Estado do México, México","region":"América Central","market":"LATAM","items":[{"productName":"Pelican Sunstream 100 Kayak","category":"Water Sports","quantity":1,"total":167.99},{"productName":"Pelican Sunstream 100 Kayak","category":"Water Sports","quantity":1,"total":169.99},{"productName":"Nike Men's CJ Elite 2 TD Football Cleat","category":"Men's Footwear","quantity":1,"total":123.49}],"total":461.47,"probableCause":"Promessa irreal"},
+  {"orderId":41906,"orderDate":"2016-09-03","shippingMode":"Same Day","trackingStatus":"Entregue","deadlineStatus":"Atrasado","delayDays":1,"delayWindow":"Atraso Leve (1 a 2 dias)","estimatedDeliveryDate":"2016-09-03","actualDeliveryDate":"2016-09-04","origin":"Porterville, Califórnia, Estados Unidos","destination":"Bur Sudan, Mar Vermelho, Sudão","region":"Norte da África","market":"Africa","items":[{"productName":"O'Brien Men's Neoprene Life Vest","category":"Indoor/Outdoor Games","quantity":4,"total":167.93},{"productName":"Field & Stream Sportsman 16 Gun Fire Safe","category":"Fishing","quantity":1,"total":363.98}],"total":531.91,"probableCause":"Promessa irreal"},
+  {"orderId":16,"orderDate":"2015-01-01","shippingMode":"Standard Class","trackingStatus":"Aguardando Liberação","deadlineStatus":"Não Avaliado","delayDays":null,"delayWindow":"Não Avaliado (Aguardando Liberação)","estimatedDeliveryDate":"2015-01-05","actualDeliveryDate":null,"origin":"Caguas, Porto Rico, Porto Rico","destination":"Brasília, Distrito Federal, Brasil","region":"América do Sul","market":"LATAM","items":[{"productName":"Perfect Fitness Perfect Rip Deck","category":"Cleats","quantity":2,"total":111.58},{"productName":"Perfect Fitness Perfect Rip Deck","category":"Cleats","quantity":5,"total":239.96}],"total":351.54,"probableCause":null},
+  {"orderId":552,"orderDate":"2015-01-09","shippingMode":"Standard Class","trackingStatus":"Cancelado","deadlineStatus":"Cancelado","delayDays":null,"delayWindow":"Envios Cancelados","estimatedDeliveryDate":"2015-01-13","actualDeliveryDate":null,"origin":"San Diego, Califórnia, Estados Unidos","destination":"Mexico City, Distrito Federal, México","region":"América Central","market":"LATAM","items":[{"productName":"O'Brien Men's Neoprene Life Vest","category":"Indoor/Outdoor Games","quantity":1,"total":41.98}],"total":41.98,"probableCause":null}
+];
+
+const EXAMPLES = [
+  { id: 15, hint: 'Entregue c/ atraso' },
+  { id: 375, hint: 'Em trânsito · Roteiro' },
+  { id: 562, hint: 'Liberação' },
+  { id: 1002, hint: 'Cancelado' }
+];
+
+const MODE_SLA = {
+  'Standard Class': 'Prazo estimado: 4 dias',
+  'Second Class':   'Prazo estimado: 2 dias',
+  'First Class':    'Prazo estimado: 1 dia',
+  'Same Day':       'Despacho no mesmo dia'
+};
+
+// Explicação honesta sem afirmar certeza ("provavelmente")
+const CAUSE_DETAIL = {
+  375: 'o prazo de 2 dias da modalidade Second Class provavelmente foi curto para a rota internacional Texas → Saltillo (México).',
+  225: 'o prazo de 1 dia da modalidade First Class provavelmente foi curto para a rota internacional Nova York → Toluca (México).',
+  41906: 'o envio no mesmo dia (Same Day) provavelmente tinha prazo curto demais para o trajeto Califórnia → Sudão.'
+};
+
+/* =====================================================================
+   ESTADO (inicia no Pedido 375 + conversa da banca por padrão)
+   ===================================================================== */
+const state = {
+  connected: true,
+  tracker: { view: 'result', orderId: 375, query: '375' }, // empty | loading | result | notfound | error
+  chat: { messages: [], typing: false },
+  // 2 pontos em aberto no documento:
+  chatOnSwitch: 'keep',     // 'keep' | 'divider' | 'clear'
+  releaseLabel: 'waiting'   // 'waiting' (Aguardando Liberação) | 'payment' (Pagamento não processado)
+};
+let trackToken = 0;
+let chatToken = 0;
+let msgSeq = 0;
+
+/* =====================================================================
+   UTILITÁRIOS
+   ===================================================================== */
+const $ = (sel) => document.querySelector(sel);
+const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' });
+const fmtMoney = (v) => money.format(v);
+const fmtDate = (s) => { if (!s) return '—'; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const nowTime = (offsetMin = 0) => new Date(Date.now() - offsetMin * 60000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const richText = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>').replace(/\n/g, '<br>');
+const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const findOrder = (id) => ORDERS.find((o) => o.orderId === Number(id)) || null;
+const currentOrder = () => (state.tracker.view === 'result' ? findOrder(state.tracker.orderId) : null);
+const splitPlace = (s) => { const p = s.split(', '); return { city: p[0], rest: p.slice(1).join(', ') }; };
+const icons = () => { if (window.lucide) window.lucide.createIcons(); };
+const manifestCode = (o) => `TL-${String(o.orderId).padStart(6, '0')}-${o.market.replace(/\s+/g, '').toUpperCase()}`;
+
+function displayTrackingStatus(o) {
+  if (o.trackingStatus === 'Aguardando Liberação' && state.releaseLabel === 'payment') {
+    return 'Pagamento não processado';
+  }
+  return o.trackingStatus;
+}
+
+function delayLabel(d) {
+  if (d == null) return null;
+  if (d > 0) return plural(d, 'dia', 'dias') + ' de atraso';
+  if (d < 0) return plural(-d, 'dia', 'dias') + ' adiantado';
+  return 'Dentro do prazo';
+}
+
+/* =====================================================================
+   BADGES SEMÂNTICOS
+   ===================================================================== */
+const STATUS_STYLE = {
+  'Entregue':                 { cls: 'bg-emerald-50 text-emerald-800 border-emerald-300', dot: 'bg-emerald-600' },
+  'Em Trânsito':              { cls: 'bg-primary-50 text-primary border-primary-200',     dot: 'bg-primary' },
+  'Aguardando Liberação':     { cls: 'bg-amber-50 text-amber-800 border-amber-300',       dot: 'bg-amber-500' },
+  'Pagamento não processado': { cls: 'bg-amber-50 text-amber-800 border-amber-300',       dot: 'bg-amber-500' },
+  'Cancelado':                { cls: 'bg-slate-100 text-slate-700 border-slate-300',      dot: 'bg-slate-400' }
+};
+const DEADLINE_STYLE = {
+  'Atrasado':  { cls: 'bg-red-50 text-red-700 border-red-300',                 icon: 'clock-alert' },
+  'No Prazo':  { cls: 'bg-emerald-50/70 text-emerald-800 border-emerald-300',  icon: 'check-circle-2' },
+  'Adiantado': { cls: 'bg-emerald-50/70 text-emerald-800 border-emerald-300',  icon: 'zap' }
+};
+const BADGE = 'inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap';
+
+function statusBadge(o) {
+  const label = displayTrackingStatus(o);
+  const s = STATUS_STYLE[label] || STATUS_STYLE['Cancelado'];
+  return `<span class="${BADGE} ${s.cls}"><span class="w-1.5 h-1.5 rounded-full ${s.dot}"></span>${label}</span>`;
+}
+function deadlineBadge(v) {
+  if (v === 'Não Avaliado' || v === 'Cancelado' || !DEADLINE_STYLE[v]) return '';
+  const s = DEADLINE_STYLE[v];
+  return `<span class="${BADGE} ${s.cls}"><i data-lucide="clock" class="w-3 h-3"></i>${v}</span>`;
+}
+
+/* =====================================================================
+   CABEÇALHO: INDICADOR DE CONEXÃO
+   ===================================================================== */
+function renderConn() {
+  $('#conn').innerHTML = state.connected
+    ? `<div class="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-slate-600"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Conectado</div>`
+    : `<div class="flex items-center gap-2 rounded border border-red-200 bg-red-50 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-red-700"><span class="w-2 h-2 rounded-full bg-red-500"></span>Sem conexão</div>`;
+}
+
+/* =====================================================================
+   COLUNA DE RASTREIO
+   ===================================================================== */
+const CARD = 'bg-white border border-slate-300/90 rounded-lg shadow-sm';
+
+function renderExamples() {
+  const active = state.tracker.view === 'result' ? state.tracker.orderId : null;
+  $('#examples').innerHTML = EXAMPLES.map(({ id, hint }) => {
+    const on = id === active;
+    return `<button type="button" data-example="${id}" class="h-7 px-2.5 rounded border font-mono text-xs tabular inline-flex items-center gap-1.5 transition ${on
+      ? 'border-primary bg-primary text-white font-semibold shadow-sm'
+      : 'border-slate-300 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary'}">
+      <span>#${id}</span>
+      <span class="font-sans text-[11px] ${on ? 'text-primary-100' : 'text-slate-400'}">${hint}</span>
+    </button>`;
+  }).join('');
+}
+
+function viewEmpty() {
+  return `<div class="${CARD} border-dashed py-14 px-8 text-center fade-in">
+    <div class="mx-auto w-12 h-12 rounded-md bg-primary-50 border border-primary-100 text-primary grid place-items-center"><i data-lucide="package-search" class="w-6 h-6"></i></div>
+    <p class="label-mono mt-4">Consulta de remessa internacional</p>
+    <h2 class="mt-1 text-base font-semibold text-slate-900">Acompanhe seu pedido</h2>
+    <p class="mt-1.5 text-sm text-slate-500 max-w-md mx-auto">Digite o número do pedido acima ou selecione um dos exemplos rápidos para ver a situação, o cumprimento do prazo, a rota e o motivo provável em caso de atraso.</p>
+  </div>`;
+}
+
+function viewLoading() {
+  const bar = (w, h = 'h-4') => `<div class="${h} ${w} rounded bg-slate-200"></div>`;
+  return `<div class="${CARD} animate-pulse overflow-hidden" aria-busy="true" aria-label="Carregando pedido">
+      <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+        <div class="flex items-center gap-3">${bar('w-28', 'h-7')}${bar('w-24', 'h-5')}${bar('w-20', 'h-5')}</div>
+        ${bar('w-36', 'h-4')}
+      </div>
+      <div class="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200">
+        <div class="p-5 space-y-2">${bar('w-24', 'h-3')}${bar('w-32', 'h-6')}</div>
+        <div class="p-5 space-y-2">${bar('w-24', 'h-3')}${bar('w-28', 'h-6')}</div>
+        <div class="p-5 space-y-2">${bar('w-20', 'h-3')}${bar('w-28', 'h-6')}</div>
+        <div class="p-5 space-y-2">${bar('w-20', 'h-3')}${bar('w-24', 'h-6')}</div>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="h-16 rounded-md bg-slate-100"></div>
+        <div class="h-32 rounded-md bg-slate-100"></div>
+      </div>
+    </div>
+    <div class="${CARD} p-6 animate-pulse space-y-3">${bar('w-28 mb-2', 'h-4')}${bar('w-full')}${bar('w-full')}</div>`;
+}
+
+function viewNotFound() {
+  return `<div class="${CARD} py-14 px-8 text-center fade-in">
+    <div class="mx-auto w-12 h-12 rounded-md bg-slate-100 border border-slate-200 text-slate-500 grid place-items-center"><i data-lucide="search-x" class="w-6 h-6"></i></div>
+    <p class="label-mono mt-4">Remessa não localizada</p>
+    <h2 class="mt-1 text-base font-semibold text-slate-900">Pedido não encontrado</h2>
+    <p class="mt-1.5 text-sm text-slate-500">Confira o número informado e tente novamente.</p>
+    ${state.tracker.query ? `<p class="mt-3 inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-xs text-slate-600 tabular">Código consultado: #${escapeHtml(state.tracker.query)}</p>` : ''}
+  </div>`;
+}
+
+function viewError() {
+  return `<div class="${CARD} py-14 px-8 text-center fade-in">
+    <div class="mx-auto w-12 h-12 rounded-md bg-red-50 border border-red-200 text-red-600 grid place-items-center"><i data-lucide="wifi-off" class="w-6 h-6"></i></div>
+    <p class="label-mono !text-red-600 mt-4">Falha de comunicação</p>
+    <h2 class="mt-1 text-base font-semibold text-slate-900">Não foi possível conectar ao sistema</h2>
+    <p class="mt-1.5 text-sm text-slate-500">Verifique sua conexão e tente novamente em alguns instantes.</p>
+    <button type="button" id="retryTrack" class="mt-5 h-9 px-4 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 transition">
+      <i data-lucide="refresh-cw" class="w-4 h-4"></i>Tentar novamente
+    </button>
+  </div>`;
+}
+
+/* ---------- Grade de Resposta Principal (Manifesto) ---------- */
+function summaryGrid(o) {
+  const s = o.trackingStatus;
+  let mainLabel = 'Previsão de entrega';
+  let mainDate = fmtDate(o.estimatedDeliveryDate);
+  let mainSub = 'Data estimada';
+
+  if (s === 'Entregue') {
+    mainLabel = 'Entregue em';
+    mainDate = fmtDate(o.actualDeliveryDate);
+    mainSub = `Previsto para ${fmtDate(o.estimatedDeliveryDate)}`;
+  } else if (s === 'Em Trânsito') {
+    mainLabel = 'Previsão de entrega';
+    mainDate = fmtDate(o.estimatedDeliveryDate);
+    mainSub = 'Remessa em trânsito';
+  } else if (s === 'Aguardando Liberação') {
+    mainLabel = 'Previsão após liberação';
+    mainDate = fmtDate(o.estimatedDeliveryDate);
+    mainSub = state.releaseLabel === 'payment' ? 'Aguardando confirmação de pagamento' : 'Aguardando liberação do pedido';
+  } else {
+    mainLabel = 'Situação final';
+    mainDate = 'Cancelado';
+    mainSub = `Previsão original: ${fmtDate(o.estimatedDeliveryDate)}`;
+  }
+
+  // Célula 2: Cumprimento do prazo / atraso
+  let delayCellCls = 'bg-white';
+  let delayLabelColor = '';
+  let delayMain = '';
+  let delaySub = '';
+
+  if (o.deadlineStatus === 'Atrasado' && o.delayDays > 0) {
+    delayCellCls = 'bg-red-50/55';
+    delayLabelColor = '!text-red-700';
+    delayMain = `<span class="font-mono text-[22px] font-bold text-red-700 tabular">+${plural(o.delayDays, 'dia', 'dias')}</span>`;
+    delaySub = `<span class="text-xs font-medium text-red-700/90">${o.delayWindow || 'Fora do prazo estimado'}</span>`;
+  } else if (o.deadlineStatus === 'Adiantado' && o.delayDays < 0) {
+    delayCellCls = 'bg-emerald-50/40';
+    delayLabelColor = '!text-emerald-800';
+    delayMain = `<span class="font-mono text-[22px] font-bold text-emerald-700 tabular">${plural(-o.delayDays, 'dia', 'dias')} antes</span>`;
+    delaySub = `<span class="text-xs text-emerald-800/80">${o.delayWindow}</span>`;
+  } else if (o.deadlineStatus === 'No Prazo') {
+    delayCellCls = 'bg-emerald-50/30';
+    delayLabelColor = '!text-emerald-800';
+    delayMain = `<span class="text-[18px] font-semibold text-emerald-700">Dentro do prazo</span>`;
+    delaySub = `<span class="text-xs text-slate-500">Sem atraso registrado</span>`;
+  } else if (s === 'Aguardando Liberação') {
+    delayCellCls = 'bg-amber-50/35';
+    delayLabelColor = '!text-amber-800';
+    delayMain = `<span class="text-[16px] font-semibold text-amber-900">${state.releaseLabel === 'payment' ? 'Pagamento pendente' : 'Aguardando liberação'}</span>`;
+    delaySub = `<span class="text-xs text-slate-500">Prazo conta após expedição</span>`;
+  } else {
+    delayMain = `<span class="text-[16px] font-medium text-slate-500">Envio cancelado</span>`;
+    delaySub = `<span class="text-xs text-slate-400">Sem entrega programada</span>`;
+  }
+
+  return `<dl class="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200">
+    <div class="px-5 py-3.5">
+      <dt class="label-mono">${mainLabel}</dt>
+      <dd class="mt-1 font-mono text-[22px] leading-tight font-semibold text-slate-900 tabular">${mainDate}</dd>
+      <dd class="mt-0.5 text-xs text-slate-500">${mainSub}</dd>
+    </div>
+    <div class="px-5 py-3.5 ${delayCellCls}">
+      <dt class="label-mono ${delayLabelColor}">Cumprimento do prazo</dt>
+      <dd class="mt-1 leading-tight">${delayMain}</dd>
+      <dd class="mt-0.5">${delaySub}</dd>
+    </div>
+    <div class="px-5 py-3.5">
+      <dt class="label-mono">Modalidade contratada</dt>
+      <dd class="mt-1 text-[16px] leading-tight font-semibold text-slate-900">${o.shippingMode}</dd>
+      <dd class="mt-0.5 text-xs text-slate-500">${MODE_SLA[o.shippingMode] || 'Envio internacional'}</dd>
+    </div>
+    <div class="px-5 py-3.5">
+      <dt class="label-mono">Pedido realizado em</dt>
+      <dd class="mt-1 font-mono text-[17px] leading-tight font-medium text-slate-900 tabular">${fmtDate(o.orderDate)}</dd>
+      <dd class="mt-0.5 text-xs text-slate-500">Origem: EUA / Porto Rico</dd>
+    </div>
+  </dl>`;
+}
+
+/* ---------- Alerta de Motivo Provável ---------- */
+function causeAlert(o) {
+  if (!o.probableCause) return '';
+  return `<div class="mx-5 mt-4 flex items-stretch rounded-md border border-amber-300 bg-amber-50/75 overflow-hidden">
+    <div class="w-11 shrink-0 bg-accent text-slate-900 grid place-items-center" aria-hidden="true">
+      <i data-lucide="triangle-alert" class="w-5 h-5"></i>
+    </div>
+    <div class="flex-1 px-4 py-3 min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="label-mono !text-amber-900 font-semibold">Motivo provável do atraso</span>
+        <span class="text-amber-400">·</span>
+        <span class="font-mono text-[11px] text-amber-800">Análise histórica da rota</span>
+      </div>
+      <p class="mt-0.5 text-base font-bold text-slate-900">${o.probableCause}</p>
+      <p class="text-xs text-slate-600 mt-0.5">Quer entender melhor? O assistente explica por que esse é o motivo provável para a modalidade <strong class="font-medium text-slate-800">${o.shippingMode}</strong> nesta rota.</p>
+    </div>
+    <div class="px-4 py-3 grid place-items-center shrink-0">
+      <button type="button" data-ask="Por que meu pedido atrasou?"
+        class="h-9 px-3.5 rounded-md border border-slate-900/80 bg-white text-xs font-semibold text-slate-900 shadow-sm hover:bg-primary hover:text-white hover:border-primary inline-flex items-center gap-2 transition">
+        <i data-lucide="message-square-more" class="w-4 h-4"></i>
+        <span>Perguntar ao assistente</span>
+      </button>
+    </div>
+  </div>`;
+}
+
+/* ---------- Bloco Integrado: Rota Internacional + Andamento em 4 Etapas ---------- */
+const TIMELINE = {
+  'Entregue':             ['done', 'done', 'done', 'done'],
+  'Em Trânsito':          ['done', 'done', 'current', 'pending'],
+  'Aguardando Liberação': ['done', 'current', 'pending', 'pending']
+};
+const STEPS = [
+  { label: 'Pedido realizado', icon: 'file-check-2' },
+  { label: 'Pedido liberado',  icon: 'package-check' },
+  { label: 'Em trânsito',      icon: 'plane' },
+  { label: 'Entregue',         icon: 'map-pin-check' }
+];
+
+function routeAndTimeline(o) {
+  const orig = splitPlace(o.origin);
+  const dest = splitPlace(o.destination);
+
+  const routeHeader = `
+    <div class="rounded-md border border-slate-200 bg-slate-50/70 px-4 py-3">
+      <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <div>
+          <p class="label-mono flex items-center gap-1.5"><span class="w-2 h-2 rounded-full border-2 border-primary bg-white"></span>De · Origem</p>
+          <p class="mt-0.5 text-base font-bold text-slate-900 leading-tight">${escapeHtml(orig.city)}</p>
+          <p class="text-xs text-slate-500">${escapeHtml(orig.rest)}</p>
+        </div>
+        <div class="flex flex-col items-center justify-center px-2 min-w-[180px]">
+          <div class="flex items-center gap-1.5 mb-1">
+            <span class="rounded bg-white border border-slate-200 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-slate-700">${escapeHtml(o.market)}</span>
+            <span class="text-xs text-slate-500">${escapeHtml(o.region)}</span>
+          </div>
+          <div class="w-full flex items-center gap-2">
+            <div class="flex-1 route-line"></div>
+            <i data-lucide="plane" class="w-3.5 h-3.5 text-primary shrink-0"></i>
+            <div class="flex-1 route-line"></div>
+          </div>
+          <span class="mt-1 font-mono text-[10px] uppercase tracking-wider text-slate-400">${escapeHtml(o.shippingMode)}</span>
+        </div>
+        <div class="text-right">
+          <p class="label-mono flex items-center justify-end gap-1.5">Para · Destino<span class="w-2 h-2 rounded-full bg-accent"></span></p>
+          <p class="mt-0.5 text-base font-bold text-slate-900 leading-tight">${escapeHtml(dest.city)}</p>
+          <p class="text-xs text-slate-500">${escapeHtml(dest.rest)}</p>
+        </div>
+      </div>
+    </div>`;
+
+  if (o.trackingStatus === 'Cancelado') {
+    return `<div class="p-5 space-y-4">
+      ${routeHeader}
+      <div class="pt-1 flex items-center gap-5">
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="w-8 h-8 rounded bg-slate-800 text-white grid place-items-center"><i data-lucide="check" class="w-4 h-4"></i></div>
+          <div>
+            <p class="text-sm font-semibold text-slate-900">Pedido realizado</p>
+            <p class="font-mono text-xs text-slate-500 tabular">${fmtDate(o.orderDate)}</p>
+          </div>
+        </div>
+        <div class="h-px w-8 border-t-2 border-dashed border-slate-300"></div>
+        <div class="flex-1 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5">
+          <i data-lucide="ban" class="w-4 h-4 text-slate-500 shrink-0"></i>
+          <div class="text-xs">
+            <span class="font-semibold text-slate-800">Este pedido foi cancelado.</span>
+            <span class="text-slate-500 ml-1">Ele não será liberado nem despachado. Em caso de dúvida, pergunte ao assistente ao lado.</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const st = TIMELINE[o.trackingStatus];
+  const stepsHtml = STEPS.map((step, i) => {
+    const k = st[i];
+    const next = st[i + 1];
+    const connector = i < 3
+      ? (next && next !== 'pending'
+          ? `<div class="absolute top-[13px] left-7 right-0 h-0.5 bg-primary"></div>`
+          : `<div class="absolute top-[13px] left-7 right-0 border-t-2 border-dashed border-slate-300"></div>`)
+      : '';
+
+    let node = '';
+    if (k === 'done') {
+      node = `<div class="relative z-10 w-7 h-7 rounded bg-slate-900 text-white grid place-items-center"><i data-lucide="check" class="w-4 h-4"></i></div>`;
+    } else if (k === 'current') {
+      const curTone = o.trackingStatus === 'Aguardando Liberação' ? 'bg-accent text-slate-900 ring-amber-100' : 'bg-primary text-white ring-primary-100';
+      node = `<div class="relative z-10 w-7 h-7 rounded ${curTone} grid place-items-center ring-4"><i data-lucide="${step.icon}" class="w-3.5 h-3.5"></i></div>`;
+    } else {
+      node = `<div class="relative z-10 w-7 h-7 rounded border-2 border-dashed border-slate-300 bg-white text-slate-300 grid place-items-center"></div>`;
+    }
+
+    let stepTitle = step.label;
+    if (i === 1 && o.trackingStatus === 'Aguardando Liberação' && state.releaseLabel === 'payment') {
+      stepTitle = 'Confirmação pendente';
+    }
+
+    let sub = '&nbsp;';
+    if (i === 0) sub = `<span class="font-mono text-xs text-slate-500 tabular">${fmtDate(o.orderDate)}</span>`;
+    else if (i === 3) {
+      sub = k === 'done'
+        ? `<span class="font-mono text-xs text-emerald-700 font-medium tabular">${fmtDate(o.actualDeliveryDate)}</span>`
+        : `<span class="font-mono text-xs text-slate-500 tabular">previsto ${fmtDate(o.estimatedDeliveryDate)}</span>`;
+    } else if (k === 'current') {
+      const subTone = o.trackingStatus === 'Aguardando Liberação' ? 'text-amber-800' : 'text-primary';
+      sub = `<span class="font-mono text-[10.5px] uppercase tracking-wider font-semibold ${subTone}">Etapa atual</span>`;
+    }
+
+    return `<li class="relative flex flex-col items-start ${i < 3 ? 'pr-4' : ''}">
+      ${connector}
+      ${node}
+      <p class="mt-2.5 text-sm ${k === 'current' ? 'font-semibold text-slate-900' : k === 'pending' ? 'font-medium text-slate-400' : 'font-medium text-slate-800'}">${stepTitle}</p>
+      <p class="mt-0.5 leading-none">${sub}</p>
+    </li>`;
+  }).join('');
+
+  return `<div class="p-5 space-y-4">
+    ${routeHeader}
+    <div class="pt-1">
+      <div class="flex items-center justify-between mb-3">
+        <span class="label-mono">Andamento do trajeto (4 etapas)</span>
+        <span class="font-mono text-[11px] text-slate-400">Dados históricos consolidados</span>
+      </div>
+      <ol class="grid grid-cols-4">${stepsHtml}</ol>
+    </div>
+  </div>`;
+}
+
+/* ---------- Tabela de Itens e Total ---------- */
+function itemsCard(o) {
+  const rows = o.items.map((it) => `<tr class="hover:bg-slate-50/70">
+      <td class="px-5 py-2.5 font-medium text-slate-900">${escapeHtml(it.productName)}</td>
+      <td class="px-3 py-2.5"><span class="inline-flex rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">${escapeHtml(it.category)}</span></td>
+      <td class="px-3 py-2.5 text-right font-mono tabular text-slate-700">${it.quantity}</td>
+      <td class="px-5 py-2.5 text-right font-mono font-medium tabular text-slate-900 whitespace-nowrap">${fmtMoney(it.total)}</td>
+    </tr>`).join('');
+
+  return `<section class="${CARD} overflow-hidden fade-in">
+    <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+      <div class="flex items-center gap-2">
+        <i data-lucide="boxes" class="w-4 h-4 text-slate-500"></i>
+        <h3 class="label-mono !text-slate-700 font-semibold">Itens da remessa</h3>
+      </div>
+      <span class="font-mono text-xs text-slate-500">${plural(o.items.length, 'item registrado', 'itens registrados')}</span>
+    </div>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-200 bg-white">
+          <th class="px-5 py-2 text-left label-mono">Produto</th>
+          <th class="px-3 py-2 text-left label-mono">Categoria</th>
+          <th class="px-3 py-2 text-right label-mono">Qtd.</th>
+          <th class="px-5 py-2 text-right label-mono">Valor</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">${rows}</tbody>
+      <tfoot>
+        <tr class="perf-t bg-slate-50/70">
+          <td colspan="3" class="px-5 py-3 text-right label-mono !text-slate-600">Total do pedido</td>
+          <td class="px-5 py-3 text-right font-mono text-base font-bold text-slate-900 tabular whitespace-nowrap">${fmtMoney(o.total)}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>`;
+}
+
+function viewResult(o) {
+  return `<article class="${CARD} overflow-hidden fade-in">
+      <!-- Topo de Guia de Remessa -->
+      <div class="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="label-mono">Pedido nº</span>
+          <h2 class="font-mono text-2xl font-bold tracking-tight text-slate-900 tabular">#${o.orderId}</h2>
+          <div class="flex items-center gap-2">
+            ${statusBadge(o)}
+            ${deadlineBadge(o.deadlineStatus)}
+          </div>
+        </div>
+        <div class="flex items-center gap-2 font-mono text-[11px] text-slate-500">
+          <span class="px-2 py-0.5 rounded border border-slate-200 bg-white text-slate-600">${manifestCode(o)}</span>
+        </div>
+      </div>
+
+      <!-- Grade de Resposta Principal (4 colunas) -->
+      ${summaryGrid(o)}
+
+      <!-- Alerta de Motivo Provável (quando houver) -->
+      ${causeAlert(o)}
+
+      <!-- Trajeto Integrado: Rota + Linha do Tempo -->
+      ${routeAndTimeline(o)}
+    </article>
+    ${itemsCard(o)}`;
+}
+
+function renderTracker() {
+  const t = state.tracker;
+  const el = $('#trackResult');
+  if (t.view === 'loading') el.innerHTML = viewLoading();
+  else if (t.view === 'result') el.innerHTML = viewResult(findOrder(t.orderId));
+  else if (t.view === 'notfound') el.innerHTML = viewNotFound();
+  else if (t.view === 'error') el.innerHTML = viewError();
+  else el.innerHTML = viewEmpty();
+  $('#searchBtn').disabled = t.view === 'loading';
+  renderExamples();
+}
+
+function handleOrderSwitchInChat(prevId, nextId) {
+  if (!prevId || prevId === nextId || !state.chat.messages.length) return;
+  if (state.chatOnSwitch === 'clear') {
+    state.chat.messages = [];
+  } else if (state.chatOnSwitch === 'divider') {
+    const last = state.chat.messages[state.chat.messages.length - 1];
+    if (!last || last.role !== 'divider' || last.orderId !== nextId) {
+      state.chat.messages.push({ id: ++msgSeq, role: 'divider', orderId: nextId });
+    }
+  }
+}
+
+function track(raw) {
+  const q = String(raw || '').replace(/\D/g, '');
+  $('#orderInput').value = q;
+  if (!q) { $('#searchHint').classList.remove('hidden'); $('#orderInput').focus(); return; }
+  $('#searchHint').classList.add('hidden');
+  const prevId = state.tracker.view === 'result' ? state.tracker.orderId : null;
+  state.tracker = { view: 'loading', orderId: null, query: q };
+  renderAll();
+  const tok = ++trackToken;
+  setTimeout(() => {
+    if (tok !== trackToken) return;
+    if (!state.connected) state.tracker.view = 'error';
+    else {
+      const o = findOrder(q);
+      if (o) {
+        handleOrderSwitchInChat(prevId, o.orderId);
+        state.tracker = { view: 'result', orderId: o.orderId, query: q };
+      } else {
+        state.tracker = { view: 'notfound', orderId: null, query: q };
+      }
+    }
+    renderAll();
+  }, 650);
+}
+
+function openOrderNow(id) {
+  trackToken++;
+  const prevId = state.tracker.view === 'result' ? state.tracker.orderId : null;
+  $('#orderInput').value = String(id);
+  $('#searchHint').classList.add('hidden');
+  handleOrderSwitchInChat(prevId, Number(id));
+  state.tracker = { view: 'result', orderId: Number(id), query: String(id) };
+}
+
+/* =====================================================================
+   CHAT (ASSISTENTE TRANSLOG)
+   ===================================================================== */
+const SUGGESTIONS = [
+  'Quando meu pedido chega?',
+  'Por que meu pedido atrasou?',
+  'Quais são as modalidades de envio?'
+];
+
+const MODES_REPLY = 'Trabalhamos com quatro modalidades internacionais:\n' +
+  '• **Standard Class**: opção econômica, com prazo estimado de 4 dias.\n' +
+  '• **Second Class**: intermediária, com prazo estimado de 2 dias.\n' +
+  '• **First Class**: prioritária, com prazo estimado de 1 dia.\n' +
+  '• **Same Day**: despacho no mesmo dia do pedido.';
+const ASK_NUMBER = 'Para consultar, informe o número do pedido no campo ao lado ou aqui na conversa (ex.: 375).';
+const FALLBACK = 'Posso informar a situação, o prazo de entrega e o motivo provável de atraso de um pedido, ou explicar as modalidades de envio.';
+
+function whenReply(o) {
+  const id = o.orderId, d = o.delayDays;
+  switch (o.trackingStatus) {
+    case 'Em Trânsito':
+      return d > 0
+        ? `O pedido **#${id}** está **Em Trânsito**. A entrega estava prevista para **${fmtDate(o.estimatedDeliveryDate)}** e acumula **${plural(d, 'dia', 'dias')} de atraso**.`
+        : `O pedido **#${id}** está **Em Trânsito**, dentro do prazo, com entrega prevista para **${fmtDate(o.estimatedDeliveryDate)}**.`;
+    case 'Entregue':
+      if (d > 0) return `O pedido **#${id}** foi **Entregue** em **${fmtDate(o.actualDeliveryDate)}**, ${plural(d, 'dia', 'dias')} após a data prevista (${fmtDate(o.estimatedDeliveryDate)}).`;
+      if (d < 0) return `O pedido **#${id}** foi **Entregue** em **${fmtDate(o.actualDeliveryDate)}**, ${plural(-d, 'dia', 'dias')} antes da data prevista.`;
+      return `O pedido **#${id}** foi **Entregue** em **${fmtDate(o.actualDeliveryDate)}**, dentro do prazo previsto.`;
+    case 'Aguardando Liberação':
+      return state.releaseLabel === 'payment'
+        ? `O pedido **#${id}** está com **Pagamento não processado**. Após a confirmação e liberação, a entrega está prevista para **${fmtDate(o.estimatedDeliveryDate)}**.`
+        : `O pedido **#${id}** está **Aguardando Liberação**. Depois de liberado, a entrega está prevista para **${fmtDate(o.estimatedDeliveryDate)}**.`;
+    default:
+      return `O pedido **#${id}** foi **Cancelado** e não será enviado.`;
+  }
+}
+
+function whyReply(o) {
+  const id = o.orderId;
+  if (o.probableCause) {
+    return CAUSE_DETAIL[id]
+      ? `O motivo provável do atraso do pedido **#${id}** é **${o.probableCause}**: ${CAUSE_DETAIL[id]}`
+      : `O motivo provável do atraso do pedido **#${id}** é **${o.probableCause}**.`;
+  }
+  if (o.trackingStatus === 'Cancelado') return `O pedido **#${id}** foi **Cancelado**, portanto não há atraso de transporte a analisar.`;
+  if (o.trackingStatus === 'Aguardando Liberação') {
+    return state.releaseLabel === 'payment'
+      ? `O pedido **#${id}** ainda não saiu para transporte porque consta como **Pagamento não processado**. A previsão após liberação é **${fmtDate(o.estimatedDeliveryDate)}**.`
+      : `O pedido **#${id}** não está atrasado no transporte. Ele está **Aguardando Liberação** com previsão para **${fmtDate(o.estimatedDeliveryDate)}**.`;
+  }
+  if (o.delayDays > 0) {
+    const verb = o.trackingStatus === 'Entregue' ? 'foi entregue' : 'está';
+    return `O pedido **#${id}** ${verb} com **${plural(o.delayDays, 'dia', 'dias')} de atraso**, mas não há um motivo provável específico registrado na base para esta remessa.`;
+  }
+  return `O pedido **#${id}** não apresenta atraso. ${whenReply(o)}`;
+}
+
+function buildReply(text) {
+  const t = norm(text);
+  let o = currentOrder();
+
+  const num = t.match(/\d+/);
+  let mentioned = false;
+  if (num) {
+    const found = findOrder(num[0]);
+    if (found) {
+      mentioned = true;
+      if (!o || o.orderId !== found.orderId) { openOrderNow(found.orderId); o = found; }
+    } else if (/pedido/.test(t) || /^\s*\d+\s*$/.test(t)) {
+      return `Não encontrei o pedido **#${num[0]}**. Confira o número e tente novamente.`;
+    }
+  }
+
+  if (/modalidade|tipos de envio|formas de envio|classe/.test(t)) return MODES_REPLY;
+  const asksWhy = /atras|por que|porque|motivo|demor|causa/.test(t);
+  const asksWhen = /quando|chega|prazo|previs|entreg|situac|status|onde/.test(t);
+  if (asksWhy || asksWhen || mentioned || /pedido/.test(t)) {
+    if (!o) return ASK_NUMBER;
+    return asksWhy ? whyReply(o) : whenReply(o);
+  }
+  return FALLBACK;
+}
+
+function renderChatContext() {
+  const o = currentOrder();
+  $('#chatContext').innerHTML = o
+    ? `<div class="px-5 py-2 border-b border-slate-200 bg-slate-100/70 flex items-center justify-between">
+        <div class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-slate-600">
+          <i data-lucide="tag" class="w-3.5 h-3.5 text-primary"></i>
+          <span>Falando sobre o pedido <strong class="text-slate-900 font-semibold">#${o.orderId}</strong></span>
+        </div>
+        <span class="font-mono text-[11px] text-slate-500">${escapeHtml(o.shippingMode)}</span>
+      </div>`
+    : `<div class="px-5 py-2 border-b border-slate-200 bg-slate-100/50 flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-slate-500">
+        <i data-lucide="info" class="w-3.5 h-3.5 text-slate-400"></i>
+        <span>Nenhum pedido selecionado</span>
+      </div>`;
+}
+
+function msgHtml(m) {
+  if (m.role === 'divider') {
+    return `<div class="flex items-center gap-3 py-1 fade-in">
+      <div class="flex-1 perf-t"></div>
+      <span class="font-mono text-[10.5px] uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Alternado para o pedido #${m.orderId}</span>
+      <div class="flex-1 perf-t"></div>
+    </div>`;
+  }
+  if (m.role === 'user') {
+    const failed = m.status === 'failed';
+    return `<div class="flex flex-col items-end fade-in">
+      <div class="max-w-[85%] rounded-md px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words ${failed ? 'bg-primary/60 text-white' : 'bg-primary text-white shadow-sm'}">${escapeHtml(m.text)}</div>
+      ${failed
+        ? `<span class="mt-1 flex items-center gap-1 font-mono text-[11px] text-red-600"><i data-lucide="circle-alert" class="w-3 h-3"></i>Falha no envio<span class="text-red-300">·</span><button type="button" data-retry="${m.id}" class="font-sans font-semibold hover:underline underline-offset-2">Tentar novamente</button></span>`
+        : `<span class="mt-1 font-mono text-[10.5px] text-slate-400 tabular">${m.time}</span>`}
+    </div>`;
+  }
+  // Estilo Parecer Oficial TransLog (inspirado na Direção A, mais limpo e escaneável)
+  return `<div class="max-w-[92%] fade-in">
+    <div class="flex items-center gap-1.5 mb-1">
+      <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+      <span class="label-mono !text-primary font-semibold">Assistente TransLog</span>
+    </div>
+    <div class="border-l-2 border-primary bg-slate-50/90 rounded-r-md px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 break-words border-y border-r border-y-slate-200/80 border-r-slate-200/80">
+      ${richText(m.text)}
+    </div>
+    <span class="mt-1 block font-mono text-[10.5px] text-slate-400 tabular">${m.time}</span>
+  </div>`;
+}
+
+function renderMessages() {
+  const el = $('#chatMessages');
+  const { messages, typing } = state.chat;
+  if (!messages.length && !typing) {
+    el.innerHTML = `<div class="h-full flex flex-col justify-center fade-in">
+      <div class="text-center mb-5">
+        <div class="mx-auto w-11 h-11 rounded-md bg-primary-50 border border-primary-100 text-primary grid place-items-center"><i data-lucide="message-square-question" class="w-5 h-5"></i></div>
+        <p class="mt-3 text-sm font-semibold text-slate-900">Como posso ajudar com sua remessa?</p>
+        <p class="mt-1 text-xs text-slate-500 max-w-[260px] mx-auto">Consulte prazos, entenda o motivo provável de um atraso ou tire dúvidas sobre modalidades.</p>
+      </div>
+      <div class="space-y-2">
+        <p class="label-mono px-1">Perguntas frequentes</p>
+        ${SUGGESTIONS.map((s) => `<button type="button" data-suggest="${s}" class="group w-full flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-left text-sm text-slate-700 hover:border-primary hover:bg-primary-50/50 hover:text-primary transition">
+          <span>${s}</span>
+          <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-400 group-hover:text-primary shrink-0"></i>
+        </button>`).join('')}
+      </div>
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="space-y-4">${messages.map(msgHtml).join('')}${typing
+      ? `<div class="max-w-[85%] fade-in">
+          <div class="flex items-center gap-1.5 mb-1"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span><span class="label-mono !text-primary font-semibold">Assistente TransLog</span></div>
+          <div class="border-l-2 border-primary bg-slate-50 px-3.5 py-2.5 rounded-r-md border-y border-r border-slate-200 inline-flex items-center gap-2.5">
+            <span class="typing"><span></span><span></span><span></span></span>
+            <span class="font-mono text-xs text-slate-500">consultando pedido…</span>
+          </div>
+        </div>`
+      : ''}</div>`;
+    el.scrollTop = el.scrollHeight;
+  }
+  updateSend();
+}
+
+function updateSend() {
+  $('#chatSend').disabled = state.chat.typing || !$('#chatInput').value.trim();
+}
+
+function deliver(msg) {
+  state.chat.typing = true;
+  renderAll();
+  const tok = ++chatToken;
+  setTimeout(() => {
+    if (tok !== chatToken) return;
+    state.chat.typing = false;
+    if (!state.connected) {
+      msg.status = 'failed';
+    } else {
+      const text = buildReply(msg.text);
+      state.chat.messages.push({ id: ++msgSeq, role: 'assistant', text, time: nowTime() });
+    }
+    renderAll();
+  }, 850);
+}
+
+function sendMessage(text) {
+  text = String(text || '').trim();
+  if (!text || state.chat.typing) return;
+  const msg = { id: ++msgSeq, role: 'user', text, time: nowTime(), status: 'sent' };
+  state.chat.messages.push(msg);
+  deliver(msg);
+}
+
+function retryMessage(id) {
+  if (state.chat.typing) return;
+  const i = state.chat.messages.findIndex((m) => m.id === id);
+  if (i < 0) return;
+  const [msg] = state.chat.messages.splice(i, 1);
+  msg.status = 'sent'; msg.time = nowTime();
+  state.chat.messages.push(msg);
+  deliver(msg);
+}
+
+/* =====================================================================
+   BARRA DE CONTROLE DO PROTÓTIPO (inclui os 2 pontos em aberto)
+   ===================================================================== */
+const PROTO = [
+  { group: 'Rastreio', items: [['t:empty', 'Vazio'], ['t:loading', 'Carregando'], ['t:15', '#15'], ['t:375', '#375'], ['t:562', '#562'], ['t:1002', '#1002'], ['t:225', '#225 (1st)'], ['t:10453', '#10453 (OK)'], ['t:20322', '#20322 (Adiant.)'], ['t:notfound', 'Não encontrado'], ['t:error', 'Erro']] },
+  { group: 'Chat', items: [['c:empty', 'Vazio'], ['c:conversation', 'Conversa'], ['c:typing', 'Digitando'], ['c:error', 'Erro']] },
+  { group: 'Ao trocar pedido', items: [['s:keep', 'Manter'], ['s:divider', 'Divisor'], ['s:clear', 'Zerar']] },
+  { group: 'Liberação (#562)', items: [['r:waiting', 'Aguard. liberação'], ['r:payment', 'Pagto. não processado']] },
+  { group: 'Rede', items: [['n:on', 'On'], ['n:off', 'Off']] }
+];
+
+function activeKeys() {
+  const t = state.tracker;
+  const tk = t.view === 'result' ? `t:${t.orderId}` : `t:${t.view}`;
+  const c = state.chat;
+  const ck = c.typing ? 'c:typing' : c.messages.some((m) => m.status === 'failed') ? 'c:error' : c.messages.length ? 'c:conversation' : 'c:empty';
+  return [tk, ck, `s:${state.chatOnSwitch}`, `r:${state.releaseLabel}`, state.connected ? 'n:on' : 'n:off'];
+}
+
+function renderProto() {
+  const on = activeKeys();
+  $('#protoGroups').innerHTML = PROTO.map((g) => `
+    <div class="h-4 w-px bg-slate-700 shrink-0"></div>
+    <div class="flex items-center gap-0.5 shrink-0">
+      <span class="mr-1 text-slate-500">${g.group}:</span>
+      ${g.items.map(([k, l]) => `<button type="button" data-proto="${k}" class="px-1.5 h-6 rounded font-medium transition ${on.includes(k)
+        ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}">${l}</button>`).join('')}
+    </div>`).join('');
+}
+
+function ensureOrderForChat() {
+  if (!currentOrder()) openOrderNow(375);
+}
+
+function presetConversation(withSecondAnswer) {
+  const o = currentOrder() || findOrder(375);
+  const q1 = 'Quando meu pedido chega?', q2 = 'Por que meu pedido atrasou?';
+  const msgs = [
+    { id: ++msgSeq, role: 'user', text: q1, time: '16:50', status: 'sent' },
+    { id: ++msgSeq, role: 'assistant', text: whenReply(o), time: '16:50' }
+  ];
+  if (withSecondAnswer) {
+    msgs.push({ id: ++msgSeq, role: 'user', text: q2, time: '16:52', status: 'sent' });
+    msgs.push({ id: ++msgSeq, role: 'assistant', text: whyReply(o), time: '16:52' });
+  }
+  return msgs;
+}
+
+function applyPreset(key) {
+  const [kind, val] = key.split(':');
+  if (kind === 't') {
+    trackToken++;
+    $('#searchHint').classList.add('hidden');
+    if (/^\d+$/.test(val)) { openOrderNow(Number(val)); state.connected = true; }
+    else if (val === 'empty') { state.tracker = { view: 'empty', orderId: null, query: '' }; $('#orderInput').value = ''; }
+    else if (val === 'loading') { state.tracker = { view: 'loading', orderId: null, query: $('#orderInput').value || '375' }; $('#orderInput').value = state.tracker.query; }
+    else if (val === 'notfound') { state.tracker = { view: 'notfound', orderId: null, query: '9999' }; $('#orderInput').value = '9999'; }
+    else if (val === 'error') { state.tracker = { view: 'error', orderId: null, query: $('#orderInput').value || '375' }; state.connected = false; }
+  } else if (kind === 'c') {
+    chatToken++;
+    state.chat.typing = false;
+    if (val === 'empty') state.chat.messages = [];
+    else {
+      ensureOrderForChat();
+      if (val === 'conversation') state.chat.messages = presetConversation(true);
+      else if (val === 'typing') {
+        state.chat.messages = presetConversation(false);
+        state.chat.messages.push({ id: ++msgSeq, role: 'user', text: 'Por que meu pedido atrasou?', time: '16:52', status: 'sent' });
+        state.chat.typing = true;
+      } else if (val === 'error') {
+        state.chat.messages = presetConversation(false);
+        state.chat.messages.push({ id: ++msgSeq, role: 'user', text: 'Por que meu pedido atrasou?', time: '16:52', status: 'failed' });
+      }
+    }
+  } else if (kind === 's') {
+    state.chatOnSwitch = val;
+  } else if (kind === 'r') {
+    state.releaseLabel = val;
+    if (state.tracker.orderId !== 562 && state.tracker.orderId !== 16) openOrderNow(562);
+  } else if (kind === 'n') {
+    state.connected = val === 'on';
+  }
+  renderAll();
+}
+
+/* =====================================================================
+   RENDER GERAL + EVENTOS
+   ===================================================================== */
+function renderAll() {
+  renderConn();
+  renderTracker();
+  renderChatContext();
+  renderMessages();
+  renderProto();
+  icons();
+}
+
+$('#searchForm').addEventListener('submit', (e) => { e.preventDefault(); track($('#orderInput').value); });
+$('#orderInput').addEventListener('input', (e) => {
+  const clean = e.target.value.replace(/\D/g, '');
+  if (clean !== e.target.value) e.target.value = clean;
+  if (clean) $('#searchHint').classList.add('hidden');
+});
+
+const chatInput = $('#chatInput');
+function autosize() { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 128) + 'px'; }
+chatInput.addEventListener('input', () => { autosize(); updateSend(); });
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#chatForm').requestSubmit(); }
+});
+$('#chatForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (state.chat.typing || !chatInput.value.trim()) return;
+  const text = chatInput.value;
+  chatInput.value = ''; autosize();
+  sendMessage(text);
+});
+$('#newChat').addEventListener('click', () => {
+  chatToken++;
+  state.chat = { messages: [], typing: false };
+  renderAll();
+  chatInput.focus();
+});
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-example],[data-ask],[data-suggest],[data-retry],[data-proto],#retryTrack');
+  if (!t) return;
+  if (t.dataset.example) track(t.dataset.example);
+  else if (t.dataset.ask) sendMessage(t.dataset.ask);
+  else if (t.dataset.suggest) sendMessage(t.dataset.suggest);
+  else if (t.dataset.retry) retryMessage(Number(t.dataset.retry));
+  else if (t.dataset.proto) applyPreset(t.dataset.proto);
+  else if (t.id === 'retryTrack') { state.connected = true; track(state.tracker.query || $('#orderInput').value || '375'); }
+});
+
+$('#protoHide').addEventListener('click', () => { $('#protoBar').classList.add('hidden'); $('#protoShow').classList.remove('hidden'); $('#protoShow').classList.add('flex'); });
+$('#protoShow').addEventListener('click', () => { $('#protoBar').classList.remove('hidden'); $('#protoShow').classList.add('hidden'); $('#protoShow').classList.remove('flex'); });
+
+/* Presets por URL: ?t=375&c=conversation&s=divider&r=payment&n=on&bar=off */
+function applyUrlPresets() {
+  const p = new URLSearchParams(location.search);
+  ['t', 'c', 's', 'r', 'n'].forEach((k) => { if (p.has(k)) applyPreset(`${k}:${p.get(k)}`); });
+  if (p.get('bar') === 'off') { $('#protoBar').classList.add('hidden'); $('#protoShow').remove(); }
+}
+
+// Estado inicial padrão: Pedido #375 aberto + conversa do roteiro da banca
+$('#orderInput').value = '375';
+state.chat.messages = presetConversation(true);
+renderAll();
+applyUrlPresets();
+</script>
+</body>
+</html>
