@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TransLog · Direção C: Sinalização</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Barlow', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          display: ['"Barlow Condensed"', 'Barlow', 'sans-serif']
+        },
+        colors: {
+          primary: { DEFAULT: '#0F4C81', 50: '#EEF4FA', 100: '#D7E5F2', 200: '#AFCAE4', 700: '#0C3E6A', 800: '#0A3256', 900: '#082641' },
+          accent: { DEFAULT: '#F59E0B', 50: '#FFF8EB', 100: '#FEEBC8', 700: '#B45309' },
+          steel: '#EDF0F3'
+        },
+        borderRadius: { DEFAULT: '4px', md: '6px', lg: '8px' }
+      }
+    }
+  };
+</script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+  html, body { height: 100%; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .sign { font-family: 'Barlow Condensed', sans-serif; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+</style>
+</head>
+<body class="flex flex-col min-w-[1280px] bg-steel text-slate-900 antialiased overflow-hidden">
+
+  <!-- CABEÇALHO -->
+  <header class="shrink-0 bg-primary text-white">
+    <div class="mx-auto max-w-[1440px] px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Símbolo: placa em destaque com seta/chevron de direção -->
+        <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
+          <rect width="36" height="36" rx="5" fill="#F59E0B"/>
+          <path d="M9 11h9l7 7-7 7H9l7-7z" fill="#082641"/>
+        </svg>
+        <div class="leading-none">
+          <div class="font-display text-[26px] font-bold tracking-tight">TransLog</div>
+          <div class="text-[12px] text-primary-200 mt-0.5">Rastreamento de pedidos</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sign text-[13px] text-primary-100"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Conectado</div>
+    </div>
+  </header>
+
+  <main class="flex-1 min-h-0">
+    <div class="mx-auto max-w-[1440px] h-full px-6 py-6 grid grid-cols-[minmax(0,1fr)_400px] grid-rows-[minmax(0,1fr)] gap-6">
+
+      <section class="min-h-0 overflow-y-auto space-y-4 pr-1">
+        <!-- Busca -->
+        <div class="bg-white rounded-md p-5">
+          <form class="flex items-end gap-3">
+            <div class="flex-1">
+              <label class="sign block text-[13px] text-slate-500 mb-1">Número do pedido</label>
+              <input value="375" class="w-full h-12 rounded border-2 border-slate-300 px-4 font-display text-xl font-semibold tabular focus:outline-none">
+            </div>
+            <button type="button" class="h-12 px-6 rounded bg-primary text-white sign text-base inline-flex items-center gap-2">Rastrear<i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+          </form>
+          <div class="mt-4 flex items-center gap-2">
+            <span class="sign text-[13px] text-slate-500 mr-1">Exemplos</span>
+            <button class="h-7 px-3 rounded bg-steel font-display text-[15px] font-semibold text-slate-700">15</button>
+            <button class="h-7 px-3 rounded bg-primary text-white font-display text-[15px] font-semibold">375</button>
+            <button class="h-7 px-3 rounded bg-steel font-display text-[15px] font-semibold text-slate-700">562</button>
+            <button class="h-7 px-3 rounded bg-steel font-display text-[15px] font-semibold text-slate-700">1002</button>
+          </div>
+        </div>
+
+        <!-- Resultado -->
+        <article class="bg-white rounded-md overflow-hidden">
+          <!-- Placa do pedido -->
+          <div class="bg-primary-900 text-white px-6 py-4 flex items-center justify-between">
+            <div class="flex items-baseline gap-4">
+              <span class="sign text-primary-200 text-sm">Pedido</span>
+              <span class="font-display text-[44px] leading-none font-bold tabular">375</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 rounded px-2.5 py-1 font-semibold text-[13px] bg-primary-50 text-primary"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>Em Trânsito</span>
+              <span class="inline-flex items-center gap-1.5 rounded px-2.5 py-1 font-semibold text-[13px] bg-red-600 text-white"><i data-lucide="clock" class="w-3.5 h-3.5"></i>Atrasado</span>
+            </div>
+          </div>
+          <!-- Painel de partidas -->
+          <div class="grid grid-cols-[1.3fr_1fr_1fr_1fr] divide-x divide-slate-200 border-b border-slate-200">
+            <div class="px-6 py-4">
+              <p class="sign text-[12px] text-slate-500">Previsão de entrega</p>
+              <p class="font-display text-[32px] leading-tight font-bold tabular">08/01/2015</p>
+            </div>
+            <div class="px-6 py-4 bg-red-50">
+              <p class="sign text-[12px] text-red-700">Atraso</p>
+              <p class="font-display text-[32px] leading-tight font-bold text-red-700 tabular">+4 dias</p>
+              <p class="text-xs text-red-700/80">Atraso Crítico (3+ dias)</p>
+            </div>
+            <div class="px-6 py-4">
+              <p class="sign text-[12px] text-slate-500">Modalidade</p>
+              <p class="font-display text-[22px] leading-tight font-semibold mt-1.5">Second Class</p>
+            </div>
+            <div class="px-6 py-4">
+              <p class="sign text-[12px] text-slate-500">Realizado em</p>
+              <p class="font-display text-[22px] leading-tight font-semibold mt-1.5 tabular">06/01/2015</p>
+            </div>
+          </div>
+
+          <!-- Motivo provável -->
+          <div class="m-6 flex items-stretch rounded overflow-hidden border-2 border-accent">
+            <div class="w-14 shrink-0 bg-accent grid place-items-center text-primary-900"><i data-lucide="triangle-alert" class="w-6 h-6"></i></div>
+            <div class="flex-1 px-4 py-3">
+              <p class="sign text-[13px] text-accent-700">Motivo provável do atraso</p>
+              <p class="font-display text-2xl font-bold leading-tight">Promessa irreal</p>
+              <p class="text-sm text-slate-600">Quer entender melhor? O assistente explica por que esse é o motivo provável.</p>
+            </div>
+            <div class="px-4 grid place-items-center">
+              <button class="h-10 px-4 rounded bg-primary-900 text-white sign text-[14px] inline-flex items-center gap-2"><i data-lucide="message-circle" class="w-4 h-4"></i>Perguntar ao assistente</button>
+            </div>
+          </div>
+
+          <!-- Andamento: barra segmentada -->
+          <div class="px-6 pb-6">
+            <p class="sign text-[13px] text-slate-500 mb-3">Andamento</p>
+            <ol class="grid grid-cols-4 gap-1.5">
+              <li><div class="h-2 rounded-sm bg-primary"></div><p class="mt-2.5 font-semibold text-[15px]">Pedido realizado</p><p class="text-xs text-slate-500 tabular">06/01/2015</p></li>
+              <li><div class="h-2 rounded-sm bg-primary"></div><p class="mt-2.5 font-semibold text-[15px]">Pedido liberado</p></li>
+              <li><div class="h-2 rounded-sm bg-primary relative overflow-visible"><span class="absolute -right-1 -top-2 w-6 h-6 rounded-full bg-primary text-white grid place-items-center ring-4 ring-white"><i data-lucide="truck" class="w-3.5 h-3.5"></i></span></div><p class="mt-2.5 font-semibold text-[15px] text-primary">Em trânsito</p><p class="sign text-[12px] text-primary">Etapa atual</p></li>
+              <li><div class="h-2 rounded-sm bg-slate-200"></div><p class="mt-2.5 font-semibold text-[15px] text-slate-400">Entregue</p><p class="text-xs text-slate-500">previsto para <span class="tabular">08/01/2015</span></p></li>
+            </ol>
+          </div>
+        </article>
+
+        <!-- Rota -->
+        <section class="bg-white rounded-md p-5 flex items-center gap-4">
+          <div class="flex-1"><p class="sign text-[12px] text-slate-500">Origem</p><p class="font-display text-[22px] font-bold leading-tight">San Benito</p><p class="text-sm text-slate-500">Texas, Estados Unidos</p></div>
+          <div class="flex items-center text-primary"><i data-lucide="chevrons-right" class="w-7 h-7"></i></div>
+          <div class="flex-1"><p class="sign text-[12px] text-slate-500">Destino</p><p class="font-display text-[22px] font-bold leading-tight">Saltillo</p><p class="text-sm text-slate-500">Coahuila, México</p></div>
+          <div class="pl-6 border-l border-slate-200"><p class="sign text-[12px] text-slate-500">Mercado</p><p class="font-display text-[22px] font-bold leading-tight">LATAM</p><p class="text-sm text-slate-500">América Central</p></div>
+        </section>
+      </section>
+
+      <!-- CHAT -->
+      <aside class="min-h-0 flex flex-col bg-white rounded-md overflow-hidden">
+        <div class="shrink-0 px-5 py-3.5 border-b-4 border-accent flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded bg-primary text-white grid place-items-center"><i data-lucide="message-square-text" class="w-5 h-5"></i></div>
+            <div class="leading-tight"><h2 class="sign text-[17px] text-slate-900">Assistente TransLog</h2><p class="text-xs text-slate-500">Pergunte sobre sua entrega</p></div>
+          </div>
+          <button class="h-8 px-2.5 rounded bg-steel sign text-[13px] text-slate-700 inline-flex items-center gap-1.5"><i data-lucide="square-pen" class="w-3.5 h-3.5"></i>Nova conversa</button>
+        </div>
+        <div class="shrink-0 px-5 py-2 bg-steel sign text-[13px] text-slate-600 flex items-center gap-1.5"><i data-lucide="package" class="w-3.5 h-3.5 text-primary"></i>Falando sobre o pedido <span class="text-slate-900 font-bold">375</span></div>
+        <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4 text-[15px]">
+          <div class="flex flex-col items-end"><div class="max-w-[85%] rounded-md bg-primary text-white px-3.5 py-2">Quando meu pedido chega?</div><span class="mt-1 text-[11px] text-slate-400">16:50</span></div>
+          <div class="max-w-[88%]"><div class="rounded-md bg-steel px-3.5 py-2.5 leading-snug text-slate-800">O pedido 375 está <strong>Em Trânsito</strong>. A entrega estava prevista para 08/01/2015 e está 4 dias atrasada.</div><span class="mt-1 block text-[11px] text-slate-400">16:50</span></div>
+          <div class="flex flex-col items-end"><div class="max-w-[85%] rounded-md bg-primary text-white px-3.5 py-2">Por que meu pedido atrasou?</div><span class="mt-1 text-[11px] text-slate-400">16:52</span></div>
+          <div class="max-w-[88%]"><div class="rounded-md bg-steel px-3.5 py-2.5 leading-snug text-slate-800">O motivo provável do atraso do pedido 375 é <strong>Promessa irreal</strong>: o prazo de 2 dias da modalidade Second Class provavelmente foi curto para a rota Texas → Saltillo (México).</div><span class="mt-1 block text-[11px] text-slate-400">16:52</span></div>
+        </div>
+        <div class="shrink-0 border-t border-slate-200 p-3">
+          <div class="flex items-end gap-2 rounded border-2 border-slate-300 p-1.5">
+            <textarea rows="1" placeholder="Escreva sua pergunta…" class="flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] focus:outline-none"></textarea>
+            <button class="w-8 h-8 rounded bg-steel text-slate-400 grid place-items-center"><i data-lucide="send-horizontal" class="w-4 h-4"></i></button>
+          </div>
+          <p class="mt-1.5 px-1 text-[11px] text-slate-400">Enter para enviar · Shift+Enter para quebrar linha</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+<script>lucide.createIcons();</script>
+</body>
+</html>

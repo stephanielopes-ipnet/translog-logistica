@@ -24,3 +24,9 @@ dist/
 
 # SO
 .DS_Store
+
+# Contexto local de desenvolvimento do portal (não versionar)
+portal/_contexto/
+
+# Cópia local da Silver para desenvolvimento do portal (grande e com dados de cliente)
+portal/dados/
