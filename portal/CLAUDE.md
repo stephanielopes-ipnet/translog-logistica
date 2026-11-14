@@ -30,6 +30,9 @@ pnpm lint                        # Biome: lint, formatação e ordem dos imports
 pnpm format                      # Biome corrigindo o que for possível
 pnpm typecheck                   # tsc em todos os pacotes
 pnpm --filter @translog/api test # um pacote só
+docker compose up --build        # forma oficial de rodar (fixtures)
+docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build  # com a Silver
+docker compose down
 ```
 
 Pacotes: `@translog/api` (`api/`) e `@translog/contracts` (`contracts/`). Documentação da API em `http://localhost:3333/docs`.

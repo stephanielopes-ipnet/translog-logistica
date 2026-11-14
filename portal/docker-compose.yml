@@ -1,0 +1,26 @@
+# Forma oficial de rodar a API: docker compose up --build
+# Este arquivo sobe com os pedidos de exemplo (fixtures), sem nenhum arquivo externo.
+# Com a Silver: docker-compose.silver.yml (ver README). Variáveis em .env.example.
+name: translog-portal
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      API_PORT: ${API_PORT:-3333}
+      # A fonte no Docker é escolhida pelos arquivos de compose, não pelo .env (que vale para o pnpm dev).
+      DATA_SOURCE: fixtures
+      SAMPLE_ORDER_IDS: ${SAMPLE_ORDER_IDS:-}
+    ports:
+      - "${API_PORT:-3333}:${API_PORT:-3333}"
+    healthcheck:
+      # 127.0.0.1 e não localhost: no Alpine, localhost pode resolver para ::1 (IPv6).
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${API_PORT:-3333}/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      # Com a Silver, a API só abre a porta depois de carregar os pedidos (~10 s).
+      start_period: 60s
+      start_interval: 1s
