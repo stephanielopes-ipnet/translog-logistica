@@ -39,6 +39,8 @@ Pacotes: `@translog/api` (`api/`) e `@translog/contracts` (`contracts/`). Docume
 
 ## Arquitetura
 
+Documentação técnica completa em `docs/backend.md` (mantenha atualizada ao mudar estrutura, contrato, configuração ou Docker). O `README.md` é a visão geral para o time, em linguagem não técnica.
+
 - O Node 24 executa o TypeScript direto (sem build): imports relativos com `.ts`, sem `enum`/`namespace` (`erasableSyntaxOnly`).
 - `contracts/` tem os esquemas Zod: validam entrada e saída da API, geram o OpenAPI e os tipos (`z.infer`).
 - `api/src/`: `main.ts` (bootstrap), `server.ts` (Fastify, swagger, rotas), `config.ts` (variáveis validadas no boot), `container.ts` (**único** lugar que escolhe adapters), `http/errors.ts` (**único** lugar que transforma erros em HTTP).
