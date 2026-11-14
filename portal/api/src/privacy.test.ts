@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { type Order, orderSchema } from "@translog/contracts";
 import type { FastifyInstance } from "fastify";
 import { describe, expect, it, onTestFinished } from "vitest";
@@ -30,6 +31,9 @@ function forbiddenKeys(value: unknown): string[] {
 }
 
 const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
+
+/** Amostra da Silver com colunas proibidas preenchidas com valores fictícios. */
+const SAMPLE_CSV = fileURLToPath(new URL("./orders/fixtures/silver-amostra.csv", import.meta.url));
 
 async function buildTestServer(env: NodeJS.ProcessEnv, overrides?: ContainerOverrides) {
   const app = await buildServer(loadConfig(env), { logger: false, overrides });
@@ -63,18 +67,34 @@ describe("varredura de chaves proibidas", () => {
     ).toEqual(["lucro_item", "customerId", "lat"]);
   });
 
-  it.each([{ source: "fixtures", env: {}, orderIds: fixtures.map((order) => order.orderId) }])(
-    "nenhuma resposta tem chave proibida (fonte $source)",
-    async ({ env, orderIds }) => {
-      const app = await buildTestServer(env);
-
-      const bodies = await responseBodies(app, allUrls(orderIds));
-
-      for (const { url, body } of bodies) {
-        expect(forbiddenKeys(body), url).toEqual([]);
-      }
+  it.each([
+    { source: "fixtures", env: {}, orderIds: fixtures.map((order) => order.orderId) },
+    {
+      source: "file",
+      env: { DATA_SOURCE: "file", ORDERS_FILE: SAMPLE_CSV },
+      orderIds: [15, 375, 552, 562, 1002],
     },
-  );
+  ])("nenhuma resposta tem chave proibida (fonte $source)", async ({ env, orderIds }) => {
+    const app = await buildTestServer(env);
+
+    const bodies = await responseBodies(app, allUrls(orderIds));
+
+    for (const { url, body } of bodies) {
+      expect(forbiddenKeys(body), url).toEqual([]);
+    }
+  });
+
+  it("nenhuma resposta traz valores das colunas proibidas ou sem uso da Silver", async () => {
+    // Na amostra, essas colunas têm valores FICTICIO-* e SEM-USO.
+    const app = await buildTestServer({ DATA_SOURCE: "file", ORDERS_FILE: SAMPLE_CSV });
+
+    const bodies = await responseBodies(app, allUrls([15, 375, 552, 562, 1002]));
+
+    expect(bodies.map(({ body }) => body).filter((body) => body.orderId)).toHaveLength(5);
+    for (const { url, body } of bodies) {
+      expect(JSON.stringify(body), url).not.toMatch(/FICTICIO|SEM-USO/);
+    }
+  });
 
   it("campos fora do contrato são descartados na resposta, mesmo se a fonte os trouxer", async () => {
     const leak = { id_cliente: 123, segmento_cliente: "Consumer", lucro_total_pedido: 99.9 };

@@ -52,6 +52,25 @@ describe("GET /api/health", () => {
       orders: 11,
     });
   });
+
+  it("com DATA_SOURCE=file, informa a fonte e os pedidos lidos do CSV", async () => {
+    const sample = new URL("./orders/fixtures/silver-amostra.csv", import.meta.url).pathname;
+    const app = await buildTestServer({ DATA_SOURCE: "file", ORDERS_FILE: sample });
+
+    const response = await app.inject({ method: "GET", url: "/api/health" });
+
+    expect(response.json()).toStrictEqual({ status: "ok", dataSource: "file", orders: 5 });
+  });
+
+  it("com DATA_SOURCE=file e arquivo ausente, o servidor não sobe", async () => {
+    await expect(
+      buildServer(loadConfig({ DATA_SOURCE: "file", ORDERS_FILE: "/nao/existe.csv" }), {
+        logger: false,
+      }),
+    ).rejects.toThrow(
+      "Não foi possível ler ORDERS_FILE (/nao/existe.csv): arquivo não encontrado.",
+    );
+  });
 });
 
 describe("tratamento de erro", () => {

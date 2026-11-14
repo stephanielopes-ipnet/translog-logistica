@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { orderSchema } from "@translog/contracts";
 import { z } from "zod";
-import type { OrderRepository } from "./order-repository.ts";
+import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
 
 /** 11 pedidos reais da Silver, só com os campos do contrato (sem dados de cliente ou lucro). */
 export const FIXTURES_FILE = new URL("./fixtures/orders.json", import.meta.url);
@@ -19,14 +19,5 @@ export async function createFixturesRepository(
       `Pedidos de exemplo inválidos em ${file.pathname}:\n${z.prettifyError(result.error)}`,
     );
   }
-  const byId = new Map(result.data.map((order) => [order.orderId, order]));
-
-  return {
-    async findById(orderId) {
-      return byId.get(orderId) ?? null;
-    },
-    async count() {
-      return byId.size;
-    },
-  };
+  return createInMemoryRepository(new Map(result.data.map((order) => [order.orderId, order])));
 }

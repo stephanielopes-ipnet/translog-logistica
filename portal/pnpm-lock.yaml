@@ -196,6 +196,9 @@ importers:
       '@translog/contracts':
         specifier: workspace:*
         version: link:../contracts
+      csv-parse:
+        specifier: 7.0.3
+        version: 7.0.3
       fastify:
         specifier: 5.12.8
         version: 5.12.8
@@ -678,6 +681,9 @@ packages:
   cookie@2.0.2:
     resolution: {integrity: sha512-SL0cVuEdETEp7pN0FuZb01toc3vnODEfVUCooxG1SJN0yIirh7JMb9X9bvfCFf0vzzbT68RdbKDHYTiWy7a7iw==}
     engines: {node: '>=22'}
+
+  csv-parse@7.0.3:
+    resolution: {integrity: sha512-YFd3QM/yo17vH91L1IOZuvl09zM0zEEtdfTcOCKWcMdM++MNaQSyp09slXyFCLaPXvHstQFx/xC8myiFHSMUvw==}
 
   dateformat@4.6.3:
     resolution: {integrity: sha512-2P0p0pFGzHS5EMnhdxQi7aJN+iMheud0UhG4dlE1DLAlvL8JHjJJTX/CSm4JXwV0Ka5nGk3zC5mcb5bUQUxxMA==}
@@ -1505,6 +1511,8 @@ snapshots:
   content-disposition@3.0.0: {}
 
   cookie@2.0.2: {}
+
+  csv-parse@7.0.3: {}
 
   dateformat@4.6.3: {}
 

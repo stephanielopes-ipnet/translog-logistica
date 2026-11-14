@@ -1,4 +1,5 @@
 import type { Config } from "./config.ts";
+import { type LoadLogger, loadFileRepository } from "./orders/file-repository.ts";
 import { createFixturesRepository } from "./orders/fixtures-repository.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
 import { createOrderService, type OrderService } from "./orders/order-service.ts";
@@ -16,26 +17,33 @@ export interface ContainerOverrides {
   orderRepository?: OrderRepository;
 }
 
+export interface ContainerOptions {
+  /** Log da carga dos pedidos (o `app.log` do Fastify). */
+  log: LoadLogger;
+  overrides?: ContainerOverrides;
+}
+
 /** Monta as dependências. Fontes de dados lentas são carregadas aqui, antes de a API abrir a porta. */
 export async function createContainer(
   config: Config,
-  overrides: ContainerOverrides = {},
+  { log, overrides = {} }: ContainerOptions,
 ): Promise<Container> {
-  const orders = overrides.orderRepository ?? (await createOrderRepository(config));
+  const orders = overrides.orderRepository ?? (await createOrderRepository(config, log));
   return {
     config,
     orderService: createOrderService({ orders, sampleOrderIds: config.sampleOrderIds }),
   };
 }
 
-async function createOrderRepository(config: Config): Promise<OrderRepository> {
+async function createOrderRepository(config: Config, log: LoadLogger): Promise<OrderRepository> {
   switch (config.dataSource) {
     case "fixtures":
       return createFixturesRepository();
     case "file":
-      throw new Error(
-        "DATA_SOURCE=file ainda não está disponível: a leitura da Silver chega na próxima " +
-          "etapa. Use DATA_SOURCE=fixtures (padrão).",
-      );
+      // O config.ts já recusa DATA_SOURCE=file sem ORDERS_FILE; isto só satisfaz o tipo.
+      if (config.ordersFile === undefined) {
+        throw new Error("ORDERS_FILE é obrigatória com DATA_SOURCE=file.");
+      }
+      return loadFileRepository(config.ordersFile, log);
   }
 }

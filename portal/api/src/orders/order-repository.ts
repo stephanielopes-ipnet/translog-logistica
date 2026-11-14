@@ -10,3 +10,15 @@ export interface OrderRepository {
   /** Quantos pedidos a fonte tem. */
   count(): Promise<number>;
 }
+
+/** Repositório sobre pedidos já carregados em memória (base dos adapters `fixtures` e `file`). */
+export function createInMemoryRepository(byId: ReadonlyMap<number, Order>): OrderRepository {
+  return {
+    async findById(orderId) {
+      return byId.get(orderId) ?? null;
+    },
+    async count() {
+      return byId.size;
+    },
+  };
+}
