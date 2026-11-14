@@ -1,6 +1,9 @@
 import type { ErrorResponse } from "@translog/contracts";
 import type { FastifyInstance, FastifyReply, FastifySchemaValidationError } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
+import { OrderNotFoundError } from "../orders/order-service.ts";
+
+const ORDER_NOT_FOUND_MESSAGE = "Pedido não encontrado. Confira o número e tente novamente.";
 
 const clientErrorMessages: Record<number, string> = {
   400: "Requisição inválida.",
@@ -12,6 +15,7 @@ const clientErrorMessages: Record<number, string> = {
 /**
  * Único lugar que transforma erros em resposta HTTP. Todo erro sai no formato
  * `{ error: { code, message } }`:
+ * - erros de domínio: `OrderNotFoundError` → `404 ORDER_NOT_FOUND`;
  * - validação Zod: `400 VALIDATION_ERROR`, citando os campos;
  * - outros 4xx do Fastify: mesmo status, `VALIDATION_ERROR` (400) ou `BAD_REQUEST`;
  * - qualquer outro erro: `500 INTERNAL_ERROR` genérico, com o detalhe só no log;
@@ -19,6 +23,10 @@ const clientErrorMessages: Record<number, string> = {
  */
 export function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof OrderNotFoundError) {
+      return sendError(reply, 404, "ORDER_NOT_FOUND", ORDER_NOT_FOUND_MESSAGE);
+    }
+
     if (hasZodFastifySchemaValidationErrors(error)) {
       return sendError(reply, 400, "VALIDATION_ERROR", validationMessage(error.validation));
     }

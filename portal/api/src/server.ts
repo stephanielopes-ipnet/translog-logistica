@@ -11,8 +11,9 @@ import {
 } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { Config } from "./config.ts";
-import { type Container, createContainer } from "./container.ts";
+import { type Container, type ContainerOverrides, createContainer } from "./container.ts";
 import { registerErrorHandler } from "./http/errors.ts";
+import { orderRoutes } from "./orders/routes.ts";
 
 // Mensagens de validação do Zod em pt-BR (aparecem nos erros VALIDATION_ERROR).
 z.config(z.locales.ptBR());
@@ -20,6 +21,8 @@ z.config(z.locales.ptBR());
 export interface ServerOptions {
   /** Liga o log do Fastify (padrão: ligado). Os testes usam `false`. */
   logger?: boolean;
+  /** Substituições do container, só para testes. */
+  overrides?: ContainerOverrides;
 }
 
 /**
@@ -53,8 +56,9 @@ export async function buildServer(config: Config, options: ServerOptions = {}) {
   });
   await app.register(swaggerUi, { routePrefix: "/docs" });
 
-  const container = await createContainer(config);
+  const container = await createContainer(config, options.overrides);
   await app.register(healthRoutes, { prefix: "/api", container });
+  await app.register(orderRoutes, { prefix: "/api", orderService: container.orderService });
 
   return app;
 }
@@ -78,7 +82,7 @@ const healthRoutes: FastifyPluginAsyncZod<{ container: Container }> = async (
     async (): Promise<HealthResponse> => ({
       status: "ok",
       dataSource: container.config.dataSource,
-      orders: container.orderCount,
+      orders: await container.orderService.count(),
     }),
   );
 };

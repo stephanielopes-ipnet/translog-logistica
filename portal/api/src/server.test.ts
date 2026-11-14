@@ -39,16 +39,18 @@ function parseError(payload: string) {
 }
 
 describe("GET /api/health", () => {
-  it("responde 200 no contrato, com a origem dos dados", async () => {
+  it("responde 200 no contrato, com a origem dos dados e quantos pedidos carregou", async () => {
     const app = await buildTestServer();
 
     const response = await app.inject({ method: "GET", url: "/api/health" });
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["content-type"]).toContain("application/json");
-    const body = healthResponseSchema.parse(response.json());
-    expect(body.status).toBe("ok");
-    expect(body.dataSource).toBe("fixtures");
+    expect(healthResponseSchema.parse(response.json())).toStrictEqual({
+      status: "ok",
+      dataSource: "fixtures",
+      orders: 11,
+    });
   });
 });
 
