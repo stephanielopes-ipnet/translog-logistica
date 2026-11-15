@@ -1,6 +1,7 @@
-import type { Order } from "@translog/contracts";
+import { useQueryClient } from "@tanstack/react-query";
+import { type Order, orderSchema } from "@translog/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError } from "@/api/client.ts";
+import { ApiError, getJson } from "@/api/client.ts";
 import { findFixtureOrder } from "@/api/fixtures.ts";
 import { useHealth, useOrderQuery, useOrderSamples } from "@/api/queries.ts";
 import { AppHeader } from "@/components/app-header.tsx";
@@ -62,6 +63,7 @@ export function App() {
   );
 
   const msgSeqRef = useRef(1);
+  const queryClient = useQueryClient();
   const nextMsgId = useCallback(() => {
     const id = msgSeqRef.current;
     msgSeqRef.current += 1;
@@ -246,6 +248,14 @@ export function App() {
     [applyOrderSwitchToChat, selectedOrderId, syncUrlOrder],
   );
 
+  const handleClearOrder = useCallback(() => {
+    setForcedTrackerView(null);
+    setSelectedOrderId(null);
+    setQueryValue("");
+    setSubmittedQuery("");
+    syncUrlOrder(null);
+  }, [syncUrlOrder]);
+
   const handleRetryTracking = useCallback(() => {
     setForcedOffline(false);
     setForcedTrackerView(null);
@@ -268,9 +278,9 @@ export function App() {
       }
       setTyping(true);
 
-      chatTimerRef.current = setTimeout(() => {
-        setTyping(false);
+      chatTimerRef.current = setTimeout(async () => {
         if (forcedOffline) {
+          setTyping(false);
           setMessages((prev) => {
             const copy = [...prev];
             for (let i = copy.length - 1; i >= 0; i -= 1) {
@@ -288,12 +298,33 @@ export function App() {
         const currentOrder =
           activeOrder ?? (selectedOrderId ? findFixtureOrder(selectedOrderId) : null);
 
+        // Se o texto mencionar outro pedido e a API estiver online, tenta buscá-lo na API real
+        let prefetchedOrder: Order | null = null;
+        const numberMatch = questionText.match(/\d+/);
+        const mentionedId = numberMatch ? parseOrderId(numberMatch[0]) : null;
+        if (mentionedId !== null && mentionedId !== activeOrder?.orderId) {
+          try {
+            prefetchedOrder = await queryClient.fetchQuery({
+              queryKey: ["orders", mentionedId],
+              queryFn: () => getJson(`/orders/${mentionedId}`, orderSchema),
+              retry: false,
+            });
+          } catch {
+            prefetchedOrder = null;
+          }
+        }
+
+        setTyping(false);
+
         const { reply, detectedOrderId } = buildAssistantReply({
           message: questionText,
           currentOrder,
           releaseLabel,
-          resolveOrder: (id) =>
-            activeOrder && activeOrder.orderId === id ? activeOrder : findFixtureOrder(id),
+          resolveOrder: (id) => {
+            if (activeOrder && activeOrder.orderId === id) return activeOrder;
+            if (prefetchedOrder && prefetchedOrder.orderId === id) return prefetchedOrder;
+            return findFixtureOrder(id);
+          },
         });
 
         if (detectedOrderId !== null && detectedOrderId !== selectedOrderId) {
@@ -321,6 +352,7 @@ export function App() {
       applyOrderSwitchToChat,
       forcedOffline,
       nextMsgId,
+      queryClient,
       releaseLabel,
       selectedOrderId,
       syncUrlOrder,
@@ -529,6 +561,7 @@ export function App() {
             submittedQuery={submittedQuery}
             onQueryChange={setQueryValue}
             onSubmitOrder={handleSelectOrder}
+            onClearOrder={handleClearOrder}
             onRetry={handleRetryTracking}
             sampleOrderIds={samplesQuery.orderIds}
             activeOrder={activeOrder}
@@ -538,6 +571,7 @@ export function App() {
 
           <ChatPanel
             activeOrder={activeOrder}
+            connected={isConnected}
             messages={messages}
             typing={typing}
             onSendMessage={handleSendMessage}

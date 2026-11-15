@@ -1,6 +1,7 @@
+import type { Order } from "@translog/contracts";
 import { ArrowUpRight, CircleAlert, MessageCircleQuestion } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
-import { CHAT_SUGGESTIONS } from "./mock-chat-service.ts";
+import { getChatSuggestions } from "./mock-chat-service.ts";
 
 export type ChatMessageItem =
   | {
@@ -55,6 +56,7 @@ function renderRichText(text: string): ReactNode {
 }
 
 interface ChatMessagesProps {
+  activeOrder: Order | null;
   messages: readonly ChatMessageItem[];
   typing: boolean;
   onSelectSuggestion: (text: string) => void;
@@ -62,12 +64,14 @@ interface ChatMessagesProps {
 }
 
 export function ChatMessages({
+  activeOrder,
   messages,
   typing,
   onSelectSuggestion,
   onRetryMessage,
 }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const suggestions = getChatSuggestions(activeOrder);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -96,8 +100,10 @@ export function ChatMessages({
         </div>
 
         <div className="space-y-2">
-          <p className="label-mono px-1">Perguntas frequentes</p>
-          {CHAT_SUGGESTIONS.map((suggestion) => (
+          <p className="label-mono px-1">
+            {activeOrder ? `Sugestões para #${activeOrder.orderId}` : "Perguntas frequentes"}
+          </p>
+          {suggestions.map((suggestion) => (
             <button
               key={suggestion}
               type="button"

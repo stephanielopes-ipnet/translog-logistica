@@ -40,12 +40,18 @@ export function AppHeader({ connected }: AppHeaderProps) {
         </div>
 
         {connected ? (
-          <div className="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-slate-600">
+          <div
+            title="Serviço de rastreamento operacional"
+            className="flex items-center gap-2 rounded border border-emerald-200/80 bg-emerald-50/70 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-emerald-800"
+          >
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             Conectado
           </div>
         ) : (
-          <div className="flex items-center gap-2 rounded border border-red-200 bg-red-50 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-red-700">
+          <div
+            title="Não foi possível alcançar o servidor de rastreamento"
+            className="flex items-center gap-2 rounded border border-red-200 bg-red-50 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-red-700"
+          >
             <span className="w-2 h-2 rounded-full bg-red-500" />
             Sem conexão
           </div>

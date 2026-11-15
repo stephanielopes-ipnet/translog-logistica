@@ -18,6 +18,7 @@ interface TrackingPanelProps {
   submittedQuery: string;
   onQueryChange: (value: string) => void;
   onSubmitOrder: (rawOrderId: string) => void;
+  onClearOrder: () => void;
   onRetry: () => void;
   sampleOrderIds: readonly number[];
   activeOrder: Order | null;
@@ -31,6 +32,7 @@ export function TrackingPanel({
   submittedQuery,
   onQueryChange,
   onSubmitOrder,
+  onClearOrder,
   onRetry,
   sampleOrderIds,
   activeOrder,
@@ -43,6 +45,7 @@ export function TrackingPanel({
         queryValue={queryValue}
         onQueryChange={onQueryChange}
         onSubmitOrder={onSubmitOrder}
+        onClearOrder={onClearOrder}
         sampleOrderIds={sampleOrderIds}
         activeOrderId={view === "result" && activeOrder ? activeOrder.orderId : null}
         isLoading={view === "loading"}
@@ -50,7 +53,9 @@ export function TrackingPanel({
 
       {view === "loading" && <TrackingLoadingState />}
       {view === "empty" && <TrackingEmptyState />}
-      {view === "notfound" && <TrackingNotFoundState query={submittedQuery} />}
+      {view === "notfound" && (
+        <TrackingNotFoundState query={submittedQuery} onClearSearch={onClearOrder} />
+      )}
       {view === "error" && <TrackingErrorState onRetry={onRetry} />}
       {view === "result" && activeOrder && (
         <div className="space-y-4">

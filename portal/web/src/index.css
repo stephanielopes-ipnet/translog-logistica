@@ -40,6 +40,19 @@ body {
   font-feature-settings: "cv11", "ss01";
 }
 
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    outline-offset: 2px;
+  }
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }

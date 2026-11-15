@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { findFixtureOrder } from "@/api/fixtures.ts";
-import { ASK_NUMBER_REPLY, buildAssistantReply, MODES_REPLY } from "./mock-chat-service.ts";
+import {
+  ASK_NUMBER_REPLY,
+  buildAssistantReply,
+  CHAT_SUGGESTIONS,
+  getChatSuggestions,
+  MODES_REPLY,
+} from "./mock-chat-service.ts";
 
 describe("mock-chat-service", () => {
   it("explains probable cause for order 375 without claiming certainty", () => {
@@ -54,5 +60,15 @@ describe("mock-chat-service", () => {
     });
 
     expect(res.reply).toBe(MODES_REPLY);
+  });
+
+  it("adapts suggested questions to the active order context", () => {
+    expect(getChatSuggestions(null)).toEqual(CHAT_SUGGESTIONS);
+
+    const order375 = findFixtureOrder(375);
+    expect(getChatSuggestions(order375 ?? null)[0]).toContain("#375 atrasou");
+
+    const order562 = findFixtureOrder(562);
+    expect(getChatSuggestions(order562 ?? null)[1]).toContain("#562 ainda não foi liberado");
   });
 });

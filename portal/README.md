@@ -31,7 +31,7 @@ Além da aplicação real em React (`portal/web/`), os protótipos visuais conti
 
 ## As partes do portal
 
-| Parte | O que faz | Situação em 14/11 |
+| Parte | O que faz | Situação em 15/11 |
 |---|---|---|
 | **Tela** (`web/`) | Interface em React que o cliente vê e usa no navegador | **Pronta** — construída com o design da Direção D, consultando os pedidos no servidor do portal e com o assistente funcionando em modo demonstração |
 | **Servidor do portal** (`api/`) | Recebe o número do pedido, busca os dados e devolve a resposta pronta para a tela | **Pronto** para a consulta de pedidos |
@@ -42,12 +42,12 @@ Além da aplicação real em React (`portal/web/`), os protótipos visuais conti
 
 A interface segue a **Direção D (Manifesto & Rota Integrada)**, pensada para transmitir a personalidade da TransLog — confiável, precisa, sóbria e internacional:
 
-- **Clareza antes de tudo:** os dados principais aparecem no topo do pedido divididos em 4 blocos lado a lado (`Previsão/Entrega`, `Cumprimento do prazo`, `Modalidade contratada` e `Pedido realizado em`).
-- **Honestidade sem alarme:** o vermelho aparece **apenas** na célula de cumprimento do prazo e na etiqueta `Atrasado` quando há atraso real. Avisos de atenção (como o motivo provável e a liberação pendente) usam âmbar (`#F59E0B`), enquanto a marca usa azul-petróleo (`#0F4C81`).
+- **Clareza antes de tudo:** os dados principais aparecem no topo do pedido divididos em 4 blocos lado a lado (`Previsão/Entrega`, `Cumprimento do prazo`, `Modalidade contratada` e `Pedido realizado em`, com resumo de itens e valor total) e um botão rápido para copiar o código da guia (`TL-000375-LATAM`).
+- **Honestidade sem alarme:** o vermelho aparece **apenas** onde há atraso real (etiqueta `Atrasado`, célula de prazo, fita superior do cartão e etapa em atraso da linha do tempo). Avisos de atenção (como o motivo provável e a liberação pendente) usam âmbar (`#F59E0B`), enquanto a marca usa azul-petróleo (`#0F4C81`).
 - **Tipografia técnica de manifesto:** textos usam a fonte `Inter` para leitura rápida, enquanto números de pedido, códigos de manifesto (`TL-000375-LATAM`), datas, quantidades e valores em dólar usam fonte monoespaçada (`IBM Plex Mono`), facilitando a leitura de números.
-- **Rota + Andamento no mesmo bloco:** em vez de uma barra de progresso genérica, a origem e o destino internacionais ficam nas duas pontas da própria linha do tempo de 4 etapas (`Pedido realizado` → `Pedido liberado` → `Em trânsito` → `Entregue`). Assim, até a tabela de itens cabe na primeira tela sem precisar rolar.
-- **Assistente como canal oficial:** o painel lateral de 400 px apresenta as respostas como um parecer da própria TransLog (com barra lateral azul-petróleo), sugere perguntas iniciais, avisa sobre qual pedido está conversando e abre automaticamente na esquerda qualquer pedido cujo número o cliente cite na conversa.
-- **Todos os estados previstos:** tela inicial vazia, carregamento (esqueleto animado), pedido não encontrado, falha de conexão com botão "Tentar novamente" e falha no envio de mensagem no chat com reenvio manual.
+- **Rota + Andamento no mesmo bloco:** em vez de uma barra de progresso genérica, a origem e o destino internacionais ficam nas duas pontas da própria linha do tempo de 4 etapas (`Pedido realizado` → `Pedido liberado` → `Em trânsito` → `Entregue`). Assim, até a tabela de itens (com contagem de itens e unidades) cabe na primeira tela sem precisar rolar.
+- **Assistente como canal oficial:** o painel lateral de 400 px apresenta as respostas como um parecer da própria TransLog (com barra lateral azul-petróleo), adapta as perguntas sugeridas ao pedido aberto na tela e busca automaticamente na base qualquer número de pedido que o cliente citar na conversa.
+- **Navegação rápida e todos os estados previstos:** busca com atalho de teclado (`/`) e botão de limpar para voltar ao início, tela inicial explicativa, carregamento animado, pedido não encontrado com retorno rápido à busca, falha de conexão com botão "Tentar novamente" e falha no envio de mensagem no chat com reenvio manual.
 
 ### Barra de controle da demonstração
 
@@ -145,9 +145,9 @@ São pedidos reais da base, escolhidos para cobrir todas as situações da tela.
 | 16 | Aguardando Liberação (pagamento pendente) |
 | 552 | Cancelado pelo cliente |
 
-## O que já foi verificado (14/11)
+## O que já foi verificado (15/11)
 
-- **129 testes automáticos** passando (105 no servidor + 24 na interface React).
+- **130 testes automáticos** passando (105 no servidor + 25 na interface React).
 - **Tela React (`@translog/web`) pronta**, validando todas as respostas do servidor pelo contrato compartilhado e compilando para produção em menos de 1 segundo.
 - Base completa: os 65.752 pedidos foram carregados sem nenhuma linha com problema, em cerca de 11 segundos.
 - Cada consulta é respondida em **menos de 1 milésimo de segundo**.

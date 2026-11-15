@@ -2,7 +2,7 @@
 
 Para quem vai rodar, revisar ou mudar o código do portal. A visão geral, sem detalhes técnicos, está no [README](../README.md).
 
-Estado em 14/11/2026: fases 0, 1 e 3 concluídas (fundação, contrato `@translog/contracts`, API de pedidos `@translog/api` e interface frontend `@translog/web` seguindo a Direção D). A integração HTTP de chat com o agente ADK (Fase 2) aguarda o acordo de contrato com o Marco. Checklist em [tasks.md](../tasks.md).
+Estado em 15/11/2026: fases 0, 1 e 3 concluídas (fundação, contrato `@translog/contracts`, API de pedidos `@translog/api` e interface frontend `@translog/web` seguindo a Direção D). A integração HTTP de chat com o agente ADK (Fase 2) aguarda o acordo de contrato com o Marco. Checklist em [tasks.md](../tasks.md).
 
 ## Sumário
 
@@ -60,10 +60,10 @@ A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento
 | @tanstack/react-query | 5.107.1 | `web` | Cache, estado assíncrono, retentativas e sincronização com a API |
 | lucide-react | 1.72.0 | `web` | Ícones consistentes com os protótipos |
 | @fontsource-variable/inter | 5.3.0 | `web` | Fonte `Inter Variable` empacotada localmente |
-| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (129 testes no total) |
+| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (130 testes no total) |
 | Biome | 2.6.7 | todos | Lint, formatação, acessibilidade e ordem dos imports |
 
-Tamanho aproximado: ~950 linhas de código na API + ~2.200 linhas no frontend, cobertos por **129 testes automatizados** (105 na API + 24 no frontend).
+Tamanho aproximado: ~950 linhas de código na API + ~2.400 linhas no frontend, cobertos por **130 testes automatizados** (105 na API + 25 no frontend).
 
 ## 2. Estrutura de pastas
 
@@ -200,7 +200,7 @@ Para não repetir os `-f`, defina `COMPOSE_FILE=docker-compose.yml:docker-compos
 | `pnpm dev` | Sobe API (`:3333`) e frontend Web (`:5173`) em paralelo com hot reload |
 | `pnpm start` | Sobe apenas a API sem watch |
 | `pnpm build` | Gera o bundle de produção do frontend em `web/dist/` |
-| `pnpm test` | Roda o Vitest em todos os pacotes (129 testes: 105 na API + 24 no Web) |
+| `pnpm test` | Roda o Vitest em todos os pacotes (130 testes: 105 na API + 25 no Web) |
 | `pnpm lint` | Biome em todos os pacotes (só verifica) |
 | `pnpm format` | Biome corrigindo formatação e imports |
 | `pnpm typecheck` | `tsc` em todos os pacotes (`contracts`, `api` e `web`) |
@@ -514,24 +514,30 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
 
 - **Tipografia técnica dupla:**
   - `Inter Variable` (`--font-sans`, via `@fontsource-variable/inter`) para leitura fluida de títulos, rótulos principais e mensagens do assistente;
-  - `IBM Plex Mono` (`--font-mono`) para códigos de manifesto (`TL-LATAM-000375`), datas, contagens de dias, preços em dólar e cabeçalhos rotulados (`.label-mono`).
+  - `IBM Plex Mono` (`--font-mono`) para códigos de manifesto (`TL-000375-LATAM`), datas, contagens de dias, preços em dólar e cabeçalhos rotulados (`.label-mono`).
   - Números tabulares forçados com `.tabular { font-variant-numeric: tabular-nums; }` para evitar deslocamento horizontal ao alternar pedidos.
-- **Paleta e tokens (`@theme inline`):**
-  - Azul-petróleo `#0F4C81` (`brand-800`) como cor primária de autoridade e foco;
-  - Âmbar `#F59E0B` / `#D97706` reservado exclusivamente para atenção ("Motivo provável" e "Aguardando Liberação");
-  - Vermelho (`red-600` / `red-50`) exclusivo para `deadlineStatus === "Atrasado"`;
-  - Verde (`emerald-700` / `emerald-50`) para pedidos entregues, no prazo ou adiantados;
-  - Neutros `slate` (tema claro padrão `#F8FAFC`, suporte opcional a tema escuro via `@custom-variant dark (&:where(.dark, .dark *))`).
+- **Paleta, contraste e interatividade (`@theme inline` + `@layer base`):**
+  - Azul-petróleo `#0F4C81` (`--color-primary`) como cor primária de autoridade e foco;
+  - Âmbar `#F59E0B` (`--color-accent`) reservado exclusivamente para atenção ("Motivo provável" e "Aguardando Liberação");
+  - Vermelho (`red-600` / `red-700` / `red-50`) exclusivo para atrasos reais (`deadlineStatus === "Atrasado"`): etiqueta de prazo, célula de dias de atraso, fita superior do manifesto e destaque da etapa em atraso na linha do tempo;
+  - Verde (`emerald-700` / `emerald-50`) para pedidos entregues no prazo ou adiantados;
+  - Neutros `slate` (apenas tema claro);
+  - Regras em `@layer base` corrigem o cursor padrão de botões do Tailwind v4 (`cursor: pointer` em botões ativos) e padronizam `:focus-visible`.
 - **Detalhes gráficos de manifesto internacional:**
   - `.perf-t`: divisor horizontal com serrilhado de manifesto logístico no rodapé de total da fatura;
-  - `.route-line`: conector horizontal tracejado ligando a cidade de origem à cidade de destino no cabeçalho da rota.
+  - `.route-line`: conector horizontal tracejado ligando origem e destino no cabeçalho da rota;
+  - Fita superior semântica de `3px` no `OrderManifestCard` e botão copiável no código de guia (`TL-000375-LATAM`).
 
-### 12.2. Layout e estrutura de tela (`src/app.tsx`)
+### 12.2. Layout, estrutura de tela e ergonomia (`src/app.tsx`)
 
 - **Desktop-first (`min-w-[1280px]`):**
-  - **Cabeçalho (`AppHeader`, `h-14`):** marca TransLog, subtítulo técnico `INTERNATIONAL FREIGHT & WAYBILL TRACKING` e indicador de conexão que reflete `GET /api/health` (exibindo `Sistema online` ou `Sem conexão`).
-  - **Coluna esquerda (`TrackingPanel`, `flex-1` ~60%):** área rolável com formulário de busca (`OrderSearchForm`), pílulas de pedidos de exemplo vindas de `GET /api/orders/samples` e o conteúdo do pedido (ou estados de vazio, skeleton, 404, 500 e offline).
-  - **Coluna direita (`ChatPanel`, `w-[400px]` fixa na altura da viewport):** assistente TransLog como canal de atendimento oficial da operação, mostrando o badge do pedido ativo (`#375 · Em Trânsito` ou `Nenhum pedido aberto`), despachos numerados (`DESPACHO #01 · ASSISTENTE TRANSLOG`), chips de perguntas contextuais e caixa de envio.
+  - **Cabeçalho (`AppHeader`, `h-16`):** marca TransLog (`International Logistics · Rastreamento de pedidos`), fita institucional e indicador de conexão que reflete `GET /api/health` (`Conectado` ou `Sem conexão`).
+  - **Coluna esquerda (`TrackingPanel`, `flex-1`):**
+    - `OrderSearchForm`: aceita apenas dígitos (1 a 10), oferece pílulas rápidas vindas de `GET /api/orders/samples`, atalho global de teclado `/` para focar a busca, botão `X` para limpar e retornar ao estado inicial, e indicador de carregamento (`Consultando`) no submit;
+    - Estados dedicados (`tracking-states.tsx`): tela inicial com resumo em 3 blocos (`01 · Situação e prazo`, `02 · Motivo provável`, `03 · Rota e manifesto`), skeleton animado, pedido não encontrado com botão *"Tentar outro número"* e erro de rede com retentativa;
+    - `OrderManifestCard`: grade de 4 colunas (`Previsão/Entrega`, `Cumprimento do prazo`, `Modalidade contratada`, `Pedido realizado em` com contagem de itens e total em `US$`), alerta de motivo provável com CTA *"Perguntar ao assistente"* e bloco integrado de rota (com truncamento seguro para cidades longas) + linha do tempo;
+    - `OrderItemsTable`: exibe itens, categorias, quantidades e soma distinta de itens e unidades totais no cabeçalho.
+  - **Coluna direita (`ChatPanel`, `w-[400px]` fixa na altura da viewport):** assistente TransLog com indicador de conexão no avatar, faixa de contexto do pedido ativo (`Falando sobre o pedido #375` ou `Nenhum pedido selecionado`), botão *"Nova conversa"* desabilitado quando o chat está vazio, sugestões contextuais e caixa de envio (`Enter` envia, `Shift+Enter` quebra linha).
 
 ### 12.3. Cliente HTTP, validação Zod e cache (`src/api/`)
 
@@ -550,36 +556,35 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
 
 - **`formatDate(isoDate)`:** converte `"2015-01-08"` em `"08/01/2015"` operando exclusivamente por regex e corte de string (`/^(\d{4})-(\d{2})-(\d{2})/`), **sem jamais instanciar `new Date()`**. Isso garante que o frontend preserve a mesma regra de calendário do backend em qualquer fuso horário do navegador.
 - **`formatCurrency(value)`:** usa `Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" })` para produzir `US$ 91,34`.
-- **`formatManifestCode(order)`:** gera o código de etiqueta internacional no formato `TL-<MARKET>-<ORDER_ID_6_DIGITOS>` (ex.: `TL-LATAM-000375`, `TL-PAC-000562`).
+- **`formatManifestCode(order)`:** gera o código de etiqueta internacional no formato `TL-<ORDER_ID_6_DIGITOS>-<MARKET>` (ex.: `TL-000375-LATAM`, `TL-020322-PACIFICASIA`).
 
 ### 12.5. Máquina de estados da linha do tempo (`src/features/tracking/timeline.ts`)
 
-`buildTimelineSteps(order, releaseLabel)` recebe um `Order` e a variante de rótulo (`"waiting"` ou `"payment"`) e devolve as 4 etapas da jornada sem efeitos colaterais:
+`buildTimelineSteps(order, releaseLabel)` recebe um `Order` e a variante de rótulo (`"waiting"` ou `"payment"`) e devolve os dados das etapas sem efeitos colaterais, mantendo a apresentação visual (conectores e destaque vermelho em atraso) no `OrderManifestCard`:
 
 | Situação (`trackingStatus`) | Etapa 1 | Etapa 2 | Etapa 3 | Etapa 4 |
 |---|---|---|---|---|
-| **Aguardando Liberação** | Pedido recebido (`done`, `orderDate`) | Aguardando liberação / Pagamento pendente (`warn`, `Em análise`) | Em trânsito (`todo`, `Aguardando`) | Entregue (`todo`, `Prev. DD/MM/AAAA`) |
-| **Em Trânsito** (no prazo) | Pedido recebido (`done`, `orderDate`) | Liberado e despachado (`done`, `Concluído`) | Em trânsito (`current`, `Rota ativa`) | Entregue (`todo`, `Prev. DD/MM/AAAA`) |
-| **Em Trânsito** (atrasado) | Pedido recebido (`done`, `orderDate`) | Liberado e despachado (`done`, `Concluído`) | Em trânsito (`late`, `+N d atraso`) | Entregue (`todo`, `Prev. DD/MM/AAAA`) |
-| **Entregue** | Pedido recebido (`done`, `orderDate`) | Liberado e despachado (`done`, `Concluído`) | Em trânsito (`done`, `Concluído`) | Entregue (`done`, `actualDeliveryDate`) |
-| **Cancelado** | Pedido recebido (`done`, `orderDate`) | Liberado (`cancel`, `Interrompido`) | Em trânsito (`cancel`, `—`) | Cancelado (`cancel`, `Encerrado`) |
-
-Quando `trackingStatus === "Cancelado"`, a quarta etapa muda o rótulo de `"Entregue"` para `"Cancelado"` e exibe um banner neutro informando que o envio foi encerrado sem previsão de entrega.
+| **Aguardando Liberação** | Pedido realizado (`done`, `orderDate`) | Pedido liberado / Confirmação pendente (`current`, âmbar, `Etapa atual`) | Em trânsito (`pending`) | Entregue (`pending`, `previsto DD/MM/AAAA`) |
+| **Em Trânsito** (no prazo) | Pedido realizado (`done`, `orderDate`) | Pedido liberado (`done`) | Em trânsito (`current`, azul, `Etapa atual`) | Entregue (`pending`, `previsto DD/MM/AAAA`) |
+| **Em Trânsito** (atrasado) | Pedido realizado (`done`, `orderDate`) | Pedido liberado (`done`) | Em trânsito (`current`, **vermelho**, `Em atraso (+Nd)`) | Entregue (`pending`, `previsto DD/MM/AAAA`) |
+| **Entregue** | Pedido realizado (`done`, `orderDate`) | Pedido liberado (`done`) | Em trânsito (`done`) | Entregue (`done`, `actualDeliveryDate` + `(+Nd)` em vermelho se atrasado) |
+| **Cancelado** | Pedido realizado (`done`, `orderDate`) | — | — | Banner neutro *"Este pedido foi cancelado."* |
 
 ### 12.6. Assistente de IA e integração entre as duas colunas (`src/features/chat/`)
 
 Enquanto o endpoint `POST /api/chat` (Fase 2) aguarda definição do contrato com o agente ADK, o frontend inclui o serviço determinístico `mock-chat-service.ts` com todas as regras de negócio e voz da TransLog:
 
-- **Detecção automática de pedido no texto:** se o cliente digitar `"Onde está o pedido 375?"` (ou apenas `"375"`), `extractOrderNumberFromText` identifica o número; se o pedido existir na API ou nos fixtures, o portal abre automaticamente o pedido na coluna esquerda e responde já contextualizado.
+- **Detecção automática de pedido e busca na API real:** se o cliente digitar `"Onde está o pedido 375?"` (ou qualquer número existente na Silver, mesmo fora dos 11 `fixtures`), `app.tsx` pré-busca `GET /api/orders/:id` via `queryClient.fetchQuery` e `buildAssistantReply` devolve `detectedOrderId`, abrindo automaticamente o pedido na coluna esquerda antes de responder.
+- **Sugestões contextuais (`getChatSuggestions`):** quando o chat está vazio, os 3 botões de pergunta rápida se adaptam ao pedido aberto no momento (ou sugerem consultar o pedido `#375` quando nenhum pedido está aberto).
 - **Respostas contextuais (`buildAssistantReply`, `buildWhenReply`, `buildWhyReply`):**
   - Perguntas sobre **prazo** (`"quando chega"`, `"prazo"`, `"data"`): informa data prevista, data real (se entregue) e dias de atraso/adiantamento.
   - Perguntas sobre **causa de atraso** (`"por que atrasou"`, `"motivo"`, `"causa"`): explica o `probableCause` sempre como **motivo provável** (por exemplo, em `Promessa irreal`, detalha que o prazo estimado na modalidade `Second Class` foi curto para a rota internacional `San Benito → Saltillo`). Nunca afirma causa comprovada nem sugere rastreio em tempo real.
   - Botão **"Perguntar ao assistente"** dentro do alerta âmbar de Motivo Provável no `OrderManifestCard`: envia imediatamente a pergunta `"Por que o pedido #375 atrasou?"` para a coluna direita.
 - **Renderização segura de formatação (`chat-messages.tsx`):** as respostas usam `**negrito**` apenas no dado principal; o componente `renderRichText` converte os segmentos em nós React `<strong>` sem usar `dangerouslySetInnerHTML`.
 - **Três modos de histórico ao trocar de pedido (`chatOnSwitch`):**
-  - `divider` (padrão recomendado): mantém o histórico da conversa e insere um divisor visual (`Agora falando sobre o pedido #375 · Em Trânsito`);
-  - `keep`: mantém todas as mensagens sem divisor;
-  - `clear`: limpa a conversa e cria uma saudação nova para o pedido selecionado.
+  - `keep` (padrão atual): mantém todas as mensagens sem divisor;
+  - `divider`: mantém o histórico e insere um divisor visual (`Alternado para o pedido #375`);
+  - `clear`: limpa a conversa ao trocar para outro pedido.
 
 ### 12.7. Estado na URL e Barra de Apresentação (`src/lib/url-state.ts` e `ProtoBar`)
 
@@ -597,9 +602,9 @@ Enquanto o endpoint `POST /api/chat` (Fase 2) aguarda definição do contrato co
 ## 13. Testes
 
 ```bash
-pnpm test                         # todos os 129 testes (~12 s com a Silver presente)
+pnpm test                         # todos os 130 testes (~15 s com a Silver presente)
 pnpm --filter @translog/api test  # só a API (105 testes)
-pnpm --filter @translog/web test  # só o frontend (24 testes, ~250 ms)
+pnpm --filter @translog/web test  # só o frontend (25 testes, ~1 s)
 ```
 
 ### Testes do Backend (`@translog/api` — 105 testes)
@@ -614,15 +619,15 @@ pnpm --filter @translog/web test  # só o frontend (24 testes, ~250 ms)
 | `orders/file-repository.test.ts` | Amostra igual aos mocks, log, descarte de colunas, linhas inválidas sem conteúdo no log, limite de avisos, itens fora de sequência, BOM, erros fatais; **integração com a Silver real** |
 | `privacy.test.ts` | Seção 10 |
 
-### Testes do Frontend (`@translog/web` — 24 testes)
+### Testes do Frontend (`@translog/web` — 25 testes)
 
 | Arquivo | Cobre |
 |---|---|
-| `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-LATAM-000375`) e pluralização de dias |
+| `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-000375-LATAM`) e pluralização de dias |
 | `lib/url-state.test.ts` | Leitura de `?pedido=375`, rejeição de IDs inválidos (`0`, `abc`), presets da `ProtoBar` e atualização limpa da query string |
 | `api/client.test.ts` | `shouldRetry` (não repete 4xx, repete 1 vez em erro de rede ou 500) e tratamento de `ApiError` |
-| `features/tracking/timeline.test.ts` | Máquina de estados das 4 etapas em todas as situações (`Entregue`, `Em Trânsito` atrasado/no prazo, `Aguardando Liberação` com variantes `waiting`/`payment`, e `Cancelado`) |
-| `features/chat/mock-chat-service.test.ts` | Extração de número de pedido no texto, explicação de motivo provável sem certeza absoluta, resposta de prazo e sugestões contextuais |
+| `features/tracking/timeline.test.ts` | Máquina de estados das 4 etapas em todas as situações (`Entregue`, `Em Trânsito`, `Aguardando Liberação` com variantes `waiting`/`payment`, e `Cancelado`) |
+| `features/chat/mock-chat-service.test.ts` | Extração de número de pedido no texto, explicação de motivo provável sem certeza absoluta, resposta de prazo, modalidades e sugestões contextuais |
 
 **Fixtures de teste da API**
 

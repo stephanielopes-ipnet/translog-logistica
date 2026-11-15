@@ -3,6 +3,7 @@ import {
   Ban,
   Check,
   Clock,
+  Copy,
   FileCheck2,
   MapPinCheck,
   MessageSquareMore,
@@ -10,7 +11,9 @@ import {
   Plane,
   TriangleAlert,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
+  formatCurrency,
   formatDate,
   formatManifestCode,
   pluralize,
@@ -72,13 +75,42 @@ function StepIcon({ stepKey }: { stepKey: TimelineStepView["key"] }) {
   }
 }
 
+function getCardAccentClass(order: Order): string {
+  if (order.trackingStatus === "Cancelado") return "bg-slate-400";
+  if (order.deadlineStatus === "Atrasado") return "bg-red-600";
+  if (order.trackingStatus === "Aguardando Liberação") return "bg-accent";
+  if (order.trackingStatus === "Entregue") return "bg-emerald-600";
+  return "bg-primary";
+}
+
 export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: OrderManifestCardProps) {
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  useEffect(() => {
+    if (!copiedCode) return;
+    const t = setTimeout(() => setCopiedCode(false), 1800);
+    return () => clearTimeout(t);
+  }, [copiedCode]);
+
+  const manifestCode = formatManifestCode(order);
+
+  async function handleCopyManifest() {
+    try {
+      await navigator.clipboard.writeText(manifestCode);
+      setCopiedCode(true);
+    } catch {
+      setCopiedCode(false);
+    }
+  }
+
   const statusLabel = getDisplayTrackingStatus(order, releaseLabel);
   const statusStyle = STATUS_BADGE_STYLE[statusLabel] ?? STATUS_BADGE_STYLE.Cancelado;
   const deadlineCls = DEADLINE_BADGE_STYLE[order.deadlineStatus];
   const orig = splitPlace(order.origin);
   const dest = splitPlace(order.destination);
   const steps = buildTimelineSteps(order, releaseLabel);
+  const isOrderDelayed =
+    order.deadlineStatus === "Atrasado" && order.delayDays !== null && order.delayDays > 0;
 
   // Célula 1: Previsão / Entrega
   let mainLabel = "Previsão de entrega";
@@ -92,7 +124,7 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
   } else if (order.trackingStatus === "Em Trânsito") {
     mainLabel = "Previsão de entrega";
     mainDate = formatDate(order.estimatedDeliveryDate);
-    mainSub = "Remessa em trânsito";
+    mainSub = isOrderDelayed ? "Prazo estimado excedido" : "Dentro da janela prevista";
   } else if (order.trackingStatus === "Aguardando Liberação") {
     mainLabel = "Previsão após liberação";
     mainDate = formatDate(order.estimatedDeliveryDate);
@@ -130,6 +162,7 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
 
   return (
     <article className="bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
+      <div className={`h-[3px] w-full ${getCardAccentClass(order)}`} />
       {/* Topo de Guia de Remessa */}
       <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
@@ -155,9 +188,19 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
           </div>
         </div>
         <div className="flex items-center gap-2 font-mono text-[11px] text-slate-500">
-          <span className="px-2 py-0.5 rounded border border-slate-200 bg-white text-slate-600">
-            {formatManifestCode(order)}
-          </span>
+          <button
+            type="button"
+            onClick={() => void handleCopyManifest()}
+            title="Copiar código da guia de remessa"
+            className="px-2.5 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900 inline-flex items-center gap-1.5 transition"
+          >
+            <span>{manifestCode}</span>
+            {copiedCode ? (
+              <Check className="w-3 h-3 text-emerald-600" />
+            ) : (
+              <Copy className="w-3 h-3 text-slate-400" />
+            )}
+          </button>
         </div>
       </div>
 
@@ -228,13 +271,15 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
           <dd className="mt-1 font-mono text-[17px] leading-tight font-medium text-slate-900 tabular">
             {formatDate(order.orderDate)}
           </dd>
-          <dd className="mt-0.5 text-xs text-slate-500">Origem: EUA / Porto Rico</dd>
+          <dd className="mt-0.5 text-xs text-slate-500 tabular">
+            {pluralize(order.items.length, "item", "itens")} · {formatCurrency(order.total)}
+          </dd>
         </div>
       </dl>
 
       {/* Alerta de Motivo Provável (quando houver) */}
       {order.probableCause && (
-        <div className="mx-5 mt-4 flex items-stretch rounded-md border border-amber-300 bg-amber-50/75 overflow-hidden">
+        <div className="mx-5 mt-4 flex items-stretch rounded-md border border-amber-300 bg-amber-50/80 shadow-[0_1px_2px_rgba(245,158,11,0.12)] overflow-hidden">
           <div
             className="w-11 shrink-0 bg-accent text-slate-900 grid place-items-center"
             aria-hidden="true"
@@ -262,8 +307,8 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
           <div className="px-4 py-3 grid place-items-center shrink-0">
             <button
               type="button"
-              onClick={() => onAskAssistant("Por que meu pedido atrasou?")}
-              className="h-9 px-3.5 rounded-md border border-slate-900/80 bg-white text-xs font-semibold text-slate-900 shadow-sm hover:bg-primary hover:text-white hover:border-primary inline-flex items-center gap-2 transition"
+              onClick={() => onAskAssistant(`Por que o pedido #${order.orderId} atrasou?`)}
+              className="h-9 px-3.5 rounded-md bg-slate-900 text-xs font-semibold text-white shadow-sm hover:bg-primary inline-flex items-center gap-2 transition"
             >
               <MessageSquareMore className="w-4 h-4" />
               <span>Perguntar ao assistente</span>
@@ -276,14 +321,16 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
       <div className="p-5 space-y-4">
         {/* Cabeçalho de Rota */}
         <div className="rounded-md border border-slate-200 bg-slate-50/70 px-4 py-3">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-            <div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
+            <div className="min-w-0">
               <p className="label-mono flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full border-2 border-primary bg-white" />
+                <span className="w-2 h-2 rounded-full border-2 border-primary bg-white shrink-0" />
                 De · Origem
               </p>
-              <p className="mt-0.5 text-base font-bold text-slate-900 leading-tight">{orig.city}</p>
-              <p className="text-xs text-slate-500">{orig.rest}</p>
+              <p className="mt-0.5 text-base font-bold text-slate-900 leading-tight truncate">
+                {orig.city}
+              </p>
+              <p className="text-xs text-slate-500 truncate">{orig.rest}</p>
             </div>
 
             <div className="flex flex-col items-center justify-center px-2 min-w-[180px]">
@@ -291,7 +338,7 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                 <span className="rounded bg-white border border-slate-200 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-slate-700">
                   {order.market}
                 </span>
-                <span className="text-xs text-slate-500">{order.region}</span>
+                <span className="text-xs text-slate-500 whitespace-nowrap">{order.region}</span>
               </div>
               <div className="w-full flex items-center gap-2">
                 <div className="flex-1 route-line" />
@@ -303,13 +350,15 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
               </span>
             </div>
 
-            <div className="text-right">
+            <div className="text-right min-w-0">
               <p className="label-mono flex items-center justify-end gap-1.5">
                 Para · Destino
-                <span className="w-2 h-2 rounded-full bg-accent" />
+                <span className="w-2 h-2 rounded-full bg-accent shrink-0" />
               </p>
-              <p className="mt-0.5 text-base font-bold text-slate-900 leading-tight">{dest.city}</p>
-              <p className="text-xs text-slate-500">{dest.rest}</p>
+              <p className="mt-0.5 text-base font-bold text-slate-900 leading-tight truncate">
+                {dest.city}
+              </p>
+              <p className="text-xs text-slate-500 truncate">{dest.rest}</p>
             </div>
           </div>
         </div>
@@ -353,6 +402,21 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                 const nextStep = steps[index + 1];
                 const isWaitingCurrent =
                   step.state === "current" && order.trackingStatus === "Aguardando Liberação";
+                const isDelayedCurrent =
+                  step.state === "current" &&
+                  order.trackingStatus === "Em Trânsito" &&
+                  isOrderDelayed;
+
+                const connectorClass =
+                  nextStep && nextStep.state !== "pending"
+                    ? nextStep.state === "done"
+                      ? "bg-slate-800"
+                      : order.trackingStatus === "Aguardando Liberação"
+                        ? "bg-accent"
+                        : order.trackingStatus === "Em Trânsito" && isOrderDelayed
+                          ? "bg-red-500"
+                          : "bg-primary"
+                    : null;
 
                 return (
                   <li
@@ -360,8 +424,10 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                     className={`relative flex flex-col items-start ${index < 3 ? "pr-4" : ""}`}
                   >
                     {index < 3 &&
-                      (nextStep && nextStep.state !== "pending" ? (
-                        <div className="absolute top-[13px] left-7 right-0 h-0.5 bg-primary" />
+                      (connectorClass ? (
+                        <div
+                          className={`absolute top-[13px] left-7 right-0 h-0.5 ${connectorClass}`}
+                        />
                       ) : (
                         <div className="absolute top-[13px] left-7 right-0 border-t-2 border-dashed border-slate-300" />
                       ))}
@@ -375,7 +441,9 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                         className={`relative z-10 w-7 h-7 rounded grid place-items-center ring-4 ${
                           isWaitingCurrent
                             ? "bg-accent text-slate-900 ring-amber-100"
-                            : "bg-primary text-white ring-primary-100"
+                            : isDelayedCurrent
+                              ? "bg-red-600 text-white ring-red-100"
+                              : "bg-primary text-white ring-primary-100"
                         }`}
                       >
                         <StepIcon stepKey={step.key} />
@@ -399,20 +467,33 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                       {step.isCurrent ? (
                         <span
                           className={`font-mono text-[10.5px] uppercase tracking-wider font-semibold ${
-                            isWaitingCurrent ? "text-amber-800" : "text-primary"
+                            isWaitingCurrent
+                              ? "text-amber-800"
+                              : isDelayedCurrent
+                                ? "text-red-700"
+                                : "text-primary"
                           }`}
                         >
-                          {step.subtitle}
+                          {isDelayedCurrent && order.delayDays !== null
+                            ? `Em atraso (+${order.delayDays}d)`
+                            : step.subtitle}
                         </span>
                       ) : step.subtitle ? (
                         <span
                           className={`font-mono text-xs tabular ${
                             step.key === "delivered" && step.state === "done"
-                              ? "text-emerald-700 font-medium"
+                              ? isOrderDelayed
+                                ? "text-red-700 font-medium"
+                                : "text-emerald-700 font-medium"
                               : "text-slate-500"
                           }`}
                         >
                           {step.subtitle}
+                          {step.key === "delivered" &&
+                            step.state === "done" &&
+                            isOrderDelayed &&
+                            order.delayDays !== null &&
+                            ` (+${order.delayDays}d)`}
                         </span>
                       ) : null}
                     </p>

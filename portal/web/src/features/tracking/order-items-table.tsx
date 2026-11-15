@@ -10,7 +10,9 @@ interface OrderItemsTableProps {
 export function OrderItemsTable({ items, total }: OrderItemsTableProps) {
   const keyedItems: Array<{ key: string; item: OrderItem }> = [];
   const counts = new Map<string, number>();
+  let totalUnits = 0;
   for (const item of items) {
+    totalUnits += item.quantity;
     const base = `${item.productName}:${item.category}:${item.quantity}:${item.total}`;
     const n = (counts.get(base) ?? 0) + 1;
     counts.set(base, n);
@@ -24,14 +26,15 @@ export function OrderItemsTable({ items, total }: OrderItemsTableProps) {
           <Boxes className="w-4 h-4 text-slate-500" />
           <h3 className="label-mono !text-slate-700 font-semibold">Itens da remessa</h3>
         </div>
-        <span className="font-mono text-xs text-slate-500">
-          {pluralize(items.length, "item registrado", "itens registrados")}
+        <span className="font-mono text-xs text-slate-500 tabular">
+          {pluralize(items.length, "item", "itens")} ·{" "}
+          {pluralize(totalUnits, "unidade", "unidades")}
         </span>
       </div>
 
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200 bg-white">
+          <tr className="border-b border-slate-200 bg-slate-50/30">
             <th className="px-5 py-2 text-left label-mono">Produto</th>
             <th className="px-3 py-2 text-left label-mono">Categoria</th>
             <th className="px-3 py-2 text-right label-mono">Qtd.</th>
@@ -40,8 +43,10 @@ export function OrderItemsTable({ items, total }: OrderItemsTableProps) {
         </thead>
         <tbody className="divide-y divide-slate-100">
           {keyedItems.map(({ key, item }) => (
-            <tr key={key} className="hover:bg-slate-50/70">
-              <td className="px-5 py-2.5 font-medium text-slate-900">{item.productName}</td>
+            <tr key={key} className="hover:bg-slate-50/80 transition-colors">
+              <td className="px-5 py-2.5 font-medium text-slate-900" title={item.productName}>
+                {item.productName}
+              </td>
               <td className="px-3 py-2.5">
                 <span className="inline-flex rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
                   {item.category}

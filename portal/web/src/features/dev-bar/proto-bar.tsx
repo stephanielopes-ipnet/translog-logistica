@@ -99,7 +99,7 @@ export function ProtoBar({ activeKeys, onSelectPreset, defaultHidden = false }: 
                       onClick={() => onSelectPreset(key)}
                       className={`px-1.5 h-6 rounded font-medium transition ${
                         isOn
-                          ? "bg-white/15 text-white"
+                          ? "bg-primary text-white shadow-xs"
                           : "text-slate-400 hover:text-white hover:bg-white/5"
                       }`}
                     >
