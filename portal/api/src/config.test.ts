@@ -8,6 +8,9 @@ const defaults = {
   ordersFile: undefined,
   sampleOrderIds: [15, 375, 562, 1002],
   agent: "mock",
+  agentUrl: undefined,
+  agentAppName: "translog_agent",
+  agentTimeoutMs: 90000,
   nodeEnv: undefined,
 };
 
@@ -33,6 +36,9 @@ describe("loadConfig", () => {
       ORDERS_FILE: "",
       SAMPLE_ORDER_IDS: "",
       AGENT: "",
+      AGENT_URL: "",
+      AGENT_APP_NAME: "",
+      AGENT_TIMEOUT_MS: "",
       NODE_ENV: "",
     });
 
@@ -45,7 +51,10 @@ describe("loadConfig", () => {
       DATA_SOURCE: "file",
       ORDERS_FILE: "/data/silver_pedidos_rastreio.csv",
       SAMPLE_ORDER_IDS: "1002,15",
-      AGENT: "mock",
+      AGENT: "adk",
+      AGENT_URL: "http://agent:8001",
+      AGENT_APP_NAME: "outro_agente",
+      AGENT_TIMEOUT_MS: "60000",
       NODE_ENV: "production",
     });
 
@@ -54,7 +63,10 @@ describe("loadConfig", () => {
       dataSource: "file",
       ordersFile: "/data/silver_pedidos_rastreio.csv",
       sampleOrderIds: [1002, 15],
-      agent: "mock",
+      agent: "adk",
+      agentUrl: "http://agent:8001",
+      agentAppName: "outro_agente",
+      agentTimeoutMs: 60000,
       nodeEnv: "production",
     });
   });
@@ -101,8 +113,44 @@ describe("loadConfig", () => {
 
   it("rejeita AGENT desconhecido", () => {
     expect(configError({ AGENT: "gpt" })).toBe(
-      'Configuração inválida:\n  - AGENT deve ser "mock" (recebido: "gpt")',
+      'Configuração inválida:\n  - AGENT deve ser "mock" ou "adk" (recebido: "gpt")',
     );
+  });
+
+  it("exige AGENT_URL com AGENT=adk", () => {
+    expect(configError({ AGENT: "adk" })).toBe(
+      "Configuração inválida:\n  - AGENT_URL deve ser o endereço http(s) do agente, obrigatório " +
+        "com AGENT=adk (ex.: http://127.0.0.1:8001) (não definida)",
+    );
+  });
+
+  it("remove a barra do fim de AGENT_URL", () => {
+    expect(loadConfig({ AGENT: "adk", AGENT_URL: "http://127.0.0.1:8001/" }).agentUrl).toBe(
+      "http://127.0.0.1:8001",
+    );
+  });
+
+  it.each(["127.0.0.1:8001", "ftp://agente", "agente"])("rejeita AGENT_URL=%s", (value) => {
+    expect(configError({ AGENT: "adk", AGENT_URL: value })).toMatch(
+      new RegExp(`AGENT_URL .* \\(recebido: "${value}"\\)$`),
+    );
+  });
+
+  it.each(["0", "999", "600001", "1.5", "abc"])("rejeita AGENT_TIMEOUT_MS=%s", (value) => {
+    expect(configError({ AGENT_TIMEOUT_MS: value })).toBe(
+      "Configuração inválida:\n  - AGENT_TIMEOUT_MS deve ser um número inteiro de milissegundos " +
+        `entre 1000 e 600000 (recebido: "${value}")`,
+    );
+  });
+
+  it("rejeita AGENT_APP_NAME com caracteres de caminho", () => {
+    expect(configError({ AGENT_APP_NAME: "../admin" })).toMatch(
+      /^Configuração inválida:\n {2}- AGENT_APP_NAME /,
+    );
+  });
+
+  it("aceita AGENT_URL definida com AGENT=mock (fica sem uso)", () => {
+    expect(loadConfig({ AGENT_URL: "http://127.0.0.1:8001" }).agent).toBe("mock");
   });
 
   it("exige ORDERS_FILE com DATA_SOURCE=file", () => {

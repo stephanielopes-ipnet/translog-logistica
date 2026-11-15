@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
-import { type ChatService, createChatService } from "./chat/chat-service.ts";
+import { createAdkAgent } from "./chat/adk-agent.ts";
+import { type ChatLogger, type ChatService, createChatService } from "./chat/chat-service.ts";
 import { createMockAgent } from "./chat/mock-agent.ts";
 import type { SupportAgent } from "./chat/support-agent.ts";
 import type { Config } from "./config.ts";
@@ -37,22 +38,34 @@ export async function createContainer(
 ): Promise<Container> {
   const orders = overrides.orderRepository ?? (await createOrderRepository(config, log));
   const orderService = createOrderService({ orders, sampleOrderIds: config.sampleOrderIds });
-  const agent = overrides.supportAgent ?? createSupportAgent(config, orderService);
+  const chatLog = log.child({ agent: config.agent });
+  const agent = overrides.supportAgent ?? createSupportAgent(config, orderService, chatLog);
   return {
     config,
     orderService,
-    chatService: createChatService({
-      agent,
-      orders: orderService,
-      log: log.child({ agent: config.agent }),
-    }),
+    chatService: createChatService({ agent, orders: orderService, log: chatLog }),
   };
 }
 
-function createSupportAgent(config: Config, orderService: OrderService): SupportAgent {
+function createSupportAgent(
+  config: Config,
+  orderService: OrderService,
+  log: ChatLogger,
+): SupportAgent {
   switch (config.agent) {
     case "mock":
       return createMockAgent({ orders: orderService });
+    case "adk":
+      // O config.ts já recusa AGENT=adk sem AGENT_URL; isto só satisfaz o tipo.
+      if (config.agentUrl === undefined) {
+        throw new Error("AGENT_URL é obrigatória com AGENT=adk.");
+      }
+      return createAdkAgent({
+        url: config.agentUrl,
+        appName: config.agentAppName,
+        timeoutMs: config.agentTimeoutMs,
+        log,
+      });
   }
 }
 

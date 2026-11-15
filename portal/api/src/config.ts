@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dataSourceSchema } from "@translog/contracts";
+import { agentModeSchema, dataSourceSchema } from "@translog/contracts";
 import { z } from "zod";
 
 /** Pasta `portal/`: caminhos relativos em `ORDERS_FILE` partem daqui, de onde quer que a API rode. */
@@ -21,8 +21,14 @@ const orderIdList = z.string().transform((value, ctx) => {
   return [...new Set(parts.map(Number))];
 });
 
-/** Assistente do chat. Nesta etapa só existe o simulado; o `adk` entra com o adapter do agente. */
-const agentMode = z.enum(["mock"]);
+/** Endereço http(s) do agente; a barra do fim é removida (`http://x:8001/` → `http://x:8001`). */
+const agentUrl = z.url({ protocol: /^https?$/ }).transform((value) => value.replace(/\/+$/, ""));
+
+/** Nome do app no ADK: vai no caminho da URL, então só letras, números, `_` e `-`. */
+const agentAppName = z.string().regex(/^[\w-]+$/);
+
+/** Limite por resposta do agente, em milissegundos. */
+const agentTimeoutMs = z.coerce.number().int().min(1000).max(600_000);
 
 /** Variáveis de ambiente aceitas, com os padrões que funcionam sem `.env`. */
 const envSchema = z
@@ -31,13 +37,21 @@ const envSchema = z
     DATA_SOURCE: dataSourceSchema.default("fixtures"),
     ORDERS_FILE: z.string().optional(),
     SAMPLE_ORDER_IDS: orderIdList.prefault("15,375,562,1002"),
-    AGENT: agentMode.default("mock"),
+    AGENT: agentModeSchema.default("mock"),
+    AGENT_URL: agentUrl.optional(),
+    AGENT_APP_NAME: agentAppName.default("translog_agent"),
+    AGENT_TIMEOUT_MS: agentTimeoutMs.default(90_000),
     NODE_ENV: z.string().optional(),
   })
   .refine((env) => env.DATA_SOURCE !== "file" || env.ORDERS_FILE !== undefined, {
     path: ["ORDERS_FILE"],
     message: "obrigatória com DATA_SOURCE=file",
     // Roda mesmo com outras variáveis inválidas, para a mensagem listar tudo de uma vez.
+    when: () => true,
+  })
+  .refine((env) => env.AGENT !== "adk" || env.AGENT_URL !== undefined, {
+    path: ["AGENT_URL"],
+    message: "obrigatória com AGENT=adk",
     when: () => true,
   });
 
@@ -53,7 +67,11 @@ const expectations: Record<EnvName, string> = {
   ORDERS_FILE: "é obrigatória com DATA_SOURCE=file: caminho do CSV da Silver",
   SAMPLE_ORDER_IDS:
     "deve ser uma lista de números de pedido separados por vírgula (inteiros positivos de até 10 dígitos)",
-  AGENT: oneOf(agentMode.options),
+  AGENT: oneOf(agentModeSchema.options),
+  AGENT_URL:
+    "deve ser o endereço http(s) do agente, obrigatório com AGENT=adk (ex.: http://127.0.0.1:8001)",
+  AGENT_APP_NAME: "deve ter só letras, números, _ ou -",
+  AGENT_TIMEOUT_MS: "deve ser um número inteiro de milissegundos entre 1000 e 600000",
   NODE_ENV: "deve ser um texto",
 };
 
@@ -66,6 +84,10 @@ const configSchema = envSchema.transform((env) => ({
   sampleOrderIds: env.SAMPLE_ORDER_IDS,
   /** Assistente do chat. */
   agent: env.AGENT,
+  /** Endereço do agente ADK, sem barra no fim; obrigatório com `adk`. */
+  agentUrl: env.AGENT_URL,
+  agentAppName: env.AGENT_APP_NAME,
+  agentTimeoutMs: env.AGENT_TIMEOUT_MS,
   nodeEnv: env.NODE_ENV,
 }));
 
