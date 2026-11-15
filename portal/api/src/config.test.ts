@@ -7,6 +7,7 @@ const defaults = {
   dataSource: "fixtures",
   ordersFile: undefined,
   sampleOrderIds: [15, 375, 562, 1002],
+  agent: "mock",
   nodeEnv: undefined,
 };
 
@@ -31,6 +32,7 @@ describe("loadConfig", () => {
       DATA_SOURCE: "",
       ORDERS_FILE: "",
       SAMPLE_ORDER_IDS: "",
+      AGENT: "",
       NODE_ENV: "",
     });
 
@@ -43,6 +45,7 @@ describe("loadConfig", () => {
       DATA_SOURCE: "file",
       ORDERS_FILE: "/data/silver_pedidos_rastreio.csv",
       SAMPLE_ORDER_IDS: "1002,15",
+      AGENT: "mock",
       NODE_ENV: "production",
     });
 
@@ -51,6 +54,7 @@ describe("loadConfig", () => {
       dataSource: "file",
       ordersFile: "/data/silver_pedidos_rastreio.csv",
       sampleOrderIds: [1002, 15],
+      agent: "mock",
       nodeEnv: "production",
     });
   });
@@ -92,6 +96,12 @@ describe("loadConfig", () => {
   it("rejeita DATA_SOURCE desconhecido", () => {
     expect(configError({ DATA_SOURCE: "postgres" })).toBe(
       'Configuração inválida:\n  - DATA_SOURCE deve ser "fixtures" ou "file" (recebido: "postgres")',
+    );
+  });
+
+  it("rejeita AGENT desconhecido", () => {
+    expect(configError({ AGENT: "gpt" })).toBe(
+      'Configuração inválida:\n  - AGENT deve ser "mock" (recebido: "gpt")',
     );
   });
 

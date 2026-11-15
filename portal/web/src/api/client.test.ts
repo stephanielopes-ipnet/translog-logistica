@@ -11,15 +11,18 @@ describe("api client", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ status: "ok", dataSource: "fixtures", orders: 11 }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({ status: "ok", dataSource: "fixtures", orders: 11, agent: "mock" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       ),
     );
 
     const data = await getJson("/health", healthResponseSchema);
-    expect(data).toEqual({ status: "ok", dataSource: "fixtures", orders: 11 });
+    expect(data).toEqual({ status: "ok", dataSource: "fixtures", orders: 11, agent: "mock" });
   });
 
   it("maps standard API error payload to ApiError", async () => {

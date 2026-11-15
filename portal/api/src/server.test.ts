@@ -50,6 +50,7 @@ describe("GET /api/health", () => {
       status: "ok",
       dataSource: "fixtures",
       orders: 11,
+      agent: "mock",
     });
   });
 
@@ -59,7 +60,12 @@ describe("GET /api/health", () => {
 
     const response = await app.inject({ method: "GET", url: "/api/health" });
 
-    expect(response.json()).toStrictEqual({ status: "ok", dataSource: "file", orders: 5 });
+    expect(response.json()).toStrictEqual({
+      status: "ok",
+      dataSource: "file",
+      orders: 5,
+      agent: "mock",
+    });
   });
 
   it("com DATA_SOURCE=file e arquivo ausente, o servidor não sobe", async () => {
@@ -178,6 +184,7 @@ describe("documentação", () => {
     expect(spec.info.title).toBe("TransLog — Portal de Rastreamento");
     expect(spec.info.description).toContain("operadora logística internacional");
     expect(spec.paths).toHaveProperty("/api/health");
+    expect(spec.paths).toHaveProperty("/api/chat");
   });
 
   it("GET /docs devolve a interface do Swagger UI", async () => {

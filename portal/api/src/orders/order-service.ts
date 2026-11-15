@@ -15,6 +15,8 @@ export class OrderNotFoundError extends Error {
 export interface OrderService {
   /** Pedido pelo número. Lança `OrderNotFoundError` se não existir. */
   getOrder(orderId: number): Promise<Order>;
+  /** Pedido pelo número, ou `null` se não existir (o chat usa para conferir pedidos citados). */
+  findOrder(orderId: number): Promise<Order | null>;
   /** Pedidos de exemplo configurados que existem na fonte, na ordem configurada. */
   sampleOrderIds(): Promise<number[]>;
   /** Quantos pedidos a fonte tem. */
@@ -36,6 +38,8 @@ export function createOrderService({ orders, sampleOrderIds }: OrderServiceDeps)
       }
       return order;
     },
+
+    findOrder: (orderId) => orders.findById(orderId),
 
     async sampleOrderIds() {
       const found = await Promise.all(sampleOrderIds.map((id) => orders.findById(id)));

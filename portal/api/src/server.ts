@@ -10,6 +10,7 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { chatRoutes } from "./chat/routes.ts";
 import type { Config } from "./config.ts";
 import { type Container, type ContainerOverrides, createContainer } from "./container.ts";
 import { registerErrorHandler } from "./http/errors.ts";
@@ -47,7 +48,8 @@ export async function buildServer(config: Config, options: ServerOptions = {}) {
           "API do portal de rastreamento da TransLog, operadora logística internacional que " +
           "despacha pedidos de e-commerce a partir dos EUA e de Porto Rico para cinco mercados " +
           "(América do Norte, América Latina, Europa, Ásia-Pacífico e África). O cliente consulta " +
-          "o pedido pelo número e vê a situação, o prazo, a rota e os itens. Nenhuma resposta " +
+          "o pedido pelo número e vê a situação, o prazo, a rota e os itens, e conversa com um " +
+          "assistente sobre a entrega. Nenhuma resposta " +
           "traz dados do cliente, de pagamento ou financeiros internos.",
         version: "0.1.0",
       },
@@ -59,6 +61,7 @@ export async function buildServer(config: Config, options: ServerOptions = {}) {
   const container = await createContainer(config, { log: app.log, overrides: options.overrides });
   await app.register(healthRoutes, { prefix: "/api", container });
   await app.register(orderRoutes, { prefix: "/api", orderService: container.orderService });
+  await app.register(chatRoutes, { prefix: "/api", chatService: container.chatService });
 
   return app;
 }
@@ -73,8 +76,8 @@ const healthRoutes: FastifyPluginAsyncZod<{ container: Container }> = async (
       schema: {
         summary: "Verifica se a API está pronta",
         description:
-          "Responde só depois de os pedidos terem sido carregados. Informa a origem dos dados " +
-          "e quantos pedidos estão disponíveis.",
+          "Responde só depois de os pedidos terem sido carregados. Informa a origem dos dados, " +
+          "quantos pedidos estão disponíveis e qual assistente responde o chat (sem consultá-lo).",
         tags: ["sistema"],
         response: { 200: healthResponseSchema },
       },
@@ -83,6 +86,7 @@ const healthRoutes: FastifyPluginAsyncZod<{ container: Container }> = async (
       status: "ok",
       dataSource: container.config.dataSource,
       orders: await container.orderService.count(),
+      agent: container.config.agent,
     }),
   );
 };

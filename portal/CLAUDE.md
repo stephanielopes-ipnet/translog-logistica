@@ -17,7 +17,10 @@ Contexto detalhado, decisões e pendências ficam em `portal/_contexto/` (local,
 - `portal/_contexto/` e `portal/dados/` nunca vão para o Git. Confira com `git status` antes de sugerir commit.
 - **Privacidade:** nenhuma resposta da API contém id do cliente, segmento, tipo de pagamento, lucro, margem, desconto, latitude/longitude ou `resumo_rastreio_rag`. Essas colunas são descartadas **na leitura** da Silver, não só na saída.
 - A Silver (`portal/dados/silver_pedidos_rastreio.csv`) nunca entra no Git nem na imagem Docker. Fixtures de teste em CSV usam valores reais só nas colunas que o portal lê; as demais recebem valores fictícios.
-- Nada de abstração especulativa: só o que a fase atual usa. Chat e agente só depois do acordo com o Marco.
+- Nada de abstração especulativa: só o que a fase atual usa (sem histórico no servidor, streaming ou rate limit no chat).
+- **Chat:** decidido em 15/11 seguir sem esperar o acordo com o Marco. O que depende dele fica isolado em `withOrderContext` (`api/src/chat/adk-agent.ts`) e na configuração (`AGENT*`). Não altere `portal/_contexto/teste-agente/agent/` (cópia do código dele).
+- **Chave do Gemini** só no `.env` do agente: nunca no portal, no código, nos testes, nos logs ou no navegador. Testes automatizados não chamam o Gemini.
+- **Log do chat sem conteúdo:** nunca registre a mensagem do cliente nem a resposta; só sessão, tamanho, modo do agente, tempo e resultado.
 - Conflito entre um pedido do humano e o plano: faça o que foi pedido, atualize `portal/_contexto/` e destaque o conflito.
 
 ## Comandos

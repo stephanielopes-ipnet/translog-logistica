@@ -21,6 +21,9 @@ const orderIdList = z.string().transform((value, ctx) => {
   return [...new Set(parts.map(Number))];
 });
 
+/** Assistente do chat. Nesta etapa só existe o simulado; o `adk` entra com o adapter do agente. */
+const agentMode = z.enum(["mock"]);
+
 /** Variáveis de ambiente aceitas, com os padrões que funcionam sem `.env`. */
 const envSchema = z
   .object({
@@ -28,6 +31,7 @@ const envSchema = z
     DATA_SOURCE: dataSourceSchema.default("fixtures"),
     ORDERS_FILE: z.string().optional(),
     SAMPLE_ORDER_IDS: orderIdList.prefault("15,375,562,1002"),
+    AGENT: agentMode.default("mock"),
     NODE_ENV: z.string().optional(),
   })
   .refine((env) => env.DATA_SOURCE !== "file" || env.ORDERS_FILE !== undefined, {
@@ -49,6 +53,7 @@ const expectations: Record<EnvName, string> = {
   ORDERS_FILE: "é obrigatória com DATA_SOURCE=file: caminho do CSV da Silver",
   SAMPLE_ORDER_IDS:
     "deve ser uma lista de números de pedido separados por vírgula (inteiros positivos de até 10 dígitos)",
+  AGENT: oneOf(agentMode.options),
   NODE_ENV: "deve ser um texto",
 };
 
@@ -59,6 +64,8 @@ const configSchema = envSchema.transform((env) => ({
   ordersFile: env.ORDERS_FILE === undefined ? undefined : resolve(PORTAL_DIR, env.ORDERS_FILE),
   /** Pedidos de exemplo da tela, na ordem configurada. */
   sampleOrderIds: env.SAMPLE_ORDER_IDS,
+  /** Assistente do chat. */
+  agent: env.AGENT,
   nodeEnv: env.NODE_ENV,
 }));
 
