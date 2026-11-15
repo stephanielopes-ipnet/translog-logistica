@@ -1,17 +1,18 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { type Order, orderSchema } from "@translog/contracts";
+import type { Order } from "@translog/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, getJson } from "@/api/client.ts";
-import { findFixtureOrder } from "@/api/fixtures.ts";
-import { useHealth, useOrderQuery, useOrderSamples } from "@/api/queries.ts";
+import { ApiError } from "@/api/client.ts";
+import { useHealth, useOrderQuery, useOrderSamples, useSendChatMessage } from "@/api/queries.ts";
 import { AppHeader } from "@/components/app-header.tsx";
-import type { ChatMessageItem } from "@/features/chat/chat-messages.tsx";
 import { ChatPanel } from "@/features/chat/chat-panel.tsx";
 import {
-  buildAssistantReply,
-  buildWhenReply,
-  buildWhyReply,
-} from "@/features/chat/mock-chat-service.ts";
+  type ChatMessageItem,
+  chatFailureLabel,
+  chatTimeLabel,
+  createSessionId,
+  messagesAfterOrderSwitch,
+  startsNewConversation,
+} from "@/features/chat/chat-session.ts";
+import { buildPresetConversation, PRESET_ORDER_ID } from "@/features/dev-bar/chat-presets.ts";
 import {
   type ChatOnSwitchMode,
   ProtoBar,
@@ -20,50 +21,17 @@ import {
 import { type TrackerViewMode, TrackingPanel } from "@/features/tracking/tracking-panel.tsx";
 import { parseOrderId, readUrlPresets, withOrderQueryParam } from "@/lib/url-state.ts";
 
-function nowTimeLabel(offsetMin = 0): string {
-  return new Date(Date.now() - offsetMin * 60_000).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function buildPresetConversation(
-  order: Order,
-  releaseLabel: ReleaseLabelMode,
-  withSecondAnswer: boolean,
-  nextId: () => number,
-): ChatMessageItem[] {
-  const q1 = "Quando meu pedido chega?";
-  const q2 = "Por que meu pedido atrasou?";
-  const items: ChatMessageItem[] = [
-    { id: nextId(), role: "user", text: q1, time: nowTimeLabel(4), status: "sent" },
-    {
-      id: nextId(),
-      role: "assistant",
-      text: buildWhenReply(order, releaseLabel),
-      time: nowTimeLabel(4),
-    },
-  ];
-  if (withSecondAnswer) {
-    items.push({ id: nextId(), role: "user", text: q2, time: nowTimeLabel(2), status: "sent" });
-    items.push({
-      id: nextId(),
-      role: "assistant",
-      text: buildWhyReply(order, releaseLabel),
-      time: nowTimeLabel(2),
-    });
-  }
-  return items;
-}
-
 export function App() {
   const initialUrl = useMemo(
     () => readUrlPresets(typeof window !== "undefined" ? window.location.search : ""),
     [],
   );
+  // Conversa de exemplo pela URL (?c=conversation|typing|error): textos fixos sobre o pedido 375.
+  const initialChatPreset =
+    initialUrl.chatPreset && initialUrl.chatPreset !== "empty" ? initialUrl.chatPreset : null;
+  const initialOrderId = initialUrl.orderId ?? (initialChatPreset ? PRESET_ORDER_ID : null);
 
   const msgSeqRef = useRef(1);
-  const queryClient = useQueryClient();
   const nextMsgId = useCallback(() => {
     const id = msgSeqRef.current;
     msgSeqRef.current += 1;
@@ -71,10 +39,15 @@ export function App() {
   }, []);
 
   // Estado de busca e pedido selecionado (abre vazio por padrão quando sem parâmetros)
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(initialUrl.orderId);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(initialOrderId);
+  // Pedido selecionado no momento, para quem lê depois de esperar (resposta do chat).
+  const selectedOrderIdRef = useRef(selectedOrderId);
+  useEffect(() => {
+    selectedOrderIdRef.current = selectedOrderId;
+  }, [selectedOrderId]);
   const [queryValue, setQueryValue] = useState<string>(
-    initialUrl.orderId
-      ? String(initialUrl.orderId)
+    initialOrderId
+      ? String(initialOrderId)
       : initialUrl.trackerPreset === "notfound"
         ? "9999"
         : initialUrl.trackerPreset === "loading" || initialUrl.trackerPreset === "error"
@@ -104,42 +77,13 @@ export function App() {
   );
 
   // Estado do Chat
-  const [messages, setMessages] = useState<ChatMessageItem[]>(() => {
-    if (!initialUrl.chatPreset || initialUrl.chatPreset === "empty") {
-      return [];
-    }
-    const baseOrder = findFixtureOrder(initialUrl.orderId ?? 375) ?? findFixtureOrder(375);
-    if (!baseOrder) return [];
-    const rel = initialUrl.releaseLabel ?? "waiting";
-    if (initialUrl.chatPreset === "conversation") {
-      return buildPresetConversation(baseOrder, rel, true, () => msgSeqRef.current++);
-    }
-    if (initialUrl.chatPreset === "typing") {
-      const list = buildPresetConversation(baseOrder, rel, false, () => msgSeqRef.current++);
-      list.push({
-        id: msgSeqRef.current++,
-        role: "user",
-        text: "Por que meu pedido atrasou?",
-        time: nowTimeLabel(),
-        status: "sent",
-      });
-      return list;
-    }
-    if (initialUrl.chatPreset === "error") {
-      const list = buildPresetConversation(baseOrder, rel, false, () => msgSeqRef.current++);
-      list.push({
-        id: msgSeqRef.current++,
-        role: "user",
-        text: "Por que meu pedido atrasou?",
-        time: nowTimeLabel(),
-        status: "failed",
-      });
-      return list;
-    }
-    return [];
-  });
-  const [typing, setTyping] = useState<boolean>(initialUrl.chatPreset === "typing");
-  const chatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [messages, setMessages] = useState<ChatMessageItem[]>(() =>
+    initialChatPreset ? buildPresetConversation(initialChatPreset, () => msgSeqRef.current++) : [],
+  );
+  const [typing, setTyping] = useState<boolean>(initialChatPreset === "typing");
+  // Conversa atual no backend. null = a próxima mensagem começa uma conversa nova.
+  const sessionIdRef = useRef<string | null>(null);
+  const { mutateAsync: sendChatMessage } = useSendChatMessage();
 
   // Consultas à API real (@translog/api)
   const healthQuery = useHealth(!forcedOffline);
@@ -148,15 +92,12 @@ export function App() {
 
   const isConnected = !forcedOffline && !healthQuery.isError;
 
-  // Pedido ativo resolvido pela API real (com fallback para fixture se inspecionando sem API)
+  // Pedido ativo resolvido pela API real
   const activeOrder: Order | null = useMemo(() => {
     if (forcedTrackerView !== null || selectedOrderId === null) {
       return null;
     }
-    if (orderQuery.data) {
-      return orderQuery.data;
-    }
-    return null;
+    return orderQuery.data ?? null;
   }, [forcedTrackerView, selectedOrderId, orderQuery.data]);
 
   // View mode calculado da coluna de rastreio
@@ -202,31 +143,30 @@ export function App() {
     window.history.replaceState(null, "", nextUrl);
   }, []);
 
+  /**
+   * Começa uma conversa nova: a próxima mensagem vai com outro `sessionId`, e a resposta ainda
+   * pendente da conversa anterior é descartada quando chegar.
+   */
+  const startNewConversation = useCallback(() => {
+    sessionIdRef.current = null;
+    setTyping(false);
+  }, []);
+
   // Aplica regra de troca de pedido no chat (keep | divider | clear)
   const applyOrderSwitchToChat = useCallback(
-    (prevOrderId: number | null, nextOrderId: number | null) => {
-      if (!prevOrderId || !nextOrderId || prevOrderId === nextOrderId) {
-        return;
+    (nextOrderId: number | null) => {
+      const previousOrderId = selectedOrderIdRef.current;
+      if (startsNewConversation(chatOnSwitch, previousOrderId, nextOrderId)) {
+        startNewConversation();
       }
-      setMessages((prev) => {
-        if (prev.length === 0) return prev;
-        if (chatOnSwitch === "clear") {
-          return [];
-        }
-        if (chatOnSwitch === "divider") {
-          const last = prev[prev.length - 1];
-          if (last && last.role === "divider" && last.orderId === nextOrderId) {
-            return prev;
-          }
-          return [...prev, { id: nextMsgId(), role: "divider", orderId: nextOrderId }];
-        }
-        return prev;
-      });
+      setMessages((prev) =>
+        messagesAfterOrderSwitch(prev, chatOnSwitch, previousOrderId, nextOrderId, nextMsgId),
+      );
     },
-    [chatOnSwitch, nextMsgId],
+    [chatOnSwitch, nextMsgId, startNewConversation],
   );
 
-  // Busca um pedido pelo formulário ou pelos chips
+  // Busca um pedido pelo formulário, pelos chips ou pelo pedido citado no chat
   const handleSelectOrder = useCallback(
     (rawOrderId: string) => {
       const parsed = parseOrderId(rawOrderId);
@@ -241,11 +181,11 @@ export function App() {
         return;
       }
 
-      applyOrderSwitchToChat(selectedOrderId, parsed);
+      applyOrderSwitchToChat(parsed);
       setSelectedOrderId(parsed);
       syncUrlOrder(parsed);
     },
-    [applyOrderSwitchToChat, selectedOrderId, syncUrlOrder],
+    [applyOrderSwitchToChat, syncUrlOrder],
   );
 
   const handleClearOrder = useCallback(() => {
@@ -270,148 +210,94 @@ export function App() {
     }
   }, [orderQuery, queryValue, selectedOrderId, submittedQuery, syncUrlOrder]);
 
-  // Dispara resposta do assistente
+  const markMessageFailed = useCallback((messageId: number, failureLabel: string) => {
+    setMessages((prev) =>
+      prev.map((item) =>
+        item.id === messageId && item.role === "user"
+          ? { ...item, status: "failed", failureLabel }
+          : item,
+      ),
+    );
+  }, []);
+
+  // Envia a pergunta à API (POST /api/chat) e mostra a resposta. Sem reenvio automático.
   const deliverChatReply = useCallback(
-    (questionText: string) => {
-      if (chatTimerRef.current) {
-        clearTimeout(chatTimerRef.current);
+    async (question: string, userMessageId: number) => {
+      if (forcedOffline) {
+        markMessageFailed(userMessageId, "Não enviada");
+        return;
       }
+
+      sessionIdRef.current ??= createSessionId();
+      const sessionId = sessionIdRef.current;
       setTyping(true);
-
-      chatTimerRef.current = setTimeout(async () => {
-        if (forcedOffline) {
-          setTyping(false);
-          setMessages((prev) => {
-            const copy = [...prev];
-            for (let i = copy.length - 1; i >= 0; i -= 1) {
-              const item = copy[i];
-              if (item && item.role === "user") {
-                copy[i] = { ...item, status: "failed" };
-                break;
-              }
-            }
-            return copy;
-          });
-          return;
-        }
-
-        const currentOrder =
-          activeOrder ?? (selectedOrderId ? findFixtureOrder(selectedOrderId) : null);
-
-        // Se o texto mencionar outro pedido e a API estiver online, tenta buscá-lo na API real
-        let prefetchedOrder: Order | null = null;
-        const numberMatch = questionText.match(/\d+/);
-        const mentionedId = numberMatch ? parseOrderId(numberMatch[0]) : null;
-        if (mentionedId !== null && mentionedId !== activeOrder?.orderId) {
-          try {
-            prefetchedOrder = await queryClient.fetchQuery({
-              queryKey: ["orders", mentionedId],
-              queryFn: () => getJson(`/orders/${mentionedId}`, orderSchema),
-              retry: false,
-            });
-          } catch {
-            prefetchedOrder = null;
-          }
-        }
-
-        setTyping(false);
-
-        const { reply, detectedOrderId } = buildAssistantReply({
-          message: questionText,
-          currentOrder,
-          releaseLabel,
-          resolveOrder: (id) => {
-            if (activeOrder && activeOrder.orderId === id) return activeOrder;
-            if (prefetchedOrder && prefetchedOrder.orderId === id) return prefetchedOrder;
-            return findFixtureOrder(id);
-          },
+      try {
+        const response = await sendChatMessage({
+          sessionId,
+          message: question,
+          orderId: activeOrder?.orderId ?? null,
         });
-
-        if (detectedOrderId !== null && detectedOrderId !== selectedOrderId) {
-          applyOrderSwitchToChat(selectedOrderId, detectedOrderId);
-          setForcedTrackerView(null);
-          setSelectedOrderId(detectedOrderId);
-          setQueryValue(String(detectedOrderId));
-          setSubmittedQuery(String(detectedOrderId));
-          syncUrlOrder(detectedOrderId);
+        if (sessionIdRef.current !== sessionId) {
+          return; // A conversa mudou enquanto esperava ("Nova conversa" ou troca com "Zerar").
         }
-
+        setTyping(false);
+        // Pedido citado na mensagem: abre no rastreio (mesma troca de pedido do formulário).
+        if (
+          response.mentionedOrderId !== null &&
+          response.mentionedOrderId !== selectedOrderIdRef.current
+        ) {
+          handleSelectOrder(String(response.mentionedOrderId));
+        }
         setMessages((prev) => [
           ...prev,
-          {
-            id: nextMsgId(),
-            role: "assistant",
-            text: reply,
-            time: nowTimeLabel(),
-          },
+          { id: nextMsgId(), role: "assistant", text: response.reply, time: chatTimeLabel() },
         ]);
-      }, 850);
+      } catch (error) {
+        if (sessionIdRef.current !== sessionId) {
+          return;
+        }
+        setTyping(false);
+        markMessageFailed(userMessageId, chatFailureLabel(error));
+      }
     },
-    [
-      activeOrder,
-      applyOrderSwitchToChat,
-      forcedOffline,
-      nextMsgId,
-      queryClient,
-      releaseLabel,
-      selectedOrderId,
-      syncUrlOrder,
-    ],
+    [activeOrder, forcedOffline, handleSelectOrder, markMessageFailed, nextMsgId, sendChatMessage],
   );
 
   const handleSendMessage = useCallback(
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || typing) return;
-      const userMsg: ChatMessageItem = {
-        id: nextMsgId(),
-        role: "user",
-        text: trimmed,
-        time: nowTimeLabel(),
-        status: "sent",
-      };
-      setMessages((prev) => [...prev, userMsg]);
-      deliverChatReply(trimmed);
+      const id = nextMsgId();
+      setMessages((prev) => [
+        ...prev,
+        { id, role: "user", text: trimmed, time: chatTimeLabel(), status: "sent" },
+      ]);
+      void deliverChatReply(trimmed, id);
     },
     [deliverChatReply, nextMsgId, typing],
   );
 
+  // Reenvio manual ("Tentar novamente"): a mensagem que falhou volta para o fim da conversa.
   const handleRetryMessage = useCallback(
-    (id: number) => {
+    (messageId: number) => {
       if (typing) return;
-      const target = messages.find((m) => m.id === id && m.role === "user");
+      const target = messages.find((m) => m.id === messageId && m.role === "user");
       if (target?.role !== "user") return;
 
+      const id = nextMsgId();
       setMessages((prev) => [
-        ...prev.filter((m) => m.id !== id),
-        {
-          id: nextMsgId(),
-          role: "user",
-          text: target.text,
-          time: nowTimeLabel(),
-          status: "sent",
-        },
+        ...prev.filter((m) => m.id !== messageId),
+        { id, role: "user", text: target.text, time: chatTimeLabel(), status: "sent" },
       ]);
-      deliverChatReply(target.text);
+      void deliverChatReply(target.text, id);
     },
     [deliverChatReply, messages, nextMsgId, typing],
   );
 
   const handleNewChat = useCallback(() => {
-    if (chatTimerRef.current) {
-      clearTimeout(chatTimerRef.current);
-    }
-    setTyping(false);
+    startNewConversation();
     setMessages([]);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (chatTimerRef.current) {
-        clearTimeout(chatTimerRef.current);
-      }
-    };
-  }, []);
+  }, [startNewConversation]);
 
   // Aplicação de presets da barra de controle
   const handleSelectPreset = useCallback(
@@ -424,7 +310,7 @@ export function App() {
           const id = Number(val);
           setForcedOffline(false);
           setForcedTrackerView(null);
-          applyOrderSwitchToChat(selectedOrderId, id);
+          applyOrderSwitchToChat(id);
           setSelectedOrderId(id);
           setQueryValue(val);
           setSubmittedQuery(val);
@@ -453,48 +339,21 @@ export function App() {
           }
         }
       } else if (kind === "c") {
-        if (chatTimerRef.current) {
-          clearTimeout(chatTimerRef.current);
-        }
-        setTyping(false);
+        // Conversa de exemplo substitui a atual: começa outra conversa no backend.
+        startNewConversation();
         if (val === "empty") {
           setMessages([]);
-        } else {
-          const targetId = selectedOrderId ?? 375;
-          if (selectedOrderId === null) {
+        } else if (val === "conversation" || val === "typing" || val === "error") {
+          if (selectedOrderIdRef.current !== PRESET_ORDER_ID) {
             setForcedTrackerView(null);
-            setSelectedOrderId(375);
-            setQueryValue("375");
-            setSubmittedQuery("375");
-            syncUrlOrder(375);
+            setSelectedOrderId(PRESET_ORDER_ID);
+            setQueryValue(String(PRESET_ORDER_ID));
+            setSubmittedQuery(String(PRESET_ORDER_ID));
+            syncUrlOrder(PRESET_ORDER_ID);
           }
-          const orderObj = activeOrder ?? findFixtureOrder(targetId) ?? findFixtureOrder(375);
-          if (!orderObj) return;
-
-          if (val === "conversation") {
-            setMessages(buildPresetConversation(orderObj, releaseLabel, true, nextMsgId));
-          } else if (val === "typing") {
-            const list = buildPresetConversation(orderObj, releaseLabel, false, nextMsgId);
-            list.push({
-              id: nextMsgId(),
-              role: "user",
-              text: "Por que meu pedido atrasou?",
-              time: nowTimeLabel(),
-              status: "sent",
-            });
-            setMessages(list);
-            setTyping(true);
-          } else if (val === "error") {
-            const list = buildPresetConversation(orderObj, releaseLabel, false, nextMsgId);
-            list.push({
-              id: nextMsgId(),
-              role: "user",
-              text: "Por que meu pedido atrasou?",
-              time: nowTimeLabel(),
-              status: "failed",
-            });
-            setMessages(list);
-          }
+          setMessages(buildPresetConversation(val, nextMsgId));
+          // "Digitando" de exemplo: nenhuma pergunta foi enviada à API.
+          setTyping(val === "typing");
         }
       } else if (kind === "s") {
         if (val === "keep" || val === "divider" || val === "clear") {
@@ -520,13 +379,12 @@ export function App() {
       }
     },
     [
-      activeOrder,
       applyOrderSwitchToChat,
       forcedTrackerView,
       nextMsgId,
       queryValue,
-      releaseLabel,
       selectedOrderId,
+      startNewConversation,
       syncUrlOrder,
     ],
   );

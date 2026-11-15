@@ -2,7 +2,7 @@ import { EyeOff, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import type { ReleaseLabelMode } from "@/features/tracking/timeline.ts";
 
-export type ChatOnSwitchMode = "keep" | "divider" | "clear";
+export type { ChatOnSwitchMode } from "@/features/chat/chat-session.ts";
 
 const PROTO_GROUPS = [
   {

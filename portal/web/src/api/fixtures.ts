@@ -11,7 +11,7 @@ export const SAMPLE_HINTS: Record<number, string> = {
 
 /**
  * 11 pedidos de referência extraídos da Silver (sem dados de cliente, pagamento ou lucro).
- * Usados pelo mock do assistente e pelos presets da barra de desenvolvimento.
+ * Usados só nos testes da tela (linha do tempo e sugestões do chat); a tela consulta a API.
  */
 export const FIXTURE_ORDERS: readonly Order[] = [
   {

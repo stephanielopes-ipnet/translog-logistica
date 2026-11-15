@@ -1,27 +1,8 @@
 import type { Order } from "@translog/contracts";
 import { ArrowUpRight, CircleAlert, MessageCircleQuestion } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
-import { getChatSuggestions } from "./mock-chat-service.ts";
-
-export type ChatMessageItem =
-  | {
-      id: number;
-      role: "user";
-      text: string;
-      time: string;
-      status: "sent" | "failed";
-    }
-  | {
-      id: number;
-      role: "assistant";
-      text: string;
-      time: string;
-    }
-  | {
-      id: number;
-      role: "divider";
-      orderId: number;
-    };
+import type { ChatMessageItem } from "./chat-session.ts";
+import { getChatSuggestions } from "./chat-suggestions.ts";
 
 /** Renderiza `**negrito**` e quebras de linha em React sem usar `dangerouslySetInnerHTML`. */
 function renderRichText(text: string): ReactNode {
@@ -149,7 +130,7 @@ export function ChatMessages({
                 {isFailed ? (
                   <span className="mt-1 flex items-center gap-1 font-mono text-[11px] text-red-600">
                     <CircleAlert className="w-3 h-3" />
-                    Não enviada
+                    {msg.failureLabel ?? "Não enviada"}
                     <span className="text-red-300">·</span>
                     <button
                       type="button"

@@ -14,18 +14,42 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * GET em `/api{path}` com validação Zod da resposta.
- */
-export async function getJson<Schema extends z.ZodType>(
+/** GET em `/api{path}` com validação Zod da resposta. */
+export function getJson<Schema extends z.ZodType>(
   path: string,
+  schema: Schema,
+): Promise<z.output<Schema>> {
+  return requestJson(path, { method: "GET" }, schema);
+}
+
+/** POST em `/api{path}` com corpo JSON e validação Zod da resposta. */
+export function postJson<Schema extends z.ZodType>(
+  path: string,
+  body: unknown,
+  schema: Schema,
+): Promise<z.output<Schema>> {
+  return requestJson(
+    path,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    schema,
+  );
+}
+
+/**
+ * Chama a API e valida a resposta com o esquema do contrato. Toda falha vira `ApiError`:
+ * rede (`status: 0`, `NETWORK_ERROR`), erro da API (código e mensagem do envelope padrão)
+ * ou resposta fora do contrato (`INVALID_RESPONSE`).
+ */
+async function requestJson<Schema extends z.ZodType>(
+  path: string,
+  init: RequestInit,
   schema: Schema,
 ): Promise<z.output<Schema>> {
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
+      ...init,
+      headers: { Accept: "application/json", ...init.headers },
     });
   } catch {
     throw new ApiError(0, "NETWORK_ERROR", "Não foi possível conectar ao sistema.");

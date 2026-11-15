@@ -1,7 +1,8 @@
 import type { Order } from "@translog/contracts";
 import { Info, MessageSquareText, RotateCcw, Tag } from "lucide-react";
 import { ChatInput } from "./chat-input.tsx";
-import { type ChatMessageItem, ChatMessages } from "./chat-messages.tsx";
+import { ChatMessages } from "./chat-messages.tsx";
+import type { ChatMessageItem } from "./chat-session.ts";
 
 interface ChatPanelProps {
   activeOrder: Order | null;

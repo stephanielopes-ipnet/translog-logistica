@@ -1,3 +1,4 @@
+import { CHAT_MESSAGE_MAX_LENGTH } from "@translog/contracts";
 import { SendHorizontal } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useRef, useState } from "react";
 
@@ -57,6 +58,7 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
         <textarea
           ref={textareaRef}
           rows={1}
+          maxLength={CHAT_MESSAGE_MAX_LENGTH}
           value={text}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
