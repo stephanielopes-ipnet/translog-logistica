@@ -1,3 +1,4 @@
+-- Databricks notebook source
 -- =============================================================================
 
 -- 1 linha por ITEM de pedido (id_item_pedido é único).
@@ -8,8 +9,14 @@
 --   4. Colunas redundantes/vazias não são selecionadas (provas em 02b)
 --   5. Regras de consistência -> registros inválidos vão para a QUARENTENA
 --   6. Regras de negócio (atraso, janela, rota, texto RAG)
+--   7. [Silver v2] Indicadores da PMO (no_prazo, faixa_atraso, periodo_pico,
+--      receita_em_risco, causa_provavel, data_entrega_real)
+-- PREMISSA DE DATAS: dias_envio_programado = prazo de ENTREGA prometido; dias_envio_real =
+-- tempo até a ENTREGA (PROCESSING: dias em trânsito até a foto); data_envio (Shipping date) =
+-- data_pedido + dias_envio_real = data da entrega para os entregues. Ver doc 03, seção 13.
 -- Saídas: silver.pedidos_rastreio (válidos), silver.pedidos_quarentena (inválidos + motivo)
---         e silver.vw_pedidos_rastreio (view de consumo para Fullstack e IA)
+-- Ordem de execução: 01 -> 01b -> 02a -> 02d (hubs + rastreio simulado) -> 02e (view de consumo)
+--                    -> 02b (testes) -> 02c (auditoria/exportação)
 -- =============================================================================
 
 
@@ -206,6 +213,50 @@ regras_negocio AS (
                  THEN 'coordenada_fora_do_intervalo' END
         ), '') AS motivo_quarentena
     FROM avaliacao
+),
+indicadores_pmo AS (
+    -- [Silver v2] Indicadores pedidos pela PMO. Ficam num CTE próprio porque dependem de
+    -- flag_atrasado/dias_atraso, calculados no CTE anterior.
+    SELECT
+        *,
+        -- no_prazo: inverso de flag_atrasado (NULL = pedido não avaliado: pendente ou cancelado).
+        CASE flag_atrasado WHEN 0 THEN 1 WHEN 1 THEN 0 END AS no_prazo,
+
+        -- faixa_atraso: versão simplificada da janela_atraso, no formato pedido pela PMO.
+        CASE
+            WHEN dias_atraso IS NULL THEN NULL
+            WHEN dias_atraso <= 0    THEN 'No prazo'
+            WHEN dias_atraso <= 2    THEN '1-2 dias'
+            ELSE '3+ dias'
+        END AS faixa_atraso,
+
+        -- data_entrega_real: data em que o pedido chegou. Só existe para ENTREGUES (COMPLETE/CLOSED).
+        -- PREMISSA DE DATAS (Silver v2): Shipping date = data_pedido + dias_envio_real (100% das
+        -- linhas, por dia) = data da ENTREGA. Usar só a data: a hora tem erro de ±12h em ~5% das linhas.
+        -- PROCESSING ainda não chegou: para ele, dias_envio_real = dias em trânsito até a foto e
+        -- data_entrega_real = NULL. Pendentes/cancelados não foram despachados: NULL.
+        CASE WHEN status_pedido IN ('COMPLETE', 'CLOSED') AND NOT pedido_cancelado
+             THEN data_envio
+        END AS data_entrega_real,
+
+        -- periodo_pico: pedidos de novembro e dezembro. Só DIMENSÃO para o BI investigar;
+        -- não é usada como causa (no DataCo o atraso em nov/dez é 58,1% contra 57,1% no resto do ano).
+        CASE WHEN MONTH(data_pedido) IN (11, 12) THEN 1 ELSE 0 END AS periodo_pico,
+
+        -- receita_em_risco: valor bruto (Sales) dos itens atrasados; 0 nos demais.
+        CASE WHEN flag_atrasado = 1 THEN valor_bruto_venda ELSE 0 END AS receita_em_risco,
+
+        -- causa_provavel (derivada só de dados reais):
+        --   Promessa irreal = atrasado com prazo prometido <= 1 dia (Same Day e First Class), em
+        --   qualquer destino. First Class promete 1 dia e leva sempre 2 (0% no prazo).
+        --   Atraso operacional = demais atrasados (a base não registra o motivo).
+        CASE
+            WHEN flag_atrasado IS NULL      THEN NULL
+            WHEN flag_atrasado = 0          THEN 'Sem atraso'
+            WHEN dias_envio_programado <= 1 THEN 'Promessa irreal'
+            ELSE 'Atraso operacional'
+        END AS causa_provavel
+    FROM regras_negocio
 )
 SELECT
     *,
@@ -221,11 +272,16 @@ SELECT
         ' | Situação: ', situacao_rastreio, ' (Status Pedido: ', COALESCE(status_pedido, 'N/A'), ')',
         ' | Prazo do Envio: ', status_entrega_pt,
         ' | Prazo Programado: ', COALESCE(CAST(dias_envio_programado AS STRING), 'N/A'), ' dias',
-        ' | Tempo Real de Trânsito: ', COALESCE(CAST(dias_envio_real AS STRING), 'N/A'), ' dias',
-        ' | Diferença/Atraso: ', COALESCE(CAST(dias_atraso AS STRING), 'N/A'), ' dias (Janela: ', janela_atraso, ').'
+        -- Dias reais e atraso só para pedidos despachados (não pagos/cancelados não têm trânsito)
+        COALESCE(CASE WHEN avaliado_prazo
+                      THEN CONCAT(' | Tempo Real de Trânsito: ', CAST(dias_envio_real AS STRING), ' dias',
+                                  ' | Diferença/Atraso: ', CAST(dias_atraso AS STRING), ' dias') END, ''),
+        ' | Janela: ', janela_atraso, '.'
     ) AS resumo_rastreio_rag,
     current_timestamp() AS dt_processamento_silver
-FROM regras_negocio;
+FROM indicadores_pmo;
+
+-- COMMAND ----------
 
 -- -----------------------------------------------------------------------------
 -- 2. SILVER (registros válidos)
@@ -237,6 +293,8 @@ SELECT * EXCEPT (motivo_quarentena)
 FROM vw_silver_staging
 WHERE motivo_quarentena IS NULL;
 
+-- COMMAND ----------
+
 -- -----------------------------------------------------------------------------
 -- 3. QUARENTENA (registros inválidos + motivo, para auditoria e não perder dados)
 -- -----------------------------------------------------------------------------
@@ -247,68 +305,13 @@ SELECT *
 FROM vw_silver_staging
 WHERE motivo_quarentena IS NOT NULL;
 
+-- COMMAND ----------
+
 -- -----------------------------------------------------------------------------
--- 3b. VIEW DE CONSUMO (Fullstack e IA leem DAQUI, não da tabela)
---     Nenhum dado é apagado: a tabela silver.pedidos_rastreio continua com tudo.
---     Ficam de fora só:
---       - Linhagem técnica: arquivo_origem, dt_ingestao_bronze, dt_processamento_silver
---       - PII: nome_cliente (portal busca por id_cliente)
---       - Colunas originais de atraso (risco_atraso_flag, status_entrega_original):
---         comprovadamente = (dias_envio_real > dias_envio_programado) em 100% das linhas,
---         então são reconstruíveis; fora da view para um agente Text-to-SQL não contar
---         atrasos de pedidos não pagos (98.976 em vez de 57.810).
---       - Redundantes: avaliado_prazo (= flag_atrasado IS NOT NULL) e
---         pedido_cancelado (= situacao_rastreio = 'Cancelado').
---     Tradução pt-BR: de-para em silver.dim_traducao (importada de
---     data/de_para_padronizacao_pt.csv ANTES de rodar este script). As colunas mantêm o
---     mesmo nome com valores em português; sem tradução, mantém o original (COALESCE).
---     rota_logistica e resumo_rastreio_rag são remontados com os valores traduzidos.
+-- 3b. VIEW DE CONSUMO: movida para 02e_silver_view_consumo.sql (Silver v2).
+--     Motivo: a view agora junta o rastreio simulado (silver.rastreio_pedidos, criado
+--     no 02d), que depende desta tabela. Ordem: 02a -> 02d -> 02e.
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW silver.vw_pedidos_rastreio
-COMMENT 'Silver para consumo (Fullstack/IA): pt-BR, sem PII, sem linhagem técnica, regra de atraso oficial'
-AS
-WITH base AS (
-    SELECT
-        s.* EXCEPT (nome_cliente, risco_atraso_flag, status_entrega_original,
-                    arquivo_origem, dt_ingestao_bronze, dt_processamento_silver,
-                    avaliado_prazo, pedido_cancelado,
-                    destino_pais, destino_estado, destino_regiao,
-                    origem_cliente_cidade, origem_cliente_estado, origem_cliente_pais,
-                    rota_logistica, resumo_rastreio_rag),
-        COALESCE(tp.valor_pt,  s.destino_pais)          AS destino_pais,
-        COALESCE(te.valor_pt,  s.destino_estado)        AS destino_estado,
-        COALESCE(tr.valor_pt,  s.destino_regiao)        AS destino_regiao,
-        COALESCE(tcc.valor_pt, s.origem_cliente_cidade) AS origem_cliente_cidade,
-        COALESCE(tce.valor_pt, s.origem_cliente_estado) AS origem_cliente_estado,
-        COALESCE(tcp.valor_pt, s.origem_cliente_pais)   AS origem_cliente_pais
-    FROM silver.pedidos_rastreio s
-    LEFT JOIN silver.dim_traducao tp  ON tp.coluna  = 'destino_pais'          AND tp.valor_original  = s.destino_pais
-    LEFT JOIN silver.dim_traducao te  ON te.coluna  = 'destino_estado'        AND te.valor_original  = s.destino_estado
-                                     AND te.contexto = s.destino_pais
-    LEFT JOIN silver.dim_traducao tr  ON tr.coluna  = 'destino_regiao'        AND tr.valor_original  = s.destino_regiao
-    LEFT JOIN silver.dim_traducao tcc ON tcc.coluna = 'origem_cliente_cidade' AND tcc.valor_original = s.origem_cliente_cidade
-    LEFT JOIN silver.dim_traducao tce ON tce.coluna = 'origem_cliente_estado' AND tce.valor_original = s.origem_cliente_estado
-    LEFT JOIN silver.dim_traducao tcp ON tcp.coluna = 'origem_cliente_pais'   AND tcp.valor_original = s.origem_cliente_pais
-)
-SELECT
-    *,
-    CONCAT(COALESCE(origem_cliente_estado, 'N/A'), ' -> ', COALESCE(destino_regiao, 'N/A'),
-           ' (', COALESCE(destino_cidade, 'N/A'), ' - ', COALESCE(destino_estado, 'N/A'), ')') AS rota_logistica,
-    CONCAT(
-        'Pedido #', COALESCE(CAST(id_pedido AS STRING), 'N/A'),
-        ' (Item #', COALESCE(CAST(id_item_pedido AS STRING), 'N/A'), ') | Cliente ID: ', COALESCE(CAST(id_cliente AS STRING), 'N/A'),
-        ' | Produto: ', COALESCE(nome_produto, 'N/A'), ' (Categoria: ', COALESCE(categoria_produto, 'N/A'), ')',
-        ' | Modalidade: ', COALESCE(modo_envio, 'N/A'),
-        ' | Rota: ', COALESCE(origem_cliente_estado, 'N/A'), ' -> ', COALESCE(destino_regiao, 'N/A'),
-                   ' (', COALESCE(destino_cidade, 'N/A'), ' - ', COALESCE(destino_estado, 'N/A'), ')',
-        ' | Situação: ', situacao_rastreio, ' (Status Pedido: ', COALESCE(status_pedido, 'N/A'), ')',
-        ' | Prazo do Envio: ', status_entrega_pt,
-        ' | Prazo Programado: ', COALESCE(CAST(dias_envio_programado AS STRING), 'N/A'), ' dias',
-        ' | Tempo Real de Trânsito: ', COALESCE(CAST(dias_envio_real AS STRING), 'N/A'), ' dias',
-        ' | Diferença/Atraso: ', COALESCE(CAST(dias_atraso AS STRING), 'N/A'), ' dias (Janela: ', janela_atraso, ').'
-    ) AS resumo_rastreio_rag,
-    ROUND(SUM(lucro_item) OVER (PARTITION BY id_pedido), 2) AS lucro_total_pedido
-FROM base;
 
 -- -----------------------------------------------------------------------------
 -- 4. Validação rápida das Janelas de Atraso (testes completos em 02b)
@@ -324,6 +327,8 @@ SELECT
 FROM silver.pedidos_rastreio
 GROUP BY janela_atraso, status_entrega_pt
 ORDER BY janela_atraso;
+
+-- COMMAND ----------
 
 -- -----------------------------------------------------------------------------
 -- 5. Validação: Order Item Product Price x Product Price
