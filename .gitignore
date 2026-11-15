@@ -7,6 +7,7 @@ secrets/
 # Dados (CSV completo do Kaggle não vai para o Git)
 data/raw/
 # Dados locais da Engenharia de Dados (brutos, de-para, dicionário): nenhum vai para o Git
+
 pipeline/data/
 # Cópia exportada do Databricks (só para comparar com pipeline/notebooks/)
 pipeline/notebooks_databricks/
@@ -15,7 +16,7 @@ DataCoSupplyChainDataset*.csv
 chroma_db/
 *.duckdb
 *.sqlite
-
+.databricks/
 # Python
 __pycache__/
 .venv/
