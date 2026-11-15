@@ -1,3 +1,4 @@
+-- Databricks notebook source
 -- =============================================================================
 -- PROJETO INTEGRADOR ACADEMY - GRUPO 3 (TRANSLOG BRASIL)
 -- ETAPA 1: CAMADA BRONZE (INGESTÃO DE DADOS BRUTOS)
@@ -6,8 +7,16 @@
 
 -- 1. Criação dos Schemas (equivalentes aos Datasets do BigQuery)
 CREATE SCHEMA IF NOT EXISTS bronze COMMENT 'Camada Bronze: Dados brutos ingeridos da origem (DataCo Supply Chain)';
+
+-- COMMAND ----------
+
 CREATE SCHEMA IF NOT EXISTS silver COMMENT 'Camada Silver: Dados limpos, tipados e enriquecidos com janelas de atraso e rotas (Consumo: IA e FullStack)';
+
+-- COMMAND ----------
+
 CREATE SCHEMA IF NOT EXISTS gold   COMMENT 'Camada Gold: Tabelas agregadas de KPIs logísticos (Consumo: BI e Gestão)';
+
+-- COMMAND ----------
 
 -- =============================================================================
 -- 2. Ingestão do CSV Bruto para a Tabela Delta Bronze
@@ -31,6 +40,8 @@ FROM read_files(
     inferSchema => true,
     encoding => 'ISO-8859-1'
 );
+
+-- COMMAND ----------
 
 -- [OPÇÃO 2B] (Alternativa) Caso você tenha usado "Create or modify table" pela interface do Databricks:
 -- CREATE OR REPLACE TABLE bronze.dataco_raw AS
