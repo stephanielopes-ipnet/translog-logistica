@@ -3,10 +3,10 @@ import { agentModeSchema } from "./chat.ts";
 
 /** Origem dos pedidos (`DATA_SOURCE`). */
 export const dataSourceSchema = z
-  .enum(["fixtures", "file"])
+  .enum(["fixtures", "file", "databricks"])
   .describe(
-    "Origem dos pedidos: fixtures (pedidos de exemplo no código) ou file (tabelas consumo_* " +
-      "exportadas em CSV)",
+    "Origem dos pedidos: fixtures (pedidos de exemplo no código), file (tabelas consumo_* " +
+      "exportadas em CSV) ou databricks (tabelas consumo_* lidas do Databricks ao subir a API)",
   );
 export type DataSource = z.infer<typeof dataSourceSchema>;
 

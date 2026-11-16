@@ -3,6 +3,8 @@
 **/coverage
 **/*.log
 **/*.test.ts
+# Apoio de testes (servidor falso do Databricks)
+api/src/testing
 
 # CSV não entra na imagem: nem a amostra de teste, nem uma cópia da Silver por engano.
 **/*.csv

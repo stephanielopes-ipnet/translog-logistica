@@ -8,6 +8,7 @@ import { loadConfig } from "./config.ts";
 import type { ContainerOverrides } from "./container.ts";
 import { FIXTURES_FILE } from "./orders/fixtures-repository.ts";
 import { buildServer } from "./server.ts";
+import { startFakeDatabricks } from "./testing/fake-databricks.ts";
 
 // Regra fixa do portal: nenhuma resposta traz dado do cliente, de pagamento ou financeiro
 // interno. Estes testes varrem todas as chaves (em qualquer nível) de todas as respostas.
@@ -43,6 +44,21 @@ const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FIL
 /** Amostra das tabelas consumo_* com as colunas proibidas preenchidas com valores fictícios. */
 const SAMPLE_DIR = fileURLToPath(new URL("./orders/fixtures/consumo/", import.meta.url));
 const ALL_IDS = fixtures.map((order) => order.orderId);
+
+/** Ambiente de cada fonte. `databricks` usa um Databricks falso que serve a mesma amostra. */
+const SOURCES = [
+  { source: "fixtures", env: async () => ({}) },
+  { source: "file", env: async () => ({ DATA_SOURCE: "file", DATA_DIR: SAMPLE_DIR }) },
+  {
+    source: "databricks",
+    env: async () => ({
+      DATA_SOURCE: "databricks",
+      DATABRICKS_HOST: (await startFakeDatabricks()).baseUrl,
+      DATABRICKS_WAREHOUSE_ID: "wh-teste",
+      DATABRICKS_TOKEN: "token-de-teste",
+    }),
+  },
+];
 
 async function buildTestServer(env: NodeJS.ProcessEnv, overrides?: ContainerOverrides) {
   const app = await buildServer(loadConfig(env), { logger: false, overrides });
@@ -103,34 +119,30 @@ describe("varredura de chaves proibidas", () => {
     ).toEqual(["lucro_item", "customerId", "lat"]);
   });
 
-  it.each([
-    { source: "fixtures", env: {}, orderIds: fixtures.map((order) => order.orderId) },
-    {
-      source: "file",
-      env: { DATA_SOURCE: "file", DATA_DIR: SAMPLE_DIR },
-      orderIds: ALL_IDS,
-    },
-  ])("nenhuma resposta tem chave proibida (fonte $source)", async ({ env, orderIds }) => {
-    const app = await buildTestServer(env);
+  it.each([...SOURCES])("nenhuma resposta tem chave proibida (fonte $source)", async ({ env }) => {
+    const app = await buildTestServer(await env());
 
-    const bodies = await responseBodies(app, allUrls(orderIds));
+    const bodies = await responseBodies(app, allUrls(ALL_IDS));
 
     for (const { url, body } of bodies) {
       expect(forbiddenKeys(body), url).toEqual([]);
     }
   });
 
-  it("nenhuma resposta traz valores das colunas proibidas ou sem uso das tabelas", async () => {
-    // Na amostra, essas colunas têm valores FICTICIO-* e SEM-USO.
-    const app = await buildTestServer({ DATA_SOURCE: "file", DATA_DIR: SAMPLE_DIR });
+  it.each(SOURCES.slice(1))(
+    "nenhuma resposta traz valores das colunas proibidas ou sem uso das tabelas (fonte $source)",
+    async ({ env }) => {
+      // Na amostra, essas colunas têm valores FICTICIO-* e SEM-USO.
+      const app = await buildTestServer(await env());
 
-    const bodies = await responseBodies(app, allUrls(ALL_IDS));
+      const bodies = await responseBodies(app, allUrls(ALL_IDS));
 
-    expect(bodies.map(({ body }) => body).filter((body) => body.orderId)).toHaveLength(9);
-    for (const { url, body } of bodies) {
-      expect(JSON.stringify(body), url).not.toMatch(/FICTICIO|SEM-USO/);
-    }
-  });
+      expect(bodies.map(({ body }) => body).filter((body) => body.orderId)).toHaveLength(9);
+      for (const { url, body } of bodies) {
+        expect(JSON.stringify(body), url).not.toMatch(/FICTICIO|SEM-USO/);
+      }
+    },
+  );
 
   it("campos fora do contrato são descartados na resposta, mesmo se a fonte os trouxer", async () => {
     const leak = { id_cliente: 123, segmento_cliente: "Consumer", valor_desconto: 99.9 };
@@ -159,19 +171,12 @@ describe("varredura de chaves proibidas", () => {
 });
 
 describe("privacidade no chat (assistente simulado)", () => {
-  it.each([
-    { source: "fixtures", env: {}, orderIds: fixtures.map((order) => order.orderId) },
-    {
-      source: "file",
-      env: { DATA_SOURCE: "file", DATA_DIR: SAMPLE_DIR },
-      orderIds: ALL_IDS,
-    },
-  ])(
+  it.each([...SOURCES])(
     "nenhuma resposta do chat tem chave, valor ou texto proibido (fonte $source)",
-    async ({ env, orderIds }) => {
-      const app = await buildTestServer(env);
+    async ({ env }) => {
+      const app = await buildTestServer(await env());
 
-      const bodies = await chatBodies(app, chatPayloads(orderIds));
+      const bodies = await chatBodies(app, chatPayloads(ALL_IDS));
 
       expect(bodies.filter(({ body }) => body.reply).length).toBe(bodies.length - 1);
       for (const { payload, body } of bodies) {

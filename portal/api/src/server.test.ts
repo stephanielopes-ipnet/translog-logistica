@@ -3,6 +3,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
 import { buildServer } from "./server.ts";
+import { startFakeDatabricks } from "./testing/fake-databricks.ts";
 
 async function buildTestServer(env: NodeJS.ProcessEnv = {}) {
   const app = await buildServer(loadConfig(env), { logger: false });
@@ -66,6 +67,40 @@ describe("GET /api/health", () => {
       orders: 9,
       agent: "mock",
     });
+  });
+
+  it("com DATA_SOURCE=databricks, carrega do Databricks antes de responder", async () => {
+    const fake = await startFakeDatabricks({ pendingPolls: 1 });
+    const app = await buildTestServer({
+      DATA_SOURCE: "databricks",
+      DATABRICKS_HOST: fake.baseUrl,
+      DATABRICKS_WAREHOUSE_ID: "wh-teste",
+      DATABRICKS_TOKEN: "token-de-teste",
+    });
+
+    const response = await app.inject({ method: "GET", url: "/api/health" });
+
+    expect(response.json()).toStrictEqual({
+      status: "ok",
+      dataSource: "databricks",
+      orders: 9,
+      agent: "mock",
+    });
+    expect(fake.statements).toHaveLength(3);
+  });
+
+  it("com DATA_SOURCE=databricks e token recusado, o servidor não sobe", async () => {
+    const fake = await startFakeDatabricks({ httpStatus: 401 });
+    const config = loadConfig({
+      DATA_SOURCE: "databricks",
+      DATABRICKS_HOST: fake.baseUrl,
+      DATABRICKS_WAREHOUSE_ID: "wh-teste",
+      DATABRICKS_TOKEN: "token-de-teste",
+    });
+
+    await expect(buildServer(config, { logger: false })).rejects.toThrow(
+      /Confira DATABRICKS_TOKEN.*use DATA_SOURCE=file/,
+    );
   });
 
   it("com DATA_SOURCE=file e pasta sem os CSVs, o servidor não sobe", async () => {

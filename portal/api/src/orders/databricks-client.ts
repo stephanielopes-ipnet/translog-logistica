@@ -17,12 +17,15 @@ export interface DatabricksClientOptions {
   pollIntervalMs?: number;
 }
 
-/** Resultado de uma consulta já concluída. `chunks()` baixa os pedaços sob demanda. */
+/**
+ * Resultado de uma consulta já concluída. `chunks()` baixa os pedaços (até
+ * `DOWNLOAD_CONCURRENCY` ao mesmo tempo) e os entrega em ordem.
+ */
 export interface CsvResult {
   columns: string[];
   totalRows: number;
   /** CSV completo em pedaços: o cabeçalho uma vez só, no começo, e depois as linhas. */
-  chunks(): AsyncGenerator<string>;
+  chunks(): AsyncGenerator<Buffer>;
 }
 
 export interface DatabricksClient {
@@ -68,6 +71,12 @@ type Statement = z.infer<typeof statementSchema>;
 const chunkSchema = z.object({ external_links: z.array(externalLinkSchema).optional() });
 
 const RUNNING_STATES = new Set(["PENDING", "RUNNING"]);
+
+/**
+ * Pedaços baixados ao mesmo tempo por consulta. Medido em 16/11: cada link pré-assinado sai a
+ * ~1,4 MB/s; baixar um de cada vez deixava a carga em ~90 s.
+ */
+const DOWNLOAD_CONCURRENCY = 4;
 
 const TRY_FILE = "Para seguir sem o Databricks, use DATA_SOURCE=file com os CSVs em portal/dados/.";
 
@@ -118,16 +127,41 @@ export function createDatabricksClient({
     );
   }
 
+  /** Todos os links do resultado (as chamadas à API são rápidas; o download é que demora). */
+  async function allLinks(first: readonly ExternalLink[]): Promise<ExternalLink[]> {
+    const links = [...first];
+    let next = links.at(-1)?.next_chunk_internal_link;
+    while (next) {
+      const page = chunkSchema.parse(await callApi("GET", next)).external_links ?? [];
+      links.push(...page);
+      next = page.at(-1)?.next_chunk_internal_link;
+    }
+    return links;
+  }
+
   async function* downloadChunks(first: readonly ExternalLink[], header: string) {
-    yield `${header}\n`;
-    let links = first;
-    while (links.length > 0) {
-      let next: string | undefined;
-      for (const link of links) {
-        yield withoutHeader(await download(link), header);
-        next = link.next_chunk_internal_link;
+    const headerBytes = Buffer.from(header);
+    yield Buffer.from(`${header}\n`);
+    const links = await allLinks(first);
+    const pending: Promise<Buffer>[] = [];
+    const start = (index: number) => {
+      const link = links[index];
+      if (link) {
+        const promise = download(link);
+        // Falha de um pedaço adiantado só aparece quando chegar a vez dele (sem rejeição solta).
+        promise.catch(() => undefined);
+        pending[index] = promise;
       }
-      links = next ? (chunkSchema.parse(await callApi("GET", next)).external_links ?? []) : [];
+    };
+    for (let index = 0; index < DOWNLOAD_CONCURRENCY; index++) {
+      start(index);
+    }
+    for (let index = 0; index < links.length; index++) {
+      const chunk = await pending[index];
+      start(index + DOWNLOAD_CONCURRENCY);
+      if (chunk) {
+        yield withoutHeader(chunk, headerBytes);
+      }
     }
   }
 
@@ -160,7 +194,7 @@ export function createDatabricksClient({
         const { error_code: code, message } = current.status.error ?? {};
         throw new DatabricksError(
           `A consulta terminou com ${current.status.state}` +
-            `${code ? ` (${code})` : ""}: ${message ?? "sem detalhes"}. ` +
+            `${code ? ` (${code})` : ""}: ${message?.split("\n")[0] ?? "sem detalhes"} ` +
             `Confira se a tabela existe e se o token tem acesso a ela. ${TRY_FILE}`,
         );
       }
@@ -189,7 +223,7 @@ export function createDatabricksClient({
  * Baixa um pedaço pelo link pré-assinado. Sem o header `Authorization`: o link já carrega a
  * autorização, e o armazenamento recusa (ou registraria) o token do Databricks.
  */
-async function download(link: ExternalLink): Promise<string> {
+async function download(link: ExternalLink): Promise<Buffer> {
   let response: Response;
   try {
     response = await fetch(link.external_link, {
@@ -206,17 +240,30 @@ async function download(link: ExternalLink): Promise<string> {
       `Falha ao baixar o pedaço ${link.chunk_index} do resultado (HTTP ${response.status}).`,
     );
   }
-  return response.text();
+  // Bytes, não texto: um pedaço de ~20 MB como string ocuparia o dobro (UTF-16) no heap.
+  return Buffer.from(await response.arrayBuffer());
 }
 
-/** Tira o cabeçalho do começo do pedaço, se vier repetido, e garante a quebra de linha final. */
-function withoutHeader(text: string, header: string): string {
-  const body = text.startsWith(`${header}\n`)
-    ? text.slice(header.length + 1)
-    : text.startsWith(`${header}\r\n`)
-      ? text.slice(header.length + 2)
-      : text;
-  return body === "" || body.endsWith("\n") ? body : `${body}\n`;
+const LF = 0x0a;
+const CR = 0x0d;
+
+/**
+ * Tira o cabeçalho do começo do pedaço, se vier repetido (no Databricks real só o primeiro
+ * pedaço o traz), e garante a quebra de linha final.
+ */
+function withoutHeader(chunk: Buffer, header: Buffer): Buffer {
+  let body = chunk;
+  if (chunk.subarray(0, header.length).equals(header)) {
+    const next = chunk[header.length];
+    if (next === LF) {
+      body = chunk.subarray(header.length + 1);
+    } else if (next === CR && chunk[header.length + 1] === LF) {
+      body = chunk.subarray(header.length + 2);
+    }
+  }
+  return body.length === 0 || body[body.length - 1] === LF
+    ? body
+    : Buffer.concat([body, Buffer.from("\n")]);
 }
 
 /** Mensagem do corpo de erro da API (`{ error_code, message }`), curta e sem dados sensíveis. */

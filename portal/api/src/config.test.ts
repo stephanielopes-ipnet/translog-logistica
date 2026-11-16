@@ -11,7 +11,15 @@ const defaults = {
   agentUrl: undefined,
   agentAppName: "translog_agent",
   agentTimeoutMs: 90000,
+  databricks: undefined,
   nodeEnv: undefined,
+};
+
+const DATABRICKS_ENV = {
+  DATA_SOURCE: "databricks",
+  DATABRICKS_HOST: "dbc-0000-test.cloud.databricks.com",
+  DATABRICKS_WAREHOUSE_ID: "abc123",
+  DATABRICKS_TOKEN: "dapi-segredo-de-teste",
 };
 
 /** Mensagem do erro lançado por `loadConfig`, ou "" se não lançar. */
@@ -39,6 +47,10 @@ describe("loadConfig", () => {
       AGENT_URL: "",
       AGENT_APP_NAME: "",
       AGENT_TIMEOUT_MS: "",
+      DATABRICKS_HOST: "",
+      DATABRICKS_WAREHOUSE_ID: "",
+      DATABRICKS_TOKEN: "",
+      DATABRICKS_CATALOG_SCHEMA: "",
       NODE_ENV: "",
     });
 
@@ -67,6 +79,7 @@ describe("loadConfig", () => {
       agentUrl: "http://agent:8001",
       agentAppName: "outro_agente",
       agentTimeoutMs: 60000,
+      databricks: undefined,
       nodeEnv: "production",
     });
   });
@@ -103,12 +116,6 @@ describe("loadConfig", () => {
 
   it("rejeita porta fora do intervalo", () => {
     expect(configError({ API_PORT: "70000" })).toMatch(/API_PORT .* \(recebido: "70000"\)/);
-  });
-
-  it("rejeita DATA_SOURCE desconhecido", () => {
-    expect(configError({ DATA_SOURCE: "postgres" })).toBe(
-      'Configuração inválida:\n  - DATA_SOURCE deve ser "fixtures" ou "file" (recebido: "postgres")',
-    );
   });
 
   it("rejeita AGENT desconhecido", () => {
@@ -183,5 +190,78 @@ describe("loadConfig", () => {
       "API_PORT",
       "AGENT_URL",
     ]);
+  });
+
+  it("com DATA_SOURCE=databricks, monta o acesso com https e o schema padrão", () => {
+    expect(loadConfig(DATABRICKS_ENV)).toMatchObject({
+      dataSource: "databricks",
+      databricks: {
+        baseUrl: "https://dbc-0000-test.cloud.databricks.com",
+        warehouseId: "abc123",
+        token: "dapi-segredo-de-teste",
+        catalogSchema: "workspace.silver",
+      },
+    });
+  });
+
+  it.each([
+    ["https://dbc-0000-test.cloud.databricks.com/", "https://dbc-0000-test.cloud.databricks.com"],
+    ["http://127.0.0.1:9999", "http://127.0.0.1:9999"],
+    ["http://localhost:9999", "http://localhost:9999"],
+  ])("aceita DATABRICKS_HOST=%s", (host, baseUrl) => {
+    expect(loadConfig({ ...DATABRICKS_ENV, DATABRICKS_HOST: host }).databricks?.baseUrl).toBe(
+      baseUrl,
+    );
+  });
+
+  it.each(["http://dbc-0000-test.cloud.databricks.com", "ftp://x", "dbc/caminho", "a b"])(
+    "rejeita DATABRICKS_HOST=%s (http só para a própria máquina)",
+    (host) => {
+      expect(configError({ ...DATABRICKS_ENV, DATABRICKS_HOST: host })).toMatch(
+        /^Configuração inválida:\n {2}- DATABRICKS_HOST deve ser o host do workspace/,
+      );
+    },
+  );
+
+  it("exige host, warehouse e token com DATA_SOURCE=databricks, listando os três", () => {
+    const lines = configError({ DATA_SOURCE: "databricks" }).split("\n");
+
+    expect(lines.slice(1).map((line) => line.trim().split(" ")[1])).toEqual([
+      "DATABRICKS_HOST",
+      "DATABRICKS_WAREHOUSE_ID",
+      "DATABRICKS_TOKEN",
+    ]);
+  });
+
+  it("nunca mostra o valor do token na mensagem de erro", () => {
+    const message = configError({
+      ...DATABRICKS_ENV,
+      API_PORT: "abc",
+      DATABRICKS_WAREHOUSE_ID: "../x",
+    });
+
+    expect(message).toContain("DATABRICKS_WAREHOUSE_ID");
+    expect(message).not.toContain("dapi-segredo-de-teste");
+  });
+
+  it.each(["workspace", "workspace.silver; DROP", "a.b.c"])(
+    "rejeita DATABRICKS_CATALOG_SCHEMA=%s",
+    (schema) => {
+      expect(configError({ ...DATABRICKS_ENV, DATABRICKS_CATALOG_SCHEMA: schema })).toMatch(
+        /DATABRICKS_CATALOG_SCHEMA deve ser catalogo\.schema/,
+      );
+    },
+  );
+
+  it("credenciais do Databricks sem DATA_SOURCE=databricks ficam sem uso no adapter", () => {
+    const { DATA_SOURCE: _source, ...credentials } = DATABRICKS_ENV;
+
+    expect(loadConfig(credentials).dataSource).toBe("fixtures");
+  });
+
+  it("rejeita DATA_SOURCE desconhecido listando as três fontes", () => {
+    expect(configError({ DATA_SOURCE: "postgres" })).toBe(
+      'Configuração inválida:\n  - DATA_SOURCE deve ser "fixtures" ou "file" ou "databricks" (recebido: "postgres")',
+    );
   });
 });

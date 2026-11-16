@@ -30,6 +30,34 @@ const agentAppName = z.string().regex(/^[\w-]+$/);
 /** Limite por resposta do agente, em milissegundos. */
 const agentTimeoutMs = z.coerce.number().int().min(1000).max(600_000);
 
+/**
+ * Workspace do Databricks → endereço base da API. Aceita só o host (`dbc-xxx.cloud.databricks.com`,
+ * como no painel) ou com `https://`. `http://` só para `localhost`/`127.0.0.1` (testes com
+ * servidor falso): o token nunca trafega sem TLS para fora da máquina.
+ */
+const databricksHost = z.string().transform((value, ctx) => {
+  const match = value
+    .trim()
+    .replace(/\/+$/, "")
+    .match(/^(?:(https?):\/\/)?([a-z0-9.-]+(?::\d+)?)$/i);
+  const [, scheme = "https", host = ""] = match ?? [];
+  const local = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host);
+  if (!match || (scheme === "http" && !local)) {
+    ctx.addIssue({ code: "custom", message: "host do Databricks inválido" });
+    return z.NEVER;
+  }
+  return `${scheme}://${host}`;
+});
+
+/** Id do SQL warehouse (o final do HTTP path `/sql/1.0/warehouses/<id>`). */
+const databricksWarehouseId = z.string().regex(/^[\w-]+$/);
+
+/** `catalogo.schema` das tabelas consumo_* (vai no SQL: só letras, números e `_`). */
+const databricksCatalogSchema = z.string().regex(/^[A-Za-z_]\w*\.[A-Za-z_]\w*$/);
+
+/** Variáveis que nunca aparecem nas mensagens de erro, nem o valor recebido. */
+const SECRET_ENV: ReadonlySet<string> = new Set(["DATABRICKS_TOKEN"]);
+
 /** Variáveis de ambiente aceitas, com os padrões que funcionam sem `.env`. */
 const envSchema = z
   .object({
@@ -41,7 +69,29 @@ const envSchema = z
     AGENT_URL: agentUrl.optional(),
     AGENT_APP_NAME: agentAppName.default("translog_agent"),
     AGENT_TIMEOUT_MS: agentTimeoutMs.default(90_000),
+    DATABRICKS_HOST: databricksHost.optional(),
+    DATABRICKS_WAREHOUSE_ID: databricksWarehouseId.optional(),
+    DATABRICKS_TOKEN: z.string().optional(),
+    DATABRICKS_CATALOG_SCHEMA: databricksCatalogSchema.default("workspace.silver"),
     NODE_ENV: z.string().optional(),
+  })
+  .superRefine((env, ctx) => {
+    if (env.DATA_SOURCE !== "databricks") {
+      return;
+    }
+    for (const name of [
+      "DATABRICKS_HOST",
+      "DATABRICKS_WAREHOUSE_ID",
+      "DATABRICKS_TOKEN",
+    ] as const) {
+      if (env[name] === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message: "obrigatória com DATA_SOURCE=databricks",
+        });
+      }
+    }
   })
   .refine((env) => env.AGENT !== "adk" || env.AGENT_URL !== undefined, {
     path: ["AGENT_URL"],
@@ -67,6 +117,12 @@ const expectations: Record<EnvName, string> = {
     "deve ser o endereço http(s) do agente, obrigatório com AGENT=adk (ex.: http://127.0.0.1:8001)",
   AGENT_APP_NAME: "deve ter só letras, números, _ ou -",
   AGENT_TIMEOUT_MS: "deve ser um número inteiro de milissegundos entre 1000 e 600000",
+  DATABRICKS_HOST:
+    "deve ser o host do workspace, obrigatório com DATA_SOURCE=databricks (ex.: dbc-xxxxxxxx-xxxx.cloud.databricks.com)",
+  DATABRICKS_WAREHOUSE_ID:
+    "deve ser o id do SQL warehouse (letras, números, _ ou -), obrigatório com DATA_SOURCE=databricks",
+  DATABRICKS_TOKEN: "é obrigatória com DATA_SOURCE=databricks (token de acesso, só no portal/.env)",
+  DATABRICKS_CATALOG_SCHEMA: "deve ser catalogo.schema (ex.: workspace.silver)",
   NODE_ENV: "deve ser um texto",
 };
 
@@ -83,6 +139,18 @@ const configSchema = envSchema.transform((env) => ({
   agentUrl: env.AGENT_URL,
   agentAppName: env.AGENT_APP_NAME,
   agentTimeoutMs: env.AGENT_TIMEOUT_MS,
+  /** Acesso ao Databricks (`DATA_SOURCE=databricks`); o token nunca vai para log nem resposta. */
+  databricks:
+    env.DATABRICKS_HOST !== undefined &&
+    env.DATABRICKS_WAREHOUSE_ID !== undefined &&
+    env.DATABRICKS_TOKEN !== undefined
+      ? {
+          baseUrl: env.DATABRICKS_HOST,
+          warehouseId: env.DATABRICKS_WAREHOUSE_ID,
+          token: env.DATABRICKS_TOKEN,
+          catalogSchema: env.DATABRICKS_CATALOG_SCHEMA,
+        }
+      : undefined,
   nodeEnv: env.NODE_ENV,
 }));
 
@@ -109,7 +177,12 @@ function formatError(error: z.ZodError, env: NodeJS.ProcessEnv): string {
   const lines = [...names].map((name) => {
     const expectation = isEnvName(name) ? expectations[name] : "é inválida";
     const value = env[name];
-    const received = value === undefined ? "não definida" : `recebido: ${JSON.stringify(value)}`;
+    const received =
+      value === undefined
+        ? "não definida"
+        : SECRET_ENV.has(name)
+          ? "valor oculto"
+          : `recebido: ${JSON.stringify(value)}`;
     return `  - ${name} ${expectation} (${received})`;
   });
   return ["Configuração inválida:", ...lines].join("\n");

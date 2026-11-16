@@ -86,12 +86,12 @@ function client(baseUrl: string, options: { timeoutMs?: number } = {}) {
   });
 }
 
-async function readAll(chunks: AsyncGenerator<string>): Promise<string> {
-  let text = "";
+async function readAll(chunks: AsyncGenerator<Buffer>): Promise<string> {
+  const parts: Buffer[] = [];
   for await (const chunk of chunks) {
-    text += chunk;
+    parts.push(chunk);
   }
-  return text;
+  return Buffer.concat(parts).toString("utf8");
 }
 
 describe("createDatabricksClient", () => {
@@ -173,12 +173,20 @@ describe("createDatabricksClient", () => {
     expect(csv).toBe(
       "id_pedido,situacao_pedido\n375,Entregue com atraso\n34,Extraviado\n9,Não pago (expirado)\n",
     );
-    expect(requests.map((r) => [r.url, r.authorization])).toEqual([
+    // Primeiro os links (API, com token); depois os pedaços em paralelo (sem token).
+    expect(requests.slice(0, 3).map((r) => [r.url, r.authorization])).toEqual([
       ["/api/2.0/sql/statements", `Bearer ${TOKEN}`],
-      ["/storage/chunk-0?assinatura=x", undefined],
       ["/api/2.0/sql/statements/st-1/result/chunks/1", `Bearer ${TOKEN}`],
-      ["/storage/chunk-1?assinatura=x", undefined],
       ["/api/2.0/sql/statements/st-1/result/chunks/2", `Bearer ${TOKEN}`],
+    ]);
+    expect(
+      requests
+        .slice(3)
+        .map((r) => [r.url, r.authorization])
+        .sort(),
+    ).toEqual([
+      ["/storage/chunk-0?assinatura=x", undefined],
+      ["/storage/chunk-1?assinatura=x", undefined],
       ["/storage/chunk-2?assinatura=x", undefined],
     ]);
   });
@@ -266,6 +274,30 @@ describe("createDatabricksClient", () => {
     await expect(client(`http://127.0.0.1:${port}`).queryCsv("SELECT 1")).rejects.toThrow(
       /^Não foi possível conectar ao Databricks \(ECONNREFUSED\)\. Confira DATABRICKS_HOST/,
     );
+  });
+
+  it("baixa os pedaços em paralelo e os entrega na ordem, mesmo se o primeiro chegar por último", async () => {
+    const { baseUrl } = await fakeDatabricks((request, response) => {
+      const chunkLink = request.url.match(/\/result\/chunks\/(\d+)$/);
+      const storage = request.url.match(/^\/storage\/chunk-(\d+)/);
+      if (request.method === "POST") {
+        json(response, 200, succeeded(baseUrl, [link(baseUrl, 0, 3)]));
+      } else if (chunkLink) {
+        json(response, 200, { external_links: [link(baseUrl, Number(chunkLink[1]), 3)] });
+      } else if (storage) {
+        const index = Number(storage[1]);
+        // O pedaço 0 demora mais: só um download paralelo deixa os outros terminarem antes.
+        setTimeout(() => response.end(CHUNKS[index]), index === 0 ? 80 : 0);
+      }
+    });
+
+    const started = performance.now();
+    const csv = await readAll((await client(baseUrl).queryCsv("SELECT 1")).chunks());
+
+    expect(csv).toBe(
+      "id_pedido,situacao_pedido\n375,Entregue com atraso\n34,Extraviado\n9,Não pago (expirado)\n",
+    );
+    expect(performance.now() - started).toBeLessThan(500);
   });
 
   it("falha no download de um pedaço vira erro claro", async () => {

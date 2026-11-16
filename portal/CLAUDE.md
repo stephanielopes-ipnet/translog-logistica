@@ -10,7 +10,7 @@ Esta pasta é o **portal**: o cliente digita o número do pedido, vê situação
 
 Contexto detalhado, decisões e pendências ficam em `portal/_contexto/` (local, fora do Git): leia `databricks.md`, `decisoes.md`, `pendencias.md`, `projeto.md` e `backend-analise.md` antes de mudar contrato ou arquitetura.
 
-Dados (16/11): tabelas oficiais `workspace.silver.consumo_pedidos`, `consumo_itens_pedido` e `consumo_eventos_logisticos` (Databricks), carregadas uma vez ao subir a API. Plano B: as mesmas tabelas em CSV em `portal/dados/` (`DATA_SOURCE=file`), atualizáveis com `pnpm export:dados`. "Hoje" da base = `data_referencia_base` (2018-02-06).
+Dados (16/11): tabelas oficiais `workspace.silver.consumo_pedidos`, `consumo_itens_pedido` e `consumo_eventos_logisticos` (Databricks), carregadas uma vez ao subir a API (`DATA_SOURCE=databricks`). Plano B: as mesmas tabelas em CSV em `portal/dados/` (`DATA_SOURCE=file`), atualizáveis com `pnpm export:dados`. Sem fallback automático: quem opera escolhe a fonte. "Hoje" da base = `data_referencia_base` (2018-02-06).
 
 ## Regras
 
@@ -19,7 +19,7 @@ Dados (16/11): tabelas oficiais `workspace.silver.consumo_pedidos`, `consumo_ite
 - `portal/_contexto/` e `portal/dados/` nunca vão para o Git. Confira com `git status` antes de sugerir commit.
 - **Privacidade:** nenhuma resposta da API contém id do cliente, segmento, tipo de pagamento, preço unitário, valor bruto, desconto, id do produto, lucro, margem ou latitude/longitude. Nas tabelas `consumo_*`, `id_cliente`, `segmento_cliente`, `valor_desconto`, `valor_bruto_venda`, `preco_unitario` e `id_produto` nunca entram no `SELECT` e são descartadas **na leitura** dos CSVs, não só na saída.
 - Os CSVs (`portal/dados/consumo_*.csv`) nunca entram no Git nem na imagem Docker. Fixtures de teste em CSV usam valores reais só nas colunas que o portal lê; as proibidas recebem valores fictícios (`FICTICIO-*`).
-- **Token do Databricks** só no `portal/.env`: nunca no código, nos testes, nos fixtures, nos logs, na documentação, na imagem Docker ou no navegador. Testes automatizados não chamam o Databricks.
+- **Token do Databricks** só no `portal/.env`: nunca no código, nos testes, nos fixtures, nos logs, na documentação, na imagem Docker ou no navegador. A mensagem de configuração inválida nunca mostra o valor dele. Testes automatizados não chamam o Databricks (usam `api/src/testing/fake-databricks.ts`); o teste real só com `DATABRICKS_IT=1`.
 - Nada de abstração especulativa: só o que a fase atual usa (sem histórico no servidor, streaming ou rate limit no chat).
 - **Chat:** decidido em 15/11 seguir sem esperar o acordo com o Marco. O que depende dele fica isolado em `withOrderContext` (`api/src/chat/adk-agent.ts`) e na configuração (`AGENT*`). Não altere `portal/_contexto/teste-agente/agent/` (cópia do código dele).
 - **Chave do Gemini** só no `.env` do agente: nunca no portal, no código, nos testes, nos logs ou no navegador. Testes automatizados não chamam o Gemini.
@@ -38,6 +38,7 @@ pnpm format                      # Biome corrigindo o que for possível
 pnpm typecheck                   # tsc em todos os pacotes
 pnpm --filter @translog/api test # um pacote só (api ou web)
 AGENT_IT_URL=http://127.0.0.1:8001 pnpm --filter @translog/api test adk-agent  # teste com o agente real (gasta cota do Gemini)
+DATABRICKS_IT=1 pnpm --filter @translog/api test databricks-repository        # teste com o Databricks real (3 consultas, gasta cota)
 pnpm export:dados                # baixa as tabelas consumo_* do Databricks para portal/dados/ (~1 min)
 pnpm --filter @translog/api fixtures  # regenera os fixtures e a amostra de teste a partir de portal/dados/
 docker compose up --build        # forma oficial de rodar a API (fixtures, chat simulado)

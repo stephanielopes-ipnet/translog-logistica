@@ -4,6 +4,7 @@ import { type ChatLogger, type ChatService, createChatService } from "./chat/cha
 import { createMockAgent } from "./chat/mock-agent.ts";
 import type { SupportAgent } from "./chat/support-agent.ts";
 import type { Config } from "./config.ts";
+import { loadDatabricksRepository } from "./orders/databricks-repository.ts";
 import { type LoadLogger, loadFileRepository } from "./orders/file-repository.ts";
 import { createFixturesRepository } from "./orders/fixtures-repository.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
@@ -75,5 +76,13 @@ async function createOrderRepository(config: Config, log: LoadLogger): Promise<O
       return createFixturesRepository();
     case "file":
       return loadFileRepository(config.dataDir, log);
+    case "databricks":
+      // O config.ts já recusa DATA_SOURCE=databricks sem host, warehouse e token.
+      if (config.databricks === undefined) {
+        throw new Error(
+          "DATABRICKS_HOST, DATABRICKS_WAREHOUSE_ID e DATABRICKS_TOKEN são obrigatórias.",
+        );
+      }
+      return loadDatabricksRepository(config.databricks, log);
   }
 }

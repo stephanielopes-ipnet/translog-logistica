@@ -2,7 +2,7 @@
 
 Para quem vai rodar, revisar ou mudar o código do portal. A visão geral, sem detalhes técnicos, está no [README](../README.md).
 
-Estado em 16/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. **Em 16/11 a fonte passou a ser a das tabelas oficiais `consumo_*` da Silver no Databricks** (contrato `Order` novo, seções 5, 8 e 9); a tela e o chat simulado foram só adaptados ao contrato e serão refeitos nas próximas tarefas. O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
+Estado em 16/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. **Em 16/11 a fonte passou a ser a das tabelas oficiais `consumo_*` da Silver no Databricks** (contrato `Order` novo, seções 5, 8 e 9), lidas direto do Databricks ao subir (`DATA_SOURCE=databricks`) ou dos CSVs exportados (`file`, plano B); a tela e o chat simulado foram só adaptados ao contrato e serão refeitos nas próximas tarefas. O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
 
 ## Sumário
 
@@ -111,6 +111,8 @@ portal/
 │       ├── container.ts     # único lugar que escolhe os adapters (dados e assistente)
 │       ├── http/
 │       │   └── errors.ts    # único lugar que transforma erros em resposta HTTP
+│       ├── testing/
+│       │   └── fake-databricks.ts # Databricks falso para os testes (fora da imagem Docker)
 │       ├── privacy.test.ts  # varredura de chaves e valores proibidos em todas as respostas (pedidos e chat)
 │       ├── chat/
 │       │   ├── routes.ts              # POST /api/chat
@@ -129,6 +131,7 @@ portal/
 │           ├── consumo-mapper.ts      # linhas das tabelas consumo_* → Order (único que conhece o formato)
 │           ├── consumo-sql.ts         # SELECT explícito das tabelas (sem colunas proibidas)
 │           ├── databricks-client.ts   # SQL Statement Execution API (fetch, EXTERNAL_LINKS, CSV)
+│           ├── databricks-repository.ts # adapter databricks (3 consultas no boot → mesma leitura do file)
 │           ├── escalation.ts          # regra única de encaminhamento à central
 │           └── fixtures/
 │               ├── orders.json        # 9 pedidos da demo (vão para a imagem)
@@ -205,6 +208,19 @@ pnpm dev
 
 Com `file`, cada recarga do `--watch` na API relê os CSVs (~13 s).
 
+Direto do Databricks (credenciais só no `portal/.env`, ver `.env.example`):
+
+```bash
+# no .env:
+#   DATA_SOURCE=databricks
+#   DATABRICKS_HOST=dbc-xxxxxxxx-xxxx.cloud.databricks.com
+#   DATABRICKS_WAREHOUSE_ID=<id do warehouse>
+#   DATABRICKS_TOKEN=<token>
+pnpm dev
+```
+
+A API só abre a porta depois de baixar as 3 tabelas (~25 a 40 s com o warehouse acordado; até 3 min se ele estiver dormindo). Cada recarga do `--watch` refaz as 3 consultas e gasta cota da edição gratuita: para mexer no código, prefira `file`. Se o Databricks falhar, a API não sobe e a mensagem diz o que conferir; o plano B é trocar para `DATA_SOURCE=file` (não há troca automática).
+
 ### Chat com o agente ADK (desenvolvimento)
 
 Sem configuração, o chat usa o assistente simulado (`AGENT=mock`). Para usar o agente do Marco, com ele no ar em `127.0.0.1:8001`:
@@ -261,6 +277,7 @@ main.ts
      ├─ createContainer(config, { log: app.log })
      │   ├─ DATA_SOURCE=fixtures → createFixturesRepository()      lê e valida orders.json
      │   ├─ DATA_SOURCE=file     → loadFileRepository(DATA_DIR)     lê os 3 CSVs consumo_*
+     │   ├─ DATA_SOURCE=databricks → loadDatabricksRepository(...)  3 consultas, download, mesma leitura
      │   └─ createOrderService({ orders, sampleOrderIds })
      └─ rotas /api/health e /api/orders
  └─ app.listen(0.0.0.0:API_PORT)         só depois de tudo carregado
@@ -492,7 +509,7 @@ curl localhost:3333/api/orders/76902
 }
 ```
 
-(Igual com `fixtures` e com `file`.)
+(Igual com `fixtures`, `file` e `databricks`.)
 
 ```bash
 curl localhost:3333/api/orders/99999
@@ -512,11 +529,13 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 | Variável | Padrão | Uso |
 |---|---|---|
 | `API_PORT` | `3333` | Porta da API (1 a 65535) |
-| `DATA_SOURCE` | `fixtures` | `fixtures` ou `file` (`databricks` na próxima tarefa) |
+| `DATA_SOURCE` | `fixtures` | `fixtures`, `file` ou `databricks` |
 | `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` (`file` e `pnpm export:dados`). Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
 | `SAMPLE_ORDER_IDS` | `76902,375,34,8` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
-| `DATABRICKS_HOST`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_TOKEN` | vazio | Só no `portal/.env`; hoje usadas pelo `pnpm export:dados` |
-| `DATABRICKS_CATALOG_SCHEMA` | `workspace.silver` | Catálogo e schema das tabelas `consumo_*` (export) |
+| `DATABRICKS_HOST` | vazio | Host do workspace (sem ou com `https://`); obrigatório com `databricks`. `http://` só para `localhost`/`127.0.0.1` (testes) |
+| `DATABRICKS_WAREHOUSE_ID` | vazio | Id do SQL warehouse (letras, números, `_`, `-`); obrigatório com `databricks` |
+| `DATABRICKS_TOKEN` | vazio | Token de acesso; obrigatório com `databricks`. Só no `portal/.env`; a mensagem de erro de configuração nunca mostra o valor |
+| `DATABRICKS_CATALOG_SCHEMA` | `workspace.silver` | `catalogo.schema` das tabelas `consumo_*` (vai no SQL: só letras, números e `_`) |
 | `AGENT` | `mock` | Assistente do chat: `mock` ou `adk` |
 | `AGENT_URL` | vazio | Endereço http(s) do agente; obrigatório com `adk` (dev: `http://127.0.0.1:8001`). Barra final removida |
 | `AGENT_APP_NAME` | `translog_agent` | Nome do app no ADK; só letras, números, `_` e `-` (vai no caminho da URL) |
@@ -629,7 +648,48 @@ O tempo de carga é quase todo da `csv-parse`. Alternativa medida em 14/11 e nã
 
 O `SELECT` vem de `orders/consumo-sql.ts`: colunas explícitas (`EXPORT_COLUMNS` = todas menos as proibidas), cada uma como `coalesce(CAST(col AS STRING), '')` (o CSV do Databricks escreve NULL como `null`; assim sai vazio, igual aos CSVs do Mateus), timestamps como `date_format(col, 'yyyy-MM-dd')` (a sessão do warehouse é UTC) e `ORDER BY` estável. Schema e nomes de coluna são conferidos antes de entrar no SQL.
 
-**Medido em 16/11:** 58 a 72 s no total (a primeira tabela leva mais quando o warehouse está acordando); `consumo_pedidos` 79,6 MB (40 colunas), `consumo_itens_pedido` 13,5 MB (7), `consumo_eventos_logisticos` 61,1 MB (14). Comparado célula a célula com os CSVs do Mateus: mesmas chaves e mesmos valores nas 596.687 linhas (fora o espaço no fim do `resumo_pedido`, que o CSV do Mateus apara).
+**Medido em 16/11** (antes do download dos pedaços em paralelo, hoje até 4 por tabela): 58 a 72 s no total (a primeira tabela leva mais quando o warehouse está acordando); `consumo_pedidos` 79,6 MB (40 colunas), `consumo_itens_pedido` 13,5 MB (7), `consumo_eventos_logisticos` 61,1 MB (14). Comparado célula a célula com os CSVs do Mateus: mesmas chaves e mesmos valores nas 596.687 linhas (fora o espaço no fim do `resumo_pedido`, que o CSV do Mateus apara).
+
+### `databricks` (tabelas lidas do Databricks ao subir)
+
+`loadDatabricksRepository(options, log)` em `orders/databricks-repository.ts`:
+
+1. As 3 consultas rodam **em paralelo** no warehouse, com o `SELECT` de `consumo-sql.ts` só com as colunas que o portal lê (`READ_COLUMNS`), sem as proibidas.
+2. Os pedaços das 3 tabelas são baixados **ao mesmo tempo** (até 4 por tabela), pelos links pré-assinados, sem o header `Authorization`. Ficam em `Buffer` só até a leitura (~76 MB no pico, fora do heap).
+3. Cada tabela é entregue ao `loadConsumoRepository` (a mesma leitura e conversão do `file`) em fatias de 64 KB, e os pedaços são soltos depois de lidos.
+
+Sem fallback automático: se algo falhar, a API não sobe, e a mensagem diz o que fazer.
+
+| Situação | Mensagem (início) |
+|---|---|
+| Variável faltando | `Configuração inválida: - DATABRICKS_HOST deve ser o host do workspace, obrigatório com DATA_SOURCE=databricks ...` |
+| Token recusado (`401`/`403`) | `Não foi possível carregar workspace.silver.consumo_... do Databricks: O Databricks recusou o acesso (HTTP 401). Confira DATABRICKS_TOKEN ... use DATA_SOURCE=file ...` |
+| Tabela ausente (`FAILED`) | `... A consulta terminou com FAILED (BAD_REQUEST): [TABLE_OR_VIEW_NOT_FOUND] ... Confira se a tabela existe ... use DATA_SOURCE=file ...` |
+| Warehouse sem responder em 3 min | `... A consulta não terminou em 180 s (estado PENDING). O warehouse pode estar ligando ou sem cota ... use DATA_SOURCE=file ...` |
+| Host inacessível | `... Não foi possível conectar ao Databricks (ENOTFOUND). Confira DATABRICKS_HOST e a rede ...` |
+| Falha no download | `Não foi possível baixar ... do Databricks: Falha ao baixar o pedaço N do resultado (HTTP 403). Tente de novo ou use DATA_SOURCE=file ...` |
+
+Log (sem dados nem token):
+
+```json
+{"catalogSchema":"workspace.silver","rows":{"orders":65752,"items":180519,"events":350416},"megabytes":76,"queryMs":1468,"downloadMs":23163,"msg":"Tabelas baixadas do Databricks"}
+{"dataSource":"databricks","catalogSchema":"workspace.silver","orders":65752,"invalidRows":0,"durationMs":10069,"msg":"Pedidos carregados"}
+```
+
+#### Medido em 16/11 (Databricks real, warehouse acordado)
+
+| Medida | Valor |
+|---|---|
+| Consultas (as 3 em paralelo) | 1,5 s |
+| Download (76 MB) | 10,8 a 23,2 s (varia com a rede) |
+| Leitura e conversão | ~10 s |
+| Até o health responder | 24 a 36 s |
+| Pedidos / linhas inválidas | 65.752 / 0 |
+| Comparação com `file` | 18 pedidos (os 9 da demo, 8 variados e 1 inexistente) idênticos |
+
+Antes do download em paralelo, a carga levava ~100 s: cada link pré-assinado sai a ~1,4 MB/s, e os pedaços eram baixados um por vez.
+
+**Memória.** O RSS varia muito entre execuções iguais, nos dois modos (de ~210 a ~730 MB, conforme o momento em que o V8 coleta lixo); o heap retido depois da coleta fica em ~103 MB. Entregar ao `csv-parse` os pedaços inteiros (~20 MB) deixava os `Buffer` presos (RSS ~670 MB numa simulação com os CSVs locais); em fatias de 64 KB, ~425 MB.
 
 ## 9. Mapeamento `consumo_*` → `Order`
 
@@ -896,7 +956,7 @@ pnpm --filter @translog/contracts test  # só o contrato
 pnpm --filter @translog/web test        # só o frontend (~1 s)
 ```
 
-Contagem em 16/11: contracts 20, api 257 (+1 desligado), web 47.
+Contagem em 16/11: contracts 20, api 287 (+2 desligados: agente real e Databricks real), web 47.
 
 ### Testes do contrato (`@translog/contracts`)
 
@@ -908,8 +968,8 @@ Contagem em 16/11: contracts 20, api 257 (+1 desligado), web 47.
 
 | Arquivo | Cobre |
 |---|---|
-| `config.test.ts` | Padrões, vazios, cada variável inválida (inclusive `AGENT*`), `DATA_DIR` relativo, `ORDERS_FILE` ignorada, barra final de `AGENT_URL`, lista de erros completa |
-| `server.test.ts` | Health (fixtures, file, pasta sem CSV, modo do agente), formato de todos os erros, OpenAPI e Swagger UI |
+| `config.test.ts` | Padrões, vazios, cada variável inválida (inclusive `AGENT*` e `DATABRICKS_*`), `DATA_DIR` relativo, `ORDERS_FILE` ignorada, barra final de `AGENT_URL`, host do Databricks (`https` ou `http` local), token nunca na mensagem, lista de erros completa |
+| `server.test.ts` | Health (fixtures, file, databricks com o falso, pasta sem CSV, token recusado, modo do agente), formato de todos os erros, OpenAPI e Swagger UI |
 | `chat/chat-service.test.ts` | Pedido citado existente e inexistente, primeiro número existente, pedido aberto inexistente ignorado, trava (mesma conversa → `ChatBusyError`; liberada depois de resposta e de falha; conversas diferentes em paralelo), resposta vazia, log sem conteúdo |
 | `chat/mock-agent.test.ts` | 76902 "por que atrasou" e "quando chega", modalidades, sem pedido, fora do escopo, pedido inexistente, cada situação, extravio, central, nenhuma causa comprovada nem tipo de pagamento |
 | `chat/routes.test.ts` | `200`, `400` (sem `sessionId`, UUID inválido, mensagem vazia, só espaços, 1001 caracteres, `orderId` inválido), mensagem aparada, `409`, `502`, `504` sem vazar detalhe, OpenAPI com exemplo |
@@ -920,9 +980,10 @@ Contagem em 16/11: contracts 20, api 257 (+1 desligado), web 47.
 | `orders/consumo-mapper.test.ts` | 375 completo e datas iguais à `linha_do_tempo`; 76902, 34, 9, 31298; linhas x unidades (8); fuso; formato do export; ordem de itens e eventos (10 depois de 9); centavos; "Sem atraso"; casos inválidos; colunas proibidas fora das lidas |
 | `orders/escalation.test.ts` | ≥ 3 dias, 2 dias, extraviado, não pago, cancelado, adiantado |
 | `orders/consumo-sql.test.ts` | SELECT explícito com `coalesce`/`date_format`, nenhuma coluna proibida (leitura e export), export ⊇ leitura, recusa de coluna proibida, schema e nome inválidos |
-| `orders/databricks-client.test.ts` | Contra um servidor HTTP falso: corpo da consulta, token só na API e nunca no link pré-assinado, `PENDING` → `RUNNING` → `SUCCEEDED`, 3 pedaços com cabeçalho uma vez só, `401`/`403`, `FAILED` (tabela ausente), timeout com cancelamento, `404`, host inacessível, falha no download |
+| `orders/databricks-client.test.ts` | Contra um servidor HTTP falso: corpo da consulta, token só na API e nunca no link pré-assinado, `PENDING` → `RUNNING` → `SUCCEEDED`, 3 pedaços com cabeçalho uma vez só, download em paralelo entregue em ordem, `401`/`403`, `FAILED` (tabela ausente), timeout com cancelamento, `404`, host inacessível, falha no download |
+| `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 3 consultas sem colunas proibidas, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
 | `orders/file-repository.test.ts` | Amostra igual aos fixtures, log, descarte de colunas nas 3 tabelas, linhas inválidas (id, repetido, curta, fora do contrato, sem pedido) sem conteúdo no log, limite de avisos, fora de ordem, BOM e CRLF, erros fatais; **integração com os CSVs reais** |
-| `privacy.test.ts` | Seção 11 (pedidos e chat, nas duas fontes) |
+| `privacy.test.ts` | Seção 11 (pedidos e chat, nas três fontes; `databricks` com o falso) |
 
 ### Testes do Frontend (`@translog/web`)
 
@@ -944,7 +1005,9 @@ Os testes da tela leem os pedidos de `api/src/orders/fixtures/orders.json` (`web
 - `orders/fixtures/orders.json`: os 9 pedidos da demo no formato `Order`.
 - `orders/fixtures/consumo/*.csv`: as linhas reais dos 9 pedidos nas 3 tabelas (9 pedidos, 17 itens, 52 eventos), no formato dos CSVs do Mateus (timestamps ISO). Valores reais só nas colunas lidas; as 6 proibidas aparecem nas 3 tabelas com `FICTICIO-<coluna>-<n>` e as sem uso com `SEM-USO`. Regenerar: `pnpm --filter @translog/api fixtures` (lê `portal/dados/`).
 
-**Integração com os CSVs reais:** roda só se `portal/dados/consumo_pedidos.csv` existir (`describe.skipIf`). Confere 65.752 pedidos, 0 linhas inválidas e os 9 pedidos dos `fixtures`. **Nenhum teste automatizado chama o Databricks.**
+**Integração com os CSVs reais:** roda só se `portal/dados/consumo_pedidos.csv` existir (`describe.skipIf`). Confere 65.752 pedidos, 0 linhas inválidas e os 9 pedidos dos `fixtures`.
+
+**Integração com o Databricks real:** só com `DATABRICKS_IT=1 pnpm --filter @translog/api test databricks-repository` (3 consultas, gasta cota; credenciais do `portal/.env`). **Nenhum teste automatizado chama o Databricks**: os demais usam o servidor falso.
 
 **Configuração do Vitest:** `isolate: false` (os testes não compartilham estado global) e `TZ=America/Sao_Paulo`. Rotas são testadas com `app.inject` (sem abrir porta). `buildServer(config, { logger: false, overrides })` aceita `overrides.orderRepository` e `overrides.supportAgent` para injetar um repositório ou um assistente (que demora ou falha) nos testes. **Nenhum teste automatizado chama o Gemini.**
 
@@ -1049,7 +1112,8 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 
 ## 19. Limitações e próximos passos
 
-- **Leitura direta do Databricks (`DATA_SOURCE=databricks`):** próxima tarefa; o cliente (`databricks-client.ts`) e a carga em CSV (`loadConsumoRepository`) já existem e são usados pelo `pnpm export:dados`.
+- **Databricks no Docker:** as credenciais entram por variável de ambiente (tarefa de Docker); hoje o compose usa `fixtures` ou os CSVs.
+- **Sem atualização periódica:** os dados ficam como estavam ao subir a API (fora do escopo).
 - **Tela e chat simulado no contrato novo:** só adaptados em 16/11 (situações, prazos de entrega, motivo provável com a explicação). A tela nova (despacho x entrega, onde está agora, extravio, aviso da central, linha do tempo por etapas) e o simulado reescrito vêm nas próximas tarefas.
 - **Agente ADK (pendências com o Marco, seção 10.8):** formato do pedido no texto, respostas longas e técnicas, formatação, sobreposição de mensagens depois de um `504`, Dockerfile na `main`. A tela e a API já funcionam com o agente; só `withOrderContext` e a configuração dependem dele.
 - **Tela x chat no motivo provável:** com `AGENT=adk`, o agente lê a base dele; o portal agora lê `consumo_pedidos`, que tem a causa e o `resumo_pedido` feito para a IA. Ficam iguais quando o agente ler a mesma tabela (pendência com o Marco).
