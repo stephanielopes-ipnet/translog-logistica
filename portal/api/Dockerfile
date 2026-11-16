@@ -5,7 +5,8 @@
 # O Node 24 executa o TypeScript direto (remoção de tipos), sem etapa de build.
 # O layout do workspace é mantido de propósito: o Node não remove tipos dentro de
 # node_modules, e o @translog/contracts é ligado por symlink até contracts/.
-# A Silver nunca entra na imagem: no Docker ela chega por volume (docker-compose.silver.yml).
+# Dados e credenciais nunca entram na imagem: os CSVs chegam por volume (docker-compose.dados.yml)
+# e as credenciais do Databricks por variável de ambiente (docker-compose.databricks.yml).
 
 FROM node:24.22.3-alpine3.24 AS base
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0

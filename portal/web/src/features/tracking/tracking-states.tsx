@@ -31,7 +31,7 @@ export function TrackingEmptyState() {
         <div className="rounded-md border border-slate-200/80 bg-slate-50/70 px-3.5 py-2.5">
           <p className="label-mono !text-slate-700">03 · Rota e manifesto</p>
           <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-            Trajeto em 4 etapas, origem EUA/Porto Rico, destino e itens do pedido.
+            Onde o volume está, cada etapa da viagem (coleta, voo, alfândega, entrega) e os itens.
           </p>
         </div>
       </div>

@@ -11,10 +11,10 @@ export type ChatPreset = "conversation" | "typing" | "error";
 
 const WHEN_QUESTION = "Quando meu pedido chega?";
 const WHEN_REPLY =
-  "O pedido **#76902** está **Em trânsito**. A entrega estava prevista para **01/02/2018** e acumula **5 dias de atraso**. Agora: **Alfândega Jacarta (Indonésia)**.";
+  "O pedido **#76902** está **em trânsito**. No momento, ele está em **Alfândega Jacarta (Indonésia)** (etapa Alfândega). A entrega estava prevista para **01/02/2018** e já soma **5 dias de atraso**. Sinto muito pela espera. Como a entrega já está 5 dias atrasada, este caso é acompanhado pela nossa **central de atendimento**, que funciona de **segunda a sexta, das 9h às 18h**.";
 const WHY_QUESTION = "Por que meu pedido atrasou?";
 const WHY_REPLY =
-  "Motivo provável do atraso do pedido **#76902**: no despacho, **Promessa irreal**; na entrega, **Volume sem atualização de rastreio**. Este caso deve ser tratado pela central de atendimento (segunda a sexta, das 9h às 18h).";
+  "Sinto muito pelo atraso do pedido **#76902**. No despacho, que saiu 1 dia depois do prometido, o motivo provável é **Promessa irreal**: o prazo de despacho prometido pela modalidade provavelmente é curto demais para a nossa operação (First Class, 1 dia para despachar). Na entrega, o motivo provável é **Volume sem atualização de rastreio**: o volume está sem novas atualizações de rastreio desde o último registro. Como a entrega já está 5 dias atrasada, este caso é acompanhado pela nossa **central de atendimento**, que funciona de **segunda a sexta, das 9h às 18h**.";
 
 /**
  * - `conversation`: duas perguntas respondidas;

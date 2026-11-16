@@ -12,7 +12,7 @@ describe("buildPresetConversation", () => {
 
     expect(items.map((item) => item.role)).toEqual(["user", "assistant", "user", "assistant"]);
     expect(items.map((item) => item.id)).toEqual([1, 2, 3, 4]);
-    expect(items[3]).toMatchObject({ text: expect.stringContaining("Motivo provável") });
+    expect(items[3]).toMatchObject({ text: expect.stringContaining("motivo provável") });
   });
 
   it("typing and error: the second question waits or fails", () => {

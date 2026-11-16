@@ -4,10 +4,12 @@ import { type FormEvent, type KeyboardEvent, useRef, useState } from "react";
 
 interface ChatInputProps {
   disabled: boolean;
+  /** Sem pedido aberto, o campo convida a informar o número. */
+  hasOrder: boolean;
   onSend: (text: string) => void;
 }
 
-export function ChatInput({ disabled, onSend }: ChatInputProps) {
+export function ChatInput({ disabled, hasOrder, onSend }: ChatInputProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,7 +64,11 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
           value={text}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Pergunte quando chega, por que atrasou…"
+          placeholder={
+            hasOrder
+              ? "Pergunte quando chega, por que atrasou…"
+              : "Digite o número do pedido (ex.: 76902)"
+          }
           className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm leading-5 placeholder:text-slate-400 focus:outline-none max-h-32 scroll-thin"
         />
         <button

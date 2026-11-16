@@ -12,6 +12,11 @@ describe("chat-suggestions", () => {
     expect(getChatSuggestions(findFixtureOrder(8))[0]).toBe("Quando o pedido #8 foi entregue?");
   });
 
+  it("without an open order, invites the customer to share the order number", () => {
+    expect(CHAT_SUGGESTIONS[0]).toBe("Quero acompanhar meu pedido");
+    expect(CHAT_SUGGESTIONS.some((suggestion) => /\d/.test(suggestion))).toBe(false);
+  });
+
   it("every suggestion cites the order number so the API resolves it", () => {
     for (const order of FIXTURE_ORDERS) {
       const [first, second] = getChatSuggestions(order);

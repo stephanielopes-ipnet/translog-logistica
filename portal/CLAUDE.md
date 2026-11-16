@@ -42,7 +42,8 @@ DATABRICKS_IT=1 pnpm --filter @translog/api test databricks-repository        # 
 pnpm export:dados                # baixa as tabelas consumo_* do Databricks para portal/dados/ (~1 min)
 pnpm --filter @translog/api fixtures  # regenera os fixtures e a amostra de teste a partir de portal/dados/
 docker compose up --build        # forma oficial de rodar a API (fixtures, chat simulado)
-docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build  # com os CSVs consumo_*
+docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build       # com os CSVs consumo_*
+docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build  # direto do Databricks (credenciais do .env, nunca na imagem)
 docker compose down
 ```
 
@@ -59,7 +60,7 @@ Documentação técnica completa em `docs/backend.md` (mantenha atualizada ao mu
 - `api/src/`: `main.ts` (bootstrap), `server.ts` (Fastify, swagger, rotas), `config.ts` (variáveis validadas no boot), `container.ts` (**único** lugar que escolhe adapters), `http/errors.ts` (**único** lugar que transforma erros em HTTP).
 - Código agrupado por funcionalidade (`orders/`, `chat/`), com porta e adapters. Funções fábrica (`createX(deps)`), sem classes de serviço.
 - A API devolve o view model `Order` pronto. A conversão das tabelas `consumo_*` → `Order` fica só em `orders/consumo-mapper.ts`; o `SELECT` (colunas explícitas) só em `orders/consumo-sql.ts`; a regra da central (`escalateToSupport`) só em `orders/escalation.ts`.
-- Chat sem histórico no servidor. A regra do assistente simulado fica só em `api/src/chat/mock-agent.ts` (nunca no frontend). O formato do pedido de contexto enviado ao agente fica só em `withOrderContext` (`chat/adk-agent.ts`). Nenhum reenvio automático, exceto após `404` "Session not found" (uma vez).
+- Chat sem histórico no servidor. A regra do assistente simulado fica só em `api/src/chat/mock-agent.ts` (nunca no frontend), com tom amigável e gentil. O nome do assistente fica só em `ASSISTANT_NAME` (`contracts/src/chat.ts`), ainda não confirmado. O formato do pedido de contexto enviado ao agente fica só em `withOrderContext` (`chat/adk-agent.ts`). Nenhum reenvio automático, exceto após `404` "Session not found" (uma vez).
 - Datas são texto de calendário (`AAAA-MM-DD`): nunca `new Date(string)` (os timestamps vêm em UTC e mudariam de dia em Brasília). No SQL, `date_format(col, 'yyyy-MM-dd')`.
 
 ## Convenções

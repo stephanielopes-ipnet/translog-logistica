@@ -2,262 +2,162 @@
 
 Parte do Desafio Final do Academy IPNET 2026, Grupo 3. Responsável: Matheus van Deursen (FullStack).
 
-Este documento explica o portal para todas as pessoas envolvidas no projeto, desenvolvedoras ou não. Os detalhes técnicos do servidor e da interface estão em [docs/backend.md](docs/backend.md).
+Este documento explica o portal para todo o grupo, de forma simples. Os detalhes técnicos estão em [docs/backend.md](docs/backend.md).
 
-## Em uma frase
+## O que é
 
-O portal é o site em que o cliente da TransLog digita o número do pedido e descobre, sem precisar ligar para a central, em que situação o pedido está, se atrasou e qual o motivo provável — podendo também tirar dúvidas na hora com o assistente virtual da operadora.
+O site em que o cliente da TransLog digita o número do pedido e vê, sem ligar para a central:
 
-## O problema que ele resolve
+- a **situação** do pedido (entregue, em trânsito, extraviado, cancelado, não pago…);
+- **onde ele está agora** e cada etapa da viagem (coleta, voo, alfândega, transferência, última milha);
+- os prazos de **despacho** e de **entrega**, com o atraso de cada um;
+- o **motivo provável** de um atraso (nunca como certeza);
+- um **aviso da central de atendimento** quando o caso precisa dela (atraso de entrega de 3 dias ou mais, ou extravio; central de segunda a sexta, das 9h às 18h).
 
-A TransLog é uma operadora logística internacional (fictícia). Ela despacha pedidos de lojas virtuais a partir dos EUA e de Porto Rico para cinco mercados (América do Norte, América Latina, Europa, Ásia-Pacífico e África), em quatro níveis de serviço: Standard Class, Second Class, First Class e Same Day.
+Ao lado, um **assistente** responde perguntas como "Por que meu pedido atrasou?".
 
-Dois problemas motivam o portal:
-
-- **O cliente não tem um canal simples para acompanhar o pedido.** Toda dúvida vira ligação ou e-mail para a central de atendimento.
-- **O prazo prometido nem sempre é realista.** Justamente as modalidades mais rápidas são as que mais atrasam. É a "promessa irreal" que o projeto investiga.
-
-## Como o cliente usa o portal
-
-1. Abre o portal e digita o número do pedido (ou clica num dos atalhos de exemplo: `#15`, `#375`, `#562`, `#1002`).
-2. Vê imediatamente, num painel com visual de guia de remessa internacional, a **previsão ou data de entrega**, o **cumprimento do prazo** (quantos dias atrasou ou adiantou), a **modalidade contratada** e a **data do pedido**.
-3. Quando há um motivo provável registrado para o atraso, vê um destaque âmbar explicando esse motivo (sem nunca afirmá-lo como certeza absoluta) com o botão **"Perguntar ao assistente"**.
-4. Ao clicar no botão ou digitar uma pergunta no painel lateral, o **Assistente TransLog** responde em linguagem direta e simples (por exemplo, explicando por que o prazo de 2 dias da Second Class provavelmente foi curto para a rota Texas → Saltillo).
-5. Logo abaixo, acompanha o **trajeto internacional** (Origem → Mercado/Região → Destino) integrado à **linha do tempo de 4 etapas** e a tabela de **itens da remessa** com o valor total em dólar.
-
-Essa é a cena da apresentação para a banca, em 23/11: alguém digita o número do pedido **375**, vê que atrasou 4 dias numa modalidade rápida, lê o motivo provável ("Promessa irreal") e pergunta ao assistente por quê.
-
-Além da aplicação real em React (`portal/web/`), os protótipos visuais continuam disponíveis em `portal/prototipos/`, sendo [prototipos/translog-prototipo-direcao-d.html](prototipos/translog-prototipo-direcao-d.html) a direção visual escolhida e implementada.
-
-## As partes do portal
-
-| Parte | O que faz | Situação em 15/11 |
-|---|---|---|
-| **Tela** (`web/`) | Interface em React que o cliente vê e usa no navegador | **Pronta** — design da Direção D; consulta os pedidos e manda as perguntas do chat ao servidor do portal |
-| **Servidor do portal** (`api/`) | Recebe o número do pedido ou a pergunta do chat, busca os dados e devolve a resposta pronta para a tela | **Pronto** para pedidos e chat |
-| **Contrato** (`contracts/`) | Lista combinada de cada informação que o servidor entrega à tela: nome, formato e valores possíveis | **Pronto** para pedidos e chat (compartilhado entre servidor e tela) |
-| **Assistente do chat** | Responde as perguntas do cliente. Dois modos, escolhidos por configuração: **simulado** (respostas prontas do próprio servidor) ou **agente de IA** do Marco | **Funcionando nos dois modos.** Com o agente real, testado em 15/11 pela tela. Alguns detalhes ainda dependem do Marco (ver "Pontos em aberto"); no Docker, só o simulado |
-
-## Como a tela foi desenhada (Identidade Visual)
-
-A interface segue a **Direção D (Manifesto & Rota Integrada)**, pensada para transmitir a personalidade da TransLog — confiável, precisa, sóbria e internacional:
-
-- **Clareza antes de tudo:** os dados principais aparecem no topo do pedido divididos em 4 blocos lado a lado (`Previsão/Entrega`, `Cumprimento do prazo`, `Modalidade contratada` e `Pedido realizado em`, com resumo de itens e valor total) e um botão rápido para copiar o código da guia (`TL-000375-LATAM`).
-- **Honestidade sem alarme:** o vermelho aparece **apenas** onde há atraso real (etiqueta `Atrasado`, célula de prazo, fita superior do cartão e etapa em atraso da linha do tempo). Avisos de atenção (como o motivo provável e a liberação pendente) usam âmbar (`#F59E0B`), enquanto a marca usa azul-petróleo (`#0F4C81`).
-- **Tipografia técnica de manifesto:** textos usam a fonte `Inter` para leitura rápida, enquanto números de pedido, códigos de manifesto (`TL-000375-LATAM`), datas, quantidades e valores em dólar usam fonte monoespaçada (`IBM Plex Mono`), facilitando a leitura de números.
-- **Rota + Andamento no mesmo bloco:** em vez de uma barra de progresso genérica, a origem e o destino internacionais ficam nas duas pontas da própria linha do tempo de 4 etapas (`Pedido realizado` → `Pedido liberado` → `Em trânsito` → `Entregue`). Assim, até a tabela de itens (com contagem de itens e unidades) cabe na primeira tela sem precisar rolar.
-- **Assistente como canal oficial:** o painel lateral de 400 px apresenta as respostas como um parecer da própria TransLog (com barra lateral azul-petróleo), adapta as perguntas sugeridas ao pedido aberto na tela, mostra listas e títulos das respostas e abre no rastreio qualquer pedido que o cliente citar na conversa.
-- **Navegação rápida e todos os estados previstos:** busca com atalho de teclado (`/`) e botão de limpar para voltar ao início, tela inicial explicativa, carregamento animado, pedido não encontrado com retorno rápido à busca, falha de conexão com botão "Tentar novamente" e falha no envio de mensagem no chat com reenvio manual.
-
-### Barra de controle da demonstração
-
-No topo da tela há uma barra escura (**Direção D**), que pode ser ocultada num clique (ou adicionando `?bar=off` no endereço da página). Ela não faz parte do produto final do cliente: serve para a equipe e a banca alternarem em um clique entre qualquer pedido (`#15`, `#375`, `#562`, `#1002`, etc.), simularem estados de carregamento/erro e compararem ao vivo as duas decisões de interface ainda em aberto (como o chat se comporta ao trocar de pedido e como exibir pedidos aguardando confirmação de pagamento).
-
-## Como o portal se conecta ao resto do projeto
-
-```
-  Base de pedidos             Servidor do portal               Tela do portal
-  (Mateus, Dados)     ───►    (Matheus, FullStack)    ◄───►    (React, no navegador)
-                                      │
-                                      └───►  Assistente de IA (Marco)
-
-  Painel de gestão (Marcelo, BI): usa a mesma base, voltado para a gestão da TransLog.
-```
-
-A tela conversa só com o servidor do portal. É o servidor que busca os dados e que fala com o assistente de IA. Assim, nenhuma chave de acesso nem dado interno chega ao navegador do cliente.
+A TransLog é uma operadora logística fictícia que despacha pedidos dos EUA e de Porto Rico para cinco mercados, em quatro modalidades (Standard Class, Second Class, First Class e Same Day). A dor central do projeto é a **promessa irreal**: o prazo de despacho das modalidades rápidas quase nunca é cumprido.
 
 ## De onde vêm os dados
 
-- A base é a **DataCo** (Kaggle), um conjunto público de pedidos de 2015 a 2018, usado para simular a operação da TransLog. Nenhum dado real de cliente.
-- O Mateus trata essa base e gera a versão **Silver**, já traduzida para o português. A cópia usada hoje tem **65.752 pedidos** (180.519 itens).
-- O portal funciona de dois jeitos:
-  - **Pedidos de exemplo** (padrão): 11 pedidos escolhidos da base, que já vêm junto com o portal. Liga na hora, sem precisar de nenhum arquivo extra.
-  - **Base completa**: o servidor lê o arquivo da Silver (163 MB) ao ligar, o que leva cerca de 11 segundos. Depois disso, qualquer um dos 65.752 pedidos pode ser consultado na tela.
-- O arquivo da Silver **nunca vai para o GitHub**: é grande e contém campos internos sobre clientes. Cada pessoa guarda a própria cópia na pasta `portal/dados/`, que fica só no computador dela.
+Das tabelas oficiais do time de dados (Mateus), no Databricks:
 
-## O que o portal mostra sobre um pedido
-
-| Informação | Exemplo (pedido 375) |
+| Tabela | O que tem |
 |---|---|
-| Número e código de manifesto | `#375` · `TL-000375-LATAM` |
-| Data do pedido | 06/01/2015 |
-| Modalidade de envio | Second Class (Prazo estimado: 2 dias) |
-| Situação | Em Trânsito |
-| Prazo | Atrasado |
-| Dias de atraso | +4 dias |
-| Faixa de atraso | Atraso Crítico (3+ dias) |
-| Entrega prevista | 08/01/2015 |
-| Entrega realizada | ainda não entregue |
-| Origem → destino | San Benito, Texas, Estados Unidos → Saltillo, Coahuila, México |
-| Região e mercado | América Central · LATAM |
-| Itens | 2 itens, cada um com produto, categoria, quantidade e valor |
-| Total | US$ 91,34 |
-| Motivo provável do atraso | Promessa irreal (por enquanto, nos pedidos de exemplo; ver "Pontos em aberto") |
+| `workspace.silver.consumo_pedidos` | 1 linha por pedido (65.752): situação, prazos, causa, local atual |
+| `workspace.silver.consumo_itens_pedido` | os itens de cada pedido, com o valor |
+| `workspace.silver.consumo_eventos_logisticos` | os eventos da viagem (coleta, voo, alfândega…) |
 
-Alguns valores aparecem em inglês porque é assim que vêm da base: modalidade, mercado e nomes de produtos.
+O portal carrega tudo **uma vez, ao ligar**, e depois responde da memória. O "hoje" dos dados é **06/02/2018** (a data mais recente da base): a situação mostrada é a dessa data.
 
-### Situação e prazo são coisas diferentes
+## Como rodar
 
-A **situação** diz em que etapa o pedido está:
-
-- **Entregue**: chegou ao destino.
-- **Em Trânsito**: já saiu e está a caminho.
-- **Aguardando Liberação**: registrado, mas ainda não liberado para envio (por exemplo, pagamento pendente).
-- **Cancelado**: não será enviado.
-
-O **prazo** diz se a data prometida foi cumprida:
-
-- **No Prazo**, **Adiantado** ou **Atrasado**.
-- **Não Avaliado**: o pedido ainda não foi liberado, então não dá para avaliar.
-- **Cancelado**.
-
-Um pedido pode estar "Em Trânsito" e já "Atrasado", como o 375.
-
-O motivo do atraso é sempre apresentado como **provável**, nunca como causa comprovada.
-
-## Privacidade
-
-O portal **nunca mostra**, e o servidor nem chega a guardar:
-
-- identificação e segmento do cliente;
-- forma de pagamento;
-- lucro, margem e descontos;
-- coordenadas geográficas;
-- o resumo em texto que a base prepara para o assistente (ele cita o número do cliente).
-
-Esses campos são descartados no momento em que o servidor lê a base. Testes automáticos conferem, a cada mudança no código, que nenhuma resposta traz essas informações.
-
-## Pedidos de exemplo
-
-São pedidos reais da base, escolhidos para cobrir todas as situações da tela. Os quatro primeiros aparecem como atalhos rápidos logo abaixo do campo de busca e são os usados na demonstração.
-
-| Pedido | Cenário |
-|---|---|
-| 15 | Entregue, com 2 dias de atraso, sem motivo provável |
-| 375 | Em Trânsito, atraso crítico (4 dias), com motivo provável de exemplo ("Promessa irreal") |
-| 562 | Aguardando Liberação |
-| 1002 | Cancelado (suspeita de fraude) |
-| 10453 | Entregue no prazo (Europa) |
-| 20322 | Entregue adiantado (Ásia-Pacífico) |
-| 31398 | Em Trânsito, dentro do prazo (América do Norte) |
-| 225 | First Class atrasado |
-| 41906 | Same Day atrasado (África) |
-| 16 | Aguardando Liberação (pagamento pendente) |
-| 552 | Cancelado pelo cliente |
-
-## O que já foi verificado (15/11)
-
-- **254 testes automáticos** passando (209 no servidor + 45 na tela). Nenhum deles chama a IA de verdade (não gastam cota).
-- **Chat pela tela, nos dois modos**, com o roteiro da banca (abrir o 375, ver o atraso, "Perguntar ao assistente"), uma pergunta citando outro pedido (que abre sozinho no rastreio) e uma "Nova conversa":
-  - simulado: respostas em menos de meio segundo;
-  - agente de IA do Marco: respostas em 11 a 17 segundos.
-- O registro (log) do servidor guarda só dados técnicos da conversa (tamanho da mensagem, tempo, resultado); **nunca o texto** das perguntas ou respostas.
-- Base completa: os 65.752 pedidos foram carregados sem nenhuma linha com problema, em cerca de 11 segundos.
-- Cada consulta de pedido é respondida em **menos de 1 milésimo de segundo**.
-- Os 65.752 pedidos foram conferidos, um a um, contra o script de referência usado para gerar os exemplos: todos iguais.
-- O servidor roda em **Docker**, tanto com os exemplos quanto com a base completa.
-
-## Pontos em aberto
-
-| Assunto | Com quem | Por que importa |
-|---|---|---|
-| Motivo provável do atraso | Mateus e Marcelo | A base ainda não tem essa informação. Hoje os exemplos têm ("Promessa irreal" no 375); com a base completa, nenhum pedido mostra o aviso. E o agente de IA lê a base, então diz que não há motivo registrado enquanto a tela mostra "Promessa irreal". Precisa estar resolvido para a demo |
-| Base usada na demo | Grupo | Pedidos de exemplo (11, com motivo provável no 375) ou base completa (todos os pedidos, sem motivo provável) |
-| Ajustes do agente de IA | Marco | O chat já funciona com o agente, mas falta combinar: como o número do pedido aberto chega a ele, respostas mais curtas e para o cliente (hoje vêm longas e com termos técnicos), formatação, o que acontece quando a resposta demora demais, e o agente no Docker |
-| Versão final da base (Silver ou Gold) | Mateus | Se as colunas mudarem, só uma parte pequena do servidor precisa ser ajustada |
-| Comportamento do chat ao trocar de pedido e rótulo de pagamento não processado | Matheus / Grupo | As opções já estão prontas e podem ser alternadas ao vivo na barra superior da tela para decisão final |
-
-## Próximos marcos do projeto
-
-| Data | Marco |
-|---|---|
-| 17/11 | Checkpoint: MVP parcial |
-| 19/11 | Code freeze e demonstração completa |
-| 23/11 | Banca |
-
-## Como ver funcionando
-
-### 1. Tela completa + Servidor (modo de desenvolvimento)
-
-Com o Node 24 e o `pnpm` instalados:
+Precisa de Node 24 e pnpm (`corepack enable`). Na pasta `portal/`:
 
 ```bash
-cd portal
 pnpm install
+pnpm dev        # tela em http://localhost:5173 e servidor em http://localhost:3333
+```
+
+A fonte dos dados é escolhida no arquivo `portal/.env` (copie de `.env.example`), pela variável `DATA_SOURCE`:
+
+| Modo | O que usa | Quando usar |
+|---|---|---|
+| `fixtures` (padrão) | 9 pedidos de exemplo que vêm no código | Desenvolver a tela, testar sem nada instalado |
+| `file` | as 3 tabelas em CSV na pasta `portal/dados/` | **Plano B da banca**: funciona sem internet e sem Databricks |
+| `databricks` | as 3 tabelas direto do Databricks | A demonstração "oficial", com dados ao vivo |
+
+### Com os exemplos (sem configurar nada)
+
+```bash
 pnpm dev
 ```
 
-Esse comando liga o servidor (`http://localhost:3333`) e a tela do portal (`http://localhost:5173`) ao mesmo tempo. Basta abrir [http://localhost:5173](http://localhost:5173) no navegador, clicar no exemplo **#375** e interagir com o rastreio e com o assistente.
+### Com os CSVs (plano B)
 
-### 2. Chat: simulado ou agente de IA
+1. Coloque `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` em `portal/dados/`. Para baixá-los do Databricks: `pnpm export:dados` (leva ~1 min; precisa das credenciais abaixo).
+2. No `portal/.env`: `DATA_SOURCE=file`.
+3. `pnpm dev`. O servidor leva ~15 s para carregar os 65.752 pedidos.
 
-Sem nenhuma configuração, o chat responde no modo **simulado**: respostas prontas, criadas pelo próprio servidor do portal, que funcionam sem internet e sem a IA.
+### Direto do Databricks
 
-Para o chat usar o **agente de IA do Marco**:
+1. No `portal/.env`:
 
-1. Suba o agente (ele precisa estar respondendo em `http://127.0.0.1:8001`).
-2. Na pasta `portal/`, crie o arquivo `.env` a partir do exemplo e mude duas linhas:
-
-   ```bash
-   cp .env.example .env
-   # no .env:
-   #   AGENT=adk
-   #   AGENT_URL=http://127.0.0.1:8001
+   ```
+   DATA_SOURCE=databricks
+   DATABRICKS_HOST=dbc-xxxxxxxx-xxxx.cloud.databricks.com
+   DATABRICKS_WAREHOUSE_ID=<id do SQL warehouse>
+   DATABRICKS_TOKEN=<seu token>
    ```
 
-3. Reinicie o `pnpm dev`.
-4. Confira em [http://localhost:3333/api/health](http://localhost:3333/api/health): deve aparecer `"agent":"adk"`.
+2. `pnpm dev`. O servidor leva ~25 a 40 s para carregar (até 3 min se o warehouse estiver "dormindo").
 
-Para voltar ao simulado, troque `AGENT=adk` por `AGENT=mock` e reinicie. O `.env` fica só no seu computador (não vai para o GitHub), e a chave da IA fica no agente, nunca no portal.
+Se o Databricks falhar (token vencido, sem internet, warehouse sem cota), o servidor **não liga** e a mensagem diz o que conferir e sugere `DATA_SOURCE=file`. A troca não é automática: quem opera escolhe.
 
-Cada pergunta ao agente usa a IA do Google (gasta cota) e pode levar de alguns segundos até um minuto e meio; nesse tempo a tela mostra "digitando…". Se passar disso, a mensagem aparece como "O assistente demorou demais · Tentar novamente".
+**O token é segredo:** fica só no `portal/.env`, que nunca vai para o GitHub. Não cole o token em mensagens, documentos ou prints.
 
-### 3. Servidor via Docker (documentação interativa da API)
+### Com Docker (só o servidor)
 
 ```bash
-cd portal
-docker compose up --build
+docker compose up --build                                                        # exemplos
+docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build      # CSVs
+docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build # Databricks
+docker compose down
 ```
 
-Depois, abra [http://localhost:3333/docs](http://localhost:3333/docs) no navegador para ver e testar os endereços da API diretamente. Para usar a base completa ou ver mais comandos, consulte [docs/backend.md](docs/backend.md).
+Com o Databricks, as credenciais saem do `portal/.env` na hora de ligar o container e nunca entram na imagem. No Docker o assistente é sempre o simulado. A documentação interativa do servidor fica em http://localhost:3333/docs.
 
-No Docker, o chat fica sempre no modo **simulado**. Dois motivos: o agente do Marco ainda não tem uma versão em Docker no repositório, e, dentro do Docker, o endereço `127.0.0.1` aponta para o próprio container do servidor, não para o computador onde o agente está rodando. Quando o agente ganhar a versão em Docker, os dois passam a subir juntos.
+### O assistente
+
+- `AGENT=mock` (padrão): assistente **simulado**, com respostas prontas a partir dos dados do pedido. Funciona sempre, sem IA, e é o plano B da banca.
+- `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001`: o **agente de IA do Marco**, que precisa estar ligado.
+
+O nome do assistente ("Assistente TransLog") ainda não foi confirmado pelo grupo; muda num lugar só.
+
+## Roteiro da banca
+
+1. Abrir o portal. O chat cumprimenta e pede o número do pedido.
+2. Digitar **76902** (ou clicar no atalho): pedido **em trânsito**, First Class, de San Jose (EUA) para Jacarta (Indonésia), parado na **Alfândega Jacarta**, com **5 dias de atraso**. Motivo provável no despacho: **Promessa irreal**. Aviso da central.
+3. Clicar em **"Perguntar ao assistente"** ("Por que o pedido #76902 atrasou?"). O assistente explica o motivo provável de cada etapa e avisa que o caso é acompanhado pela central.
+4. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
+
+Pedidos de exemplo para mostrar cada situação:
+
+| Pedido | Situação | Para mostrar |
+|---|---|---|
+| **76902** | Em trânsito, 5 dias de atraso, na alfândega | Pedido principal: promessa irreal, onde está, central |
+| **375** | Entregue com 4 dias de atraso | Número que o grupo já conhece; central |
+| **34** | Extraviado na alfândega | Extravio e central |
+| **222** | Entregue com 1 dia de atraso | Promessa irreal sem central |
+| **8** | Entregue no prazo | Caso feliz |
+| **9** | Não pago (expirado) | Sem prazos, só o registro |
+| **50** | Cancelado | Pedido encerrado |
+| **31298** | Entregue no prazo, rota dentro dos EUA por caminhão | Sem voo nem alfândega |
+| **76385** | Em trânsito, em voo para a Austrália, 6 dias de atraso | Outro caso em trânsito |
+
+Os atalhos da tela são 76902, 375, 34 e 8 (`SAMPLE_ORDER_IDS`). A barra escura no topo da tela (some com `?bar=off` no endereço) abre qualquer um deles e simula carregamento, erro e conversas de exemplo.
+
+## Privacidade
+
+Nenhuma resposta do portal traz dados do cliente (id, segmento) nem valores internos (preço unitário, valor bruto, desconto, id do produto). Essas colunas **nem são lidas**: a consulta ao Databricks lista só as colunas permitidas, e a leitura dos CSVs descarta as demais. Testes automáticos conferem todas as respostas.
+
+## Pontos em aberto
+
+- Nome do assistente (citado "Login" na reunião de 16/11).
+- Regra da central: "3 dias ou mais" (como está) ou "mais de 3 dias".
+- Telefone ou e-mail da central para o aviso da tela.
+- A explicação da base diz "cumprido em apenas 0.0%" (ponto decimal, número estranho): ajuste pedido ao Mateus.
+- Agente do Marco lendo a mesma tabela (`consumo_pedidos` tem o `resumo_pedido`, feito para a IA).
 
 ## Glossário
 
 | Termo | Significado |
 |---|---|
-| API | A "porta de entrada" do servidor: os endereços que a tela (ou outro sistema) chama para pedir dados |
-| Backend / servidor | A parte do sistema que roda fora do navegador e cuida dos dados |
-| Frontend / tela | O que aparece no navegador do cliente (construído em React na pasta `web/`) |
-| Contrato | Acordo escrito sobre quais informações a API entrega e em que formato. Tela e servidor seguem o mesmo contrato |
-| Silver / Gold | Etapas do tratamento dos dados feito pelo Mateus. Silver: dados limpos e traduzidos. Gold: dados prontos para consumo |
-| Pedidos de exemplo (fixtures) | Os 11 pedidos que já vêm junto com o portal |
-| Docker | Ferramenta que empacota o servidor para ele funcionar do mesmo jeito em qualquer computador |
-| Documentação da API (`/docs`) | Página gerada automaticamente que descreve a API e permite testá-la pelo navegador |
-| Teste automático | Verificação escrita em código, que roda a cada mudança para garantir que nada quebrou |
-| Assistente simulado (`mock`) | Modo do chat com respostas prontas, criadas pelo próprio servidor do portal. Não usa IA |
-| Agente de IA (`adk`) | O assistente do Marco, feito com o Google ADK e o modelo Gemini. O servidor do portal conversa com ele |
-| Conversa (sessão) | Sequência de perguntas e respostas. Cada "Nova conversa" na tela começa uma conversa nova no agente |
+| Despacho | Saída do pedido da expedição de origem. Cada modalidade promete um prazo (Standard 4 dias, Second 2, First 1, Same Day no mesmo dia) |
+| Entrega | Chegada ao destinatário. Atraso de entrega = dias depois da data prevista |
+| Motivo provável | Causa mais provável do atraso, vinda da base. Nunca é apresentada como certeza |
+| Promessa irreal | Prazo de despacho que a operação quase nunca cumpre (First Class e Same Day) |
+| Silver | Camada de dados tratados e traduzidos pelo time de dados, no Databricks |
+| Data de referência | O "hoje" dos dados: 06/02/2018 |
 
 ## Pessoas ligadas ao portal
 
 | Pessoa | Papel | Relação com o portal |
 |---|---|---|
-| Matheus van Deursen | FullStack | Responsável pelo portal (servidor e tela) |
-| Mateus Maciel | Engenharia de Dados | Fornece a base de pedidos (Silver e, depois, Gold) |
-| Marco Aurélio | Engenharia de IA | Agente de IA que responde no chat |
-| Marcelo Pimenta | BI | Painel de gestão; motivo provável do atraso, junto com o Mateus |
-| Stephanie Lopes | Gestão de Projetos | Acompanhamento e documentação do projeto |
+| Matheus van Deursen | FullStack | Responsável pelo portal (tela e servidor) |
+| Mateus Maciel | Engenharia de Dados | Tabelas `consumo_*` no Databricks |
+| Marco Aurélio | Engenharia de IA | Agente de IA que responde no chat (`AGENT=adk`) |
+| Marcelo Pimenta | BI | Painel de gestão com os mesmos dados |
+| Stephanie Lopes | Gestão de Projetos | Acompanhamento do projeto, FAQ da central e refinamento da tela |
 
 ## Onde está cada coisa nesta pasta
 
-| Pasta ou arquivo | Conteúdo |
+| Pasta ou arquivo | O que tem |
 |---|---|
-| `web/` | Tela do portal em React (`@translog/web`) |
-| `api/` | Servidor do portal (`@translog/api`) |
-| `contracts/` | Contrato compartilhado entre o servidor e a tela (`@translog/contracts`) |
-| `prototipos/` | Protótipos visuais em HTML (incluindo a Direção D escolhida) |
-| `docs/backend.md` | Documentação técnica completa (backend, contratos e frontend) |
-| `tasks.md` | Lista de tarefas por fase, com o que já foi feito |
-| `dados/` | Cópia local da base (fica só no computador, nunca vai para o GitHub) |
+| `web/` | A tela (React) |
+| `api/` | O servidor (Node + Fastify) e o assistente simulado |
+| `contracts/` | O formato combinado dos dados entre tela e servidor |
+| `dados/` | CSVs das tabelas (só no seu computador, nunca no GitHub) |
+| `docs/backend.md` | Documentação técnica completa |
+| `tasks.md` | Checklist do que foi feito |
+| `prototipos/` | Protótipos visuais (a Direção D foi a escolhida) |

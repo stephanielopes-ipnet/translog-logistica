@@ -41,7 +41,7 @@ describe("POST /api/chat (assistente simulado)", () => {
     expect(response.statusCode).toBe(200);
     expect(chatResponseSchema.parse(response.json())).toStrictEqual({
       sessionId: SESSION,
-      reply: expect.stringContaining("Motivo provável do atraso do pedido **#375**"),
+      reply: expect.stringContaining("Sinto muito pelo atraso do pedido **#375**"),
       mentionedOrderId: 375,
     });
   });
@@ -70,7 +70,7 @@ describe("POST /api/chat (assistente simulado)", () => {
     ]) {
       const response = await postChat(app, payload);
       expect(response.statusCode).toBe(200);
-      expect(response.json().reply).toMatch(/^Para consultar, informe o número do pedido/);
+      expect(response.json().reply).toMatch(/me diga o número do pedido/);
     }
   });
 

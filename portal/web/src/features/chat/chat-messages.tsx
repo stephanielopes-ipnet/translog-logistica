@@ -1,4 +1,4 @@
-import type { Order } from "@translog/contracts";
+import { ASSISTANT_NAME, type Order } from "@translog/contracts";
 import { ArrowUpRight, CircleAlert, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils.ts";
@@ -93,18 +93,30 @@ export function ChatMessages({
           <div className="mx-auto w-11 h-11 rounded-md bg-primary-50 border border-primary-100 text-primary grid place-items-center">
             <MessageCircleQuestion className="w-5 h-5" />
           </div>
-          <p className="mt-3 text-sm font-semibold text-slate-900">
-            Como posso ajudar com sua remessa?
-          </p>
-          <p className="mt-1 text-xs text-slate-500 max-w-[260px] mx-auto">
-            Consulte prazos, entenda o motivo provável de um atraso ou tire dúvidas sobre
-            modalidades.
-          </p>
+          {activeOrder ? (
+            <>
+              <p className="mt-3 text-sm font-semibold text-slate-900">
+                Como posso ajudar com o pedido #{activeOrder.orderId}?
+              </p>
+              <p className="mt-1 text-xs text-slate-500 max-w-[260px] mx-auto">
+                Pergunte onde ele está, quando chega ou o motivo provável de um atraso.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-3 text-sm font-semibold text-slate-900">
+                Olá! {ASSISTANT_NAME} por aqui.
+              </p>
+              <p className="mt-1 text-xs text-slate-500 max-w-[260px] mx-auto">
+                Para começar, informe o número do seu pedido aqui na conversa ou no campo ao lado.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="space-y-2">
           <p className="label-mono px-1">
-            {activeOrder ? `Sugestões para #${activeOrder.orderId}` : "Perguntas frequentes"}
+            {activeOrder ? `Sugestões para #${activeOrder.orderId}` : "Para começar"}
           </p>
           {suggestions.map((suggestion) => (
             <button
@@ -175,7 +187,7 @@ export function ChatMessages({
             <div key={msg.id} className="max-w-[92%] fade-in">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                <span className="label-mono !text-primary font-semibold">Assistente TransLog</span>
+                <span className="label-mono !text-primary font-semibold">{ASSISTANT_NAME}</span>
               </div>
               <div className="border-l-2 border-primary bg-slate-50/90 rounded-r-md px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 break-words border-y border-r border-y-slate-200/80 border-r-slate-200/80">
                 <RichText text={msg.text} />
@@ -191,7 +203,7 @@ export function ChatMessages({
           <div className="max-w-[85%] fade-in">
             <div className="flex items-center gap-1.5 mb-1">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              <span className="label-mono !text-primary font-semibold">Assistente TransLog</span>
+              <span className="label-mono !text-primary font-semibold">{ASSISTANT_NAME}</span>
             </div>
             <div className="border-l-2 border-primary bg-slate-50 px-3.5 py-2.5 rounded-r-md border-y border-r border-slate-200 inline-flex items-center gap-2.5">
               <span className="typing">

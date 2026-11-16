@@ -3,10 +3,11 @@ import type { Order } from "@translog/contracts";
 // Perguntas sugeridas quando a conversa está vazia. São só atalhos de digitação:
 // quem responde é a API (`POST /api/chat`).
 
+/** Sem pedido aberto: o primeiro atalho leva o assistente a pedir o número. */
 export const CHAT_SUGGESTIONS = [
-  "Onde está o pedido 76902?",
-  "Por que o pedido 76902 atrasou?",
+  "Quero acompanhar meu pedido",
   "Quais são as modalidades de envio?",
+  "Como funciona a central de atendimento?",
 ] as const;
 
 const MODES = "Quais são as modalidades de envio?";

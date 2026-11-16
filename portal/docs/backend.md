@@ -2,7 +2,7 @@
 
 Para quem vai rodar, revisar ou mudar o código do portal. A visão geral, sem detalhes técnicos, está no [README](../README.md).
 
-Estado em 16/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. **Em 16/11 a fonte passou a ser a das tabelas oficiais `consumo_*` da Silver no Databricks** (contrato `Order` novo, seções 5, 8 e 9), lidas direto do Databricks ao subir (`DATA_SOURCE=databricks`) ou dos CSVs exportados (`file`, plano B); a tela foi refeita para o contrato novo (seção 13) e o chat simulado só foi adaptado (será reescrito na próxima tarefa). O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
+Estado em 16/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. **Em 16/11 a fonte passou a ser a das tabelas oficiais `consumo_*` da Silver no Databricks** (contrato `Order` novo, seções 5, 8 e 9), lidas direto do Databricks ao subir (`DATA_SOURCE=databricks`) ou dos CSVs exportados (`file`, plano B); a tela foi refeita para o contrato novo (seção 13) e o chat simulado foi reescrito (seção 10.3). O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
 
 ## Sumário
 
@@ -83,7 +83,8 @@ portal/
 ├── .env.example             # todas as variáveis, comentadas
 ├── .dockerignore
 ├── docker-compose.yml       # API com fixtures
-├── docker-compose.silver.yml  # sobreposição: API com os CSVs consumo_* por volume (vira docker-compose.dados.yml)
+├── docker-compose.dados.yml      # sobreposição: API com os CSVs consumo_* por volume somente leitura
+├── docker-compose.databricks.yml # sobreposição: API lendo do Databricks (credenciais do .env, fora da imagem)
 ├── README.md                # visão geral (não técnica)
 ├── CLAUDE.md                # regras e comandos para o assistente de código
 ├── tasks.md                 # checklist por fase
@@ -246,12 +247,13 @@ AGENT_IT_URL=http://127.0.0.1:8001 pnpm --filter @translog/api test adk-agent
 ### Docker
 
 ```bash
-docker compose up --build                                                    # fixtures
-docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build # CSVs consumo_*
+docker compose up --build                                                        # fixtures
+docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build      # CSVs consumo_*
+docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build # Databricks
 docker compose down
 ```
 
-Para não repetir os `-f`, defina `COMPOSE_FILE=docker-compose.yml:docker-compose.silver.yml` no `.env`.
+Para não repetir os `-f`, defina `COMPOSE_FILE=docker-compose.yml:docker-compose.dados.yml` (ou `...:docker-compose.databricks.yml`) no `.env`.
 
 ### Comandos do workspace
 
@@ -749,18 +751,25 @@ O serviço guarda as conversas ocupadas num `Set`, conferido e marcado **antes d
 
 ### 10.3. Assistente simulado (`AGENT=mock`)
 
-`mock-agent.ts` tem as regras e os textos que ficavam na tela, consultando a fonte configurada (funciona com a base inteira; em 16/11 só adaptado ao contrato novo, com textos simples):
+`mock-agent.ts`, reescrito em 16/11 para o contrato das tabelas `consumo_*`, com tom amigável e gentil. Responde cada mensagem sozinha, consultando a fonte configurada (funciona com a base inteira). Intenções, nesta ordem:
 
-| Pergunta | Resposta |
+| Mensagem | Resposta |
 |---|---|
-| Cita pedido inexistente (com a palavra "pedido" ou só o número) | "Não encontrei o pedido **#N**. Confira o número e tente novamente." |
-| "modalidade", "tipos de envio", "formas de envio", "classe" | As quatro modalidades e seus prazos |
-| "atras", "por que", "motivo", "demor", "causa" | `buildWhyReply`: motivo provável, ou situação sem atraso, cancelado, aguardando liberação |
-| "quando", "chega", "prazo", "previs", "entreg", "situac", "status", "onde", ou só o pedido | `buildWhenReply`: situação, datas e dias de atraso |
-| Sem pedido de contexto | Pede o número do pedido |
-| Fora do escopo | Diz o que sabe fazer |
+| Cita pedido inexistente (com "pedido" ou só o número) | "Não encontrei o pedido **#N** na nossa base. Pode conferir o número? …" |
+| "modalidade", "tipos de envio", "formas de envio", "classe" | `MODES_REPLY`: as 4 modalidades e o prazo de despacho de cada uma |
+| "central", "atendimento", "atendente", "humano", "telefone", "contato" | `SUPPORT_REPLY` (horário e regra); com pedido encaminhado, "O pedido **#N** se enquadra: …" |
+| "atras", "por que", "motivo", "demor", "causa" | `buildWhyReply`: motivo provável de cada etapa ("No despacho, que saiu N dias depois do prometido, o motivo provável é …"; "Na entrega, …"), com uma explicação de cada causa sempre como hipótese; sem atraso de entrega, diz que não atrasou (e se o transporte recuperou o despacho); extravio, cancelado, não pago e aguardando pagamento têm frase própria |
+| "onde", "local", "rastre", "aconteceu", "extravi"… | `buildWhereReply`: local atual, etapa e desde quando (em trânsito); nos demais, a situação |
+| "quando", "chega", "prazo", "situac", "status", "acompanh"…, ou só o pedido | `buildStatusReply`: situação, datas, atraso e local, por situação |
+| Pergunta de pedido sem pedido aberto nem citado | `ASK_NUMBER_REPLY`: pede o número (ex.: 76902) |
+| Cumprimento ("oi", "bom dia"…) | `GREETING_REPLY` com o nome do assistente; com pedido aberto, cita o pedido |
+| Fora do escopo | `FALLBACK_REPLY`: diz com gentileza o que sabe fazer |
 
-Regras fixas: rótulo sempre "Motivo provável", nenhum texto apresenta a causa como comprovada, nada sobre pagamento (só "Aguardando Liberação"). O detalhe de "Promessa irreal" é montado a partir do pedido (modalidade, prazo, estado de origem → cidade e país de destino; "rota internacional" só se os países forem diferentes). Outros motivos aparecem sem detalhe.
+Regras fixas:
+- a causa é sempre "motivo provável" (testado: nenhuma resposta diz "comprovado", "com certeza" ou "causa do atraso");
+- o aviso da central ("Como a entrega já está N dias atrasada / houve extravio, este caso é acompanhado pela nossa **central de atendimento**, que funciona de **segunda a sexta, das 9h às 18h**") só aparece quando a API marcou `escalateToSupport` (testado nos 9 pedidos);
+- horário e limite vêm de `orders/escalation.ts` (`SUPPORT_HOURS`, `SUPPORT_MIN_DELAY_DAYS`); o nome, de `ASSISTANT_NAME` (`@translog/contracts`), o mesmo da tela;
+- nada de dados do cliente nem do tipo de pagamento (só a situação do pedido, como "Aguardando pagamento").
 
 ### 10.4. Adapter do agente ADK (`AGENT=adk`)
 
@@ -946,7 +955,9 @@ A tela não tem mais regra de respostas: tudo vem de `POST /api/chat` (a regra d
 - **Pedido citado:** `mentionedOrderId` diferente do pedido aberto abre esse pedido pela mesma função do formulário (`handleSelectOrder`), aplicando a regra de troca do chat.
 - **Falha:** a pergunta fica "Não enviada · Tentar novamente"; no `504`, "O assistente demorou demais · Tentar novamente" (`chatFailureLabel`). Reenvio só manual. Com a rede simulada desligada na barra (`n=off`), a mensagem falha na hora, sem chamar a API.
 - **Formatação (`rich-text.ts`):** `parseRichText` transforma o texto em linhas (texto, título `#`/`##`/`###`, item de lista `*`/`-`/`•` com até 2 níveis, linha em branco) com trechos em `**negrito**`; `chat-messages.tsx` monta os elementos React, sem `dangerouslySetInnerHTML`. Tabelas, links, `---`, `*itálico*` e crases aparecem como texto.
-- **Sugestões (`chat-suggestions.ts`):** com a conversa vazia, 3 perguntas adaptadas ao pedido aberto; sempre citam o número do pedido.
+- **Sem pedido aberto:** o estado vazio diz "Olá! <nome> por aqui." e convida a informar o número; o campo de texto mostra "Digite o número do pedido (ex.: 76902)"; as sugestões são "Quero acompanhar meu pedido" (o assistente pede o número), as modalidades e a central.
+- **Sugestões (`chat-suggestions.ts`):** com pedido aberto e a conversa vazia, 3 perguntas adaptadas à situação; sempre citam o número do pedido.
+- **Nome do assistente:** `ASSISTANT_NAME` em `contracts/src/chat.ts` (cabeçalho, mensagens e respostas do simulado). Ainda não confirmado pelo grupo.
 - **Limite:** a caixa de texto aceita até `CHAT_MESSAGE_MAX_LENGTH` (1000) caracteres. `Enter` envia, `Shift+Enter` quebra linha.
 - **Três modos ao trocar de pedido (`chatOnSwitch`, decisão em aberto):** `keep` (padrão) mantém a conversa; `divider` insere `Alternado para o pedido #N`; `clear` limpa a conversa e começa outra no backend.
 
@@ -971,7 +982,7 @@ pnpm --filter @translog/contracts test  # só o contrato
 pnpm --filter @translog/web test        # só o frontend (~1 s)
 ```
 
-Contagem em 16/11: contracts 20, api 287 (+2 desligados: agente real e Databricks real), web 68.
+Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databricks real), web 69.
 
 ### Testes do contrato (`@translog/contracts`)
 
@@ -986,7 +997,7 @@ Contagem em 16/11: contracts 20, api 287 (+2 desligados: agente real e Databrick
 | `config.test.ts` | Padrões, vazios, cada variável inválida (inclusive `AGENT*` e `DATABRICKS_*`), `DATA_DIR` relativo, `ORDERS_FILE` ignorada, barra final de `AGENT_URL`, host do Databricks (`https` ou `http` local), token nunca na mensagem, lista de erros completa |
 | `server.test.ts` | Health (fixtures, file, databricks com o falso, pasta sem CSV, token recusado, modo do agente), formato de todos os erros, OpenAPI e Swagger UI |
 | `chat/chat-service.test.ts` | Pedido citado existente e inexistente, primeiro número existente, pedido aberto inexistente ignorado, trava (mesma conversa → `ChatBusyError`; liberada depois de resposta e de falha; conversas diferentes em paralelo), resposta vazia, log sem conteúdo |
-| `chat/mock-agent.test.ts` | 76902 "por que atrasou" e "quando chega", modalidades, sem pedido, fora do escopo, pedido inexistente, cada situação, extravio, central, nenhuma causa comprovada nem tipo de pagamento |
+| `chat/mock-agent.test.ts` | Roteiro da banca (76902: por que, quando, onde, botão da tela), sem pedido (cumprimento, pede o número), modalidades, central (e se o pedido se enquadra), fora do escopo, pedido inexistente, as situações dos 9 pedidos, em trânsito no prazo, adiantado, aguardando pagamento, nenhuma causa comprovada nem tipo de pagamento, central só nos pedidos marcados pela API |
 | `chat/routes.test.ts` | `200`, `400` (sem `sessionId`, UUID inválido, mensagem vazia, só espaços, 1001 caracteres, `orderId` inválido), mensagem aparada, `409`, `502`, `504` sem vazar detalhe, OpenAPI com exemplo |
 | `chat/adk-events.test.ts` | Todos os casos de teste de `extract_final_text` + formatos inesperados, `error_code`, `function_call`/`function_response` |
 | `chat/adk-agent.test.ts` | Contra um servidor HTTP falso: sessão, `409`, `404` → recria e reenvia uma vez, `500` → `502`, timeout → `504`, contexto do pedido no texto, expiração do `Map`. Integração com o agente real só com `AGENT_IT_URL` |
@@ -1010,7 +1021,7 @@ Contagem em 16/11: contracts 20, api 287 (+2 desligados: agente real e Databrick
 | `features/tracking/order-status.test.ts` | Mensagem principal das 7 situações (76902, 375, 34, 222, 8, 9, 50, aguardando, adiantado, no prazo), prazo de entrega, motivo da central |
 | `features/tracking/stage-timeline.test.ts` | Etapas e estados: 76902 (alfândega com atraso), 76385 (voo com atraso), 375 (entregue), 34 (extravio + não alcançadas), 31298 (doméstica rodoviária sem voo nem alfândega), 8 (Porto Rico → Brasil), 9 e 50 (só o pedido), doméstica aérea, aguardando pagamento |
 | `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, conversa nova só com "Zerar", efeito da troca de pedido nas mensagens, texto de falha por status |
-| `features/chat/chat-suggestions.test.ts` | Sugestões por situação do pedido, sempre citando o número |
+| `features/chat/chat-suggestions.test.ts` | Sem pedido, convida a informar o número; com pedido, sugestões por situação, sempre citando o número |
 | `features/chat/rich-text.test.ts` | Negrito, listas (`*`, `-`, `•`, subníveis), títulos, linha em branco, asteriscos soltos |
 | `features/dev-bar/chat-presets.test.ts` | Conversas de exemplo da barra |
 
@@ -1044,11 +1055,22 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | Arquivo | Conteúdo |
 |---|---|
 | `docker-compose.yml` | Serviço `api` com `DATA_SOURCE=fixtures`, `AGENT=mock`, porta `${API_PORT:-3333}`, healthcheck em `/api/health` (`start_period: 60s`, `start_interval: 1s`) |
-| `docker-compose.silver.yml` | Sobreposição: `DATA_SOURCE=file`, `DATA_DIR=/data`, volume `./dados:/data:ro` (vira `docker-compose.dados.yml` na tarefa de Docker) |
+| `docker-compose.dados.yml` | Sobreposição: `DATA_SOURCE=file`, `DATA_DIR=/data`, volume `./dados:/data:ro` (substitui o `docker-compose.silver.yml`) |
+| `docker-compose.databricks.yml` | Sobreposição: `DATA_SOURCE=databricks` e as `DATABRICKS_*` interpoladas do `portal/.env` (ou do ambiente) **na hora de subir**, com `${VAR:?mensagem}` para as obrigatórias; `start_period: 240s` (warehouse dormindo) |
+
+**Credenciais fora da imagem:** a imagem não recebe nenhuma `DATABRICKS_*` no build; elas entram só como variáveis de ambiente do container. Conferido em 16/11: `docker image inspect` sem nenhuma `DATABRICKS_*` e o token ausente do log do container. Para validar o compose sem imprimir o token, use `docker compose -f docker-compose.yml -f docker-compose.databricks.yml config --quiet` (sem `--quiet`, o `config` mostra os valores).
+
+**Verificado em 16/11:**
+
+| Modo | Até ficar `healthy` | Pedidos / inválidas | Memória do container |
+|---|---|---|---|
+| fixtures | ~2 s | 9 / 0 | — |
+| dados (CSVs) | 18 s | 65.752 / 0 | ~371 MiB |
+| databricks | 40 s (consultas 1,8 s, download 23 s, leitura 10 s) | 65.752 / 0 | ~449 MiB |
 
 **Chat no Docker sempre simulado:** o agente do Marco ainda não tem imagem na `main`, e, dentro do container da API, `AGENT_URL=http://127.0.0.1:8001` apontaria para o próprio container, não para a máquina. Quando o Dockerfile do agente estiver na `main`, ele entra como serviço no compose e a API usa `AGENT_URL=http://agent:8001`. Para testar com o agente, use `pnpm dev`.
 
-**Por que dois arquivos:** com o volume no `docker-compose.yml`, o Docker cria `portal/dados/` **como root** no host quando a pasta não existe (testado em 14/11). Em um clone novo no Linux, copiar os CSVs para lá passaria a exigir `sudo`. A sobreposição só monta o volume quando os CSVs são usados.
+**Por que sobreposições:** com o volume no `docker-compose.yml`, o Docker cria `portal/dados/` **como root** no host quando a pasta não existe (testado em 14/11). Em um clone novo no Linux, copiar os CSVs para lá passaria a exigir `sudo`. A sobreposição só monta o volume quando os CSVs são usados; a do Databricks só exige as credenciais quando ele é usado.
 
 ## 16. Como fazer mudanças comuns
 
@@ -1128,9 +1150,8 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 
 ## 19. Limitações e próximos passos
 
-- **Databricks no Docker:** as credenciais entram por variável de ambiente (tarefa de Docker); hoje o compose usa `fixtures` ou os CSVs.
 - **Sem atualização periódica:** os dados ficam como estavam ao subir a API (fora do escopo).
-- **Tela e chat simulado no contrato novo:** só adaptados em 16/11 (situações, prazos de entrega, motivo provável com a explicação). A tela nova (despacho x entrega, onde está agora, extravio, aviso da central, linha do tempo por etapas) e o simulado reescrito vêm nas próximas tarefas.
+- **Nome do assistente e contato da central:** o nome (`ASSISTANT_NAME`) ainda não foi confirmado; o aviso da central mostra só o horário (sem telefone ou e-mail).
 - **Agente ADK (pendências com o Marco, seção 10.8):** formato do pedido no texto, respostas longas e técnicas, formatação, sobreposição de mensagens depois de um `504`, Dockerfile na `main`. A tela e a API já funcionam com o agente; só `withOrderContext` e a configuração dependem dele.
 - **Tela x chat no motivo provável:** com `AGENT=adk`, o agente lê a base dele; o portal agora lê `consumo_pedidos`, que tem a causa e o `resumo_pedido` feito para a IA. Ficam iguais quando o agente ler a mesma tabela (pendência com o Marco).
 - **Decisão de produto em aberto (simulável na `ProtoBar`):**

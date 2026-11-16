@@ -1,6 +1,7 @@
 # Forma oficial de rodar a API: docker compose up --build
 # Este arquivo sobe com os pedidos de exemplo (fixtures), sem nenhum arquivo externo.
-# Com a Silver: docker-compose.silver.yml (ver README). Variáveis em .env.example.
+# Com os CSVs: docker-compose.dados.yml; direto do Databricks: docker-compose.databricks.yml
+# (ver README). Variáveis em .env.example.
 name: translog-portal
 
 services:
@@ -24,6 +25,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-      # Com a Silver, a API só abre a porta depois de carregar os pedidos (~10 s).
+      # Com os CSVs ou o Databricks, a API só abre a porta depois de carregar os pedidos.
       start_period: 60s
       start_interval: 1s

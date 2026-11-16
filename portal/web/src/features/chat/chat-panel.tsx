@@ -1,4 +1,4 @@
-import type { Order } from "@translog/contracts";
+import { ASSISTANT_NAME, type Order } from "@translog/contracts";
 import { Info, MessageSquareText, RotateCcw, Tag } from "lucide-react";
 import { ChatInput } from "./chat-input.tsx";
 import { ChatMessages } from "./chat-messages.tsx";
@@ -40,7 +40,7 @@ export function ChatPanel({
             />
           </div>
           <div className="leading-tight">
-            <h2 className="text-sm font-semibold text-slate-900">Assistente TransLog</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{ASSISTANT_NAME}</h2>
             <p className="text-xs text-slate-500 mt-0.5">Pergunte sobre sua entrega</p>
           </div>
         </div>
@@ -88,7 +88,7 @@ export function ChatPanel({
       />
 
       {/* Input de mensagem */}
-      <ChatInput disabled={typing} onSend={onSendMessage} />
+      <ChatInput disabled={typing} hasOrder={activeOrder !== null} onSend={onSendMessage} />
     </aside>
   );
 }

@@ -1,0 +1,19 @@
+# Sobreposição para rodar a API lendo as tabelas consumo_* direto do Databricks
+# (DATA_SOURCE=databricks):
+#   docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build
+# ou, no .env: COMPOSE_FILE=docker-compose.yml:docker-compose.databricks.yml
+#
+# As credenciais vêm do portal/.env (ou do ambiente) na hora de subir o container: entram como
+# variáveis de ambiente e nunca na imagem. Sem elas, o compose para com a mensagem abaixo.
+# Se o Databricks falhar, a API não sobe e sugere o plano B: docker-compose.dados.yml.
+services:
+  api:
+    environment:
+      DATA_SOURCE: databricks
+      DATABRICKS_HOST: ${DATABRICKS_HOST:?defina DATABRICKS_HOST no portal/.env}
+      DATABRICKS_WAREHOUSE_ID: ${DATABRICKS_WAREHOUSE_ID:?defina DATABRICKS_WAREHOUSE_ID no portal/.env}
+      DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:?defina DATABRICKS_TOKEN no portal/.env}
+      DATABRICKS_CATALOG_SCHEMA: ${DATABRICKS_CATALOG_SCHEMA:-workspace.silver}
+    healthcheck:
+      # O warehouse da edição gratuita pode estar dormindo: a carga leva até ~3 min.
+      start_period: 240s
