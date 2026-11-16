@@ -97,7 +97,7 @@ export function OrderSearchForm({
               inputMode="numeric"
               autoComplete="off"
               maxLength={10}
-              placeholder="Ex.: 375"
+              placeholder="Ex.: 76902"
               value={queryValue}
               onChange={(e) => handleInputChange(e.target.value)}
               className="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 pl-10 pr-10 font-mono text-[15px] font-medium text-slate-900 tabular placeholder:font-sans placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"

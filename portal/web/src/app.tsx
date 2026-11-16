@@ -13,11 +13,7 @@ import {
   startsNewConversation,
 } from "@/features/chat/chat-session.ts";
 import { buildPresetConversation, PRESET_ORDER_ID } from "@/features/dev-bar/chat-presets.ts";
-import {
-  type ChatOnSwitchMode,
-  ProtoBar,
-  type ReleaseLabelMode,
-} from "@/features/dev-bar/proto-bar.tsx";
+import { type ChatOnSwitchMode, ProtoBar } from "@/features/dev-bar/proto-bar.tsx";
 import { type TrackerViewMode, TrackingPanel } from "@/features/tracking/tracking-panel.tsx";
 import { parseOrderId, readUrlPresets, withOrderQueryParam } from "@/lib/url-state.ts";
 
@@ -68,12 +64,9 @@ export function App() {
   );
   const [forcedOffline, setForcedOffline] = useState<boolean>(initialUrl.networkOnline === false);
 
-  // Os 2 pontos em aberto configuráveis
+  // Ponto em aberto configurável na barra: o chat ao trocar de pedido
   const [chatOnSwitch, setChatOnSwitch] = useState<ChatOnSwitchMode>(
     initialUrl.chatOnSwitch ?? "keep",
-  );
-  const [releaseLabel, setReleaseLabel] = useState<ReleaseLabelMode>(
-    initialUrl.releaseLabel ?? "waiting",
   );
 
   // Estado do Chat
@@ -359,11 +352,6 @@ export function App() {
         if (val === "keep" || val === "divider" || val === "clear") {
           setChatOnSwitch(val);
         }
-      } else if (kind === "r") {
-        if (val === "waiting" || val === "payment") {
-          // Só muda o rótulo de pedidos "Aguardando pagamento" (nenhum entre os fixtures).
-          setReleaseLabel(val);
-        }
       } else if (kind === "n") {
         const nextOffline = val === "off";
         setForcedOffline(nextOffline);
@@ -393,8 +381,8 @@ export function App() {
         : messages.length > 0
           ? "c:conversation"
           : "c:empty";
-    return [tk, ck, `s:${chatOnSwitch}`, `r:${releaseLabel}`, isConnected ? "n:on" : "n:off"];
-  }, [activeOrder, chatOnSwitch, isConnected, messages, releaseLabel, trackerView, typing]);
+    return [tk, ck, `s:${chatOnSwitch}`, isConnected ? "n:on" : "n:off"];
+  }, [activeOrder, chatOnSwitch, isConnected, messages, trackerView, typing]);
 
   return (
     <div className="flex flex-col h-full min-w-[1280px] bg-slate-100/80 text-slate-900 antialiased overflow-hidden">
@@ -416,7 +404,6 @@ export function App() {
             onRetry={handleRetryTracking}
             sampleOrderIds={samplesQuery.orderIds}
             activeOrder={activeOrder}
-            releaseLabel={releaseLabel}
             onAskAssistant={handleSendMessage}
           />
 

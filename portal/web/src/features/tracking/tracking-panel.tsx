@@ -2,7 +2,6 @@ import type { Order } from "@translog/contracts";
 import { OrderItemsTable } from "./order-items-table.tsx";
 import { OrderManifestCard } from "./order-manifest-card.tsx";
 import { OrderSearchForm } from "./order-search-form.tsx";
-import type { ReleaseLabelMode } from "./timeline.ts";
 import {
   TrackingEmptyState,
   TrackingErrorState,
@@ -22,7 +21,6 @@ interface TrackingPanelProps {
   onRetry: () => void;
   sampleOrderIds: readonly number[];
   activeOrder: Order | null;
-  releaseLabel: ReleaseLabelMode;
   onAskAssistant: (question: string) => void;
 }
 
@@ -36,7 +34,6 @@ export function TrackingPanel({
   onRetry,
   sampleOrderIds,
   activeOrder,
-  releaseLabel,
   onAskAssistant,
 }: TrackingPanelProps) {
   return (
@@ -59,11 +56,7 @@ export function TrackingPanel({
       {view === "error" && <TrackingErrorState onRetry={onRetry} />}
       {view === "result" && activeOrder && (
         <div className="space-y-4">
-          <OrderManifestCard
-            order={activeOrder}
-            releaseLabel={releaseLabel}
-            onAskAssistant={onAskAssistant}
-          />
+          <OrderManifestCard order={activeOrder} onAskAssistant={onAskAssistant} />
           <OrderItemsTable items={activeOrder.items} total={activeOrder.total} />
         </div>
       )}

@@ -4,107 +4,58 @@ import {
   Check,
   Clock,
   Copy,
-  FileCheck2,
+  Headset,
+  MapPin,
   MapPinCheck,
-  MessageSquareMore,
-  PackageCheck,
+  PackageX,
   Plane,
-  TriangleAlert,
+  Truck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { formatDate, formatManifestCode, splitPlace } from "@/lib/format.ts";
+import { DeadlinesBlock } from "./deadlines-block.tsx";
 import {
-  formatCurrency,
-  formatDate,
-  formatManifestCode,
-  pluralize,
-  SHIPPING_MODE_SLA,
-  splitPlace,
-} from "@/lib/format.ts";
-import {
-  buildTimelineSteps,
-  getDisplayTrackingStatus,
-  isTerminalBeforeDispatch,
-  type ReleaseLabelMode,
-  type TimelineStepView,
-} from "./timeline.ts";
+  type DeadlineStatus,
+  deliveryDeadline,
+  deliveryDelay,
+  endedBeforeDispatch,
+  isDelivered,
+  STATUS_TONE,
+  type StatusTone,
+  SUPPORT_HOURS,
+  statusHeadline,
+  supportReason,
+} from "./order-status.ts";
+import { StageTimelineView } from "./stage-timeline-view.tsx";
 
 interface OrderManifestCardProps {
   order: Order;
-  releaseLabel: ReleaseLabelMode;
   onAskAssistant: (question: string) => void;
 }
 
-const DELIVERED_BADGE = {
-  cls: "bg-emerald-50 text-emerald-800 border-emerald-300",
-  dot: "bg-emerald-600",
+const TONE_BADGE: Record<StatusTone, { cls: string; dot: string }> = {
+  success: { cls: "bg-emerald-50 text-emerald-800 border-emerald-300", dot: "bg-emerald-600" },
+  transit: { cls: "bg-primary-50 text-primary border-primary-200", dot: "bg-primary" },
+  danger: { cls: "bg-red-50 text-red-700 border-red-300", dot: "bg-red-600" },
+  waiting: { cls: "bg-amber-50 text-amber-800 border-amber-300", dot: "bg-amber-500" },
+  neutral: { cls: "bg-slate-100 text-slate-700 border-slate-300", dot: "bg-slate-400" },
 };
 
-const STATUS_BADGE_STYLE: Record<string, { cls: string; dot: string }> = {
-  "Entregue no prazo": DELIVERED_BADGE,
-  "Entregue com atraso": DELIVERED_BADGE,
-  "Em trânsito": {
-    cls: "bg-primary-50 text-primary border-primary-200",
-    dot: "bg-primary",
-  },
-  Extraviado: {
-    cls: "bg-red-50 text-red-700 border-red-300",
-    dot: "bg-red-600",
-  },
-  "Aguardando pagamento": {
-    cls: "bg-amber-50 text-amber-800 border-amber-300",
-    dot: "bg-amber-500",
-  },
-  "Pagamento não processado": {
-    cls: "bg-amber-50 text-amber-800 border-amber-300",
-    dot: "bg-amber-500",
-  },
-  Cancelado: {
-    cls: "bg-slate-100 text-slate-700 border-slate-300",
-    dot: "bg-slate-400",
-  },
-};
-
-type DeadlineStatus = "Atrasado" | "No Prazo" | "Adiantado";
-
-const DEADLINE_BADGE_STYLE: Record<DeadlineStatus, string> = {
+const DEADLINE_BADGE: Record<DeadlineStatus, string> = {
   Atrasado: "bg-red-50 text-red-700 border-red-300",
   "No Prazo": "bg-emerald-50/70 text-emerald-800 border-emerald-300",
   Adiantado: "bg-emerald-50/70 text-emerald-800 border-emerald-300",
 };
 
-/** Situação do prazo de entrega a partir do atraso (null = ainda sem como avaliar). */
-function deliveryDeadline(order: Order): DeadlineStatus | null {
-  const delay = order.delivery.delayDays;
-  if (delay === null) return null;
-  if (delay > 0) return "Atrasado";
-  return delay < 0 ? "Adiantado" : "No Prazo";
-}
-
-const isDelivered = (order: Order) =>
-  order.status === "Entregue no prazo" || order.status === "Entregue com atraso";
-
-function StepIcon({ stepKey }: { stepKey: TimelineStepView["key"] }) {
-  switch (stepKey) {
-    case "placed":
-      return <FileCheck2 className="w-3.5 h-3.5" />;
-    case "released":
-      return <PackageCheck className="w-3.5 h-3.5" />;
-    case "in_transit":
-      return <Plane className="w-3.5 h-3.5" />;
-    case "delivered":
-      return <MapPinCheck className="w-3.5 h-3.5" />;
-  }
-}
-
-function getCardAccentClass(order: Order): string {
-  if (isTerminalBeforeDispatch(order)) return "bg-slate-400";
-  if (order.status === "Extraviado" || deliveryDeadline(order) === "Atrasado") return "bg-red-600";
+function accentClass(order: Order): string {
+  if (endedBeforeDispatch(order)) return "bg-slate-400";
+  if (order.status === "Extraviado" || deliveryDelay(order) !== null) return "bg-red-600";
   if (order.status === "Aguardando pagamento") return "bg-accent";
   if (isDelivered(order)) return "bg-emerald-600";
   return "bg-primary";
 }
 
-export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: OrderManifestCardProps) {
+export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardProps) {
   const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
@@ -124,67 +75,17 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
     }
   }
 
-  const statusLabel = getDisplayTrackingStatus(order, releaseLabel);
-  const statusStyle = STATUS_BADGE_STYLE[statusLabel] ?? STATUS_BADGE_STYLE.Cancelado;
+  const badge = TONE_BADGE[STATUS_TONE[order.status]];
   const deadline = deliveryDeadline(order);
-  const deadlineCls = deadline ? DEADLINE_BADGE_STYLE[deadline] : undefined;
-  const delayDays = order.delivery.delayDays;
+  const headline = statusHeadline(order);
+  const reason = supportReason(order);
   const orig = splitPlace(order.origin);
   const dest = splitPlace(order.destination);
-  const steps = buildTimelineSteps(order);
-  const isOrderDelayed = deadline === "Atrasado" && delayDays !== null && delayDays > 0;
-  const isWaitingPayment = order.status === "Aguardando pagamento";
-  const probableCause = order.dispatch.probableCause ?? order.delivery.probableCause;
-  const showProbableCause =
-    probableCause !== null && (isOrderDelayed || order.status === "Extraviado");
-
-  // Célula 1: Previsão / Entrega
-  let mainLabel = "Previsão de entrega";
-  let mainDate = formatDate(order.delivery.expectedDate);
-  let mainSub = "Data estimada";
-
-  if (isDelivered(order)) {
-    mainLabel = "Entregue em";
-    mainDate = formatDate(order.delivery.actualDate);
-    mainSub = `Previsto para ${formatDate(order.delivery.expectedDate)}`;
-  } else if (order.status === "Em trânsito") {
-    mainSub = isOrderDelayed ? "Prazo estimado excedido" : "Dentro da janela prevista";
-  } else if (order.status === "Extraviado") {
-    mainLabel = "Situação";
-    mainDate = "Extraviado";
-    mainSub = order.lostAtStage
-      ? `Na etapa ${order.lostAtStage.label}`
-      : `Previsão original: ${formatDate(order.delivery.expectedDate)}`;
-  } else if (isWaitingPayment) {
-    mainLabel = "Previsão de entrega";
-    mainSub = releaseLabel === "payment" ? "Pagamento não processado" : "Aguardando pagamento";
-  } else {
-    mainLabel = "Situação final";
-    mainDate = order.status;
-    mainSub = "Sem entrega programada";
-  }
-
-  // Célula 2: Cumprimento do prazo
-  let delayCellCls = "bg-white";
-  let delayLabelColor = "";
-
-  if (isOrderDelayed) {
-    delayCellCls = "bg-red-50/55";
-    delayLabelColor = "!text-red-700";
-  } else if (deadline === "Adiantado") {
-    delayCellCls = "bg-emerald-50/40";
-    delayLabelColor = "!text-emerald-800";
-  } else if (deadline === "No Prazo") {
-    delayCellCls = "bg-emerald-50/30";
-    delayLabelColor = "!text-emerald-800";
-  } else if (isWaitingPayment) {
-    delayCellCls = "bg-amber-50/35";
-    delayLabelColor = "!text-amber-800";
-  }
+  const RouteIcon = order.transportMode === "Rodoviário" ? Truck : Plane;
 
   return (
     <article className="bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
-      <div className={`h-[3px] w-full ${getCardAccentClass(order)}`} />
+      <div className={`h-[3px] w-full ${accentClass(order)}`} />
       {/* Topo de Guia de Remessa */}
       <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
@@ -194,14 +95,14 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
           </h2>
           <div className="flex items-center gap-2">
             <span
-              className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${statusStyle?.cls ?? ""}`}
+              className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${badge.cls}`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${statusStyle?.dot ?? ""}`} />
-              {statusLabel}
+              <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+              {order.status}
             </span>
-            {deadlineCls && (
+            {deadline && (
               <span
-                className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${deadlineCls}`}
+                className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${DEADLINE_BADGE[deadline]}`}
               >
                 <Clock className="w-3 h-3" />
                 {deadline}
@@ -209,7 +110,8 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-500">
+        <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500">
+          <span>Pedido em {formatDate(order.orderDate)}</span>
           <button
             type="button"
             onClick={() => void handleCopyManifest()}
@@ -226,112 +128,43 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
         </div>
       </div>
 
-      {/* Grade de Resposta Principal (4 colunas) */}
-      <dl className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200">
-        <div className="px-5 py-3.5">
-          <dt className="label-mono">{mainLabel}</dt>
-          <dd className="mt-1 font-mono text-[22px] leading-tight font-semibold text-slate-900 tabular">
-            {mainDate}
-          </dd>
-          <dd className="mt-0.5 text-xs text-slate-500">{mainSub}</dd>
+      {/* Resposta principal + onde está agora */}
+      <div className="px-5 pt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 items-start">
+        <div className="min-w-0">
+          <p className="text-[22px] leading-tight font-semibold text-slate-900">{headline.title}</p>
+          <p className="mt-1 text-sm text-slate-600">{headline.detail}</p>
         </div>
+        <WhereNow order={order} />
+      </div>
 
-        <div className={`px-5 py-3.5 ${delayCellCls}`}>
-          <dt className={`label-mono ${delayLabelColor}`}>Cumprimento do prazo</dt>
-          <dd className="mt-1 leading-tight">
-            {isOrderDelayed && delayDays !== null ? (
-              <span className="font-mono text-[22px] font-bold text-red-700 tabular">
-                +{pluralize(delayDays, "dia", "dias")}
-              </span>
-            ) : deadline === "Adiantado" && delayDays !== null ? (
-              <span className="font-mono text-[22px] font-bold text-emerald-700 tabular">
-                {pluralize(-delayDays, "dia", "dias")} antes
-              </span>
-            ) : deadline === "No Prazo" ? (
-              <span className="text-[18px] font-semibold text-emerald-700">Dentro do prazo</span>
-            ) : isWaitingPayment ? (
-              <span className="text-[16px] font-semibold text-amber-900">
-                {releaseLabel === "payment" ? "Pagamento pendente" : "Aguardando pagamento"}
-              </span>
-            ) : order.status === "Extraviado" ? (
-              <span className="text-[16px] font-semibold text-red-700">Volume extraviado</span>
-            ) : (
-              <span className="text-[16px] font-medium text-slate-500">Sem envio</span>
-            )}
-          </dd>
-          <dd className="mt-0.5">
-            {isOrderDelayed ? (
-              <span className="text-xs font-medium text-red-700/90">Fora do prazo estimado</span>
-            ) : deadline === "Adiantado" ? (
-              <span className="text-xs text-emerald-800/80">Entregue antes do previsto</span>
-            ) : deadline === "No Prazo" ? (
-              <span className="text-xs text-slate-500">Sem atraso registrado</span>
-            ) : isWaitingPayment ? (
-              <span className="text-xs text-slate-500">Prazo conta após o despacho</span>
-            ) : (
-              <span className="text-xs text-slate-400">Sem entrega programada</span>
-            )}
-          </dd>
-        </div>
-
-        <div className="px-5 py-3.5">
-          <dt className="label-mono">Modalidade contratada</dt>
-          <dd className="mt-1 text-[16px] leading-tight font-semibold text-slate-900">
-            {order.shippingMode}
-          </dd>
-          <dd className="mt-0.5 text-xs text-slate-500">{SHIPPING_MODE_SLA[order.shippingMode]}</dd>
-        </div>
-
-        <div className="px-5 py-3.5">
-          <dt className="label-mono">Pedido realizado em</dt>
-          <dd className="mt-1 font-mono text-[17px] leading-tight font-medium text-slate-900 tabular">
-            {formatDate(order.orderDate)}
-          </dd>
-          <dd className="mt-0.5 text-xs text-slate-500 tabular">
-            {pluralize(order.items.length, "item", "itens")} · {formatCurrency(order.total)}
-          </dd>
-        </div>
-      </dl>
-
-      {/* Alerta de Motivo Provável (quando houver) */}
-      {showProbableCause && (
-        <div className="mx-5 mt-4 flex items-stretch rounded-md border border-amber-300 bg-amber-50/80 shadow-[0_1px_2px_rgba(245,158,11,0.12)] overflow-hidden">
-          <div
-            className="w-11 shrink-0 bg-accent text-slate-900 grid place-items-center"
-            aria-hidden="true"
-          >
-            <TriangleAlert className="w-5 h-5" />
-          </div>
-          <div className="flex-1 px-4 py-3 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="label-mono !text-amber-900 font-semibold">
-                Motivo provável do atraso
-              </span>
-              <span className="text-amber-400">·</span>
-              <span className="font-mono text-[11px] text-amber-800">
-                Análise histórica da rota
-              </span>
-            </div>
-            <p className="mt-0.5 text-base font-bold text-slate-900">{probableCause}</p>
-            {order.explanation && (
-              <p className="text-xs text-slate-600 mt-0.5">{order.explanation}</p>
-            )}
-          </div>
-          <div className="px-4 py-3 grid place-items-center shrink-0">
-            <button
-              type="button"
-              onClick={() => onAskAssistant(`Por que o pedido #${order.orderId} atrasou?`)}
-              className="h-9 px-3.5 rounded-md bg-slate-900 text-xs font-semibold text-white shadow-sm hover:bg-primary inline-flex items-center gap-2 transition"
-            >
-              <MessageSquareMore className="w-4 h-4" />
-              <span>Perguntar ao assistente</span>
-            </button>
+      {reason && (
+        <div className="mx-5 mt-4 flex items-start gap-3 rounded-md border border-primary-200 bg-primary-50/70 px-4 py-3">
+          <Headset className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="text-sm">
+            <p className="font-semibold text-slate-900">Encaminhado à central de atendimento</p>
+            <p className="text-slate-700">
+              Como {reason}, este pedido é acompanhado pela nossa central de atendimento, que
+              funciona de <strong className="font-semibold">{SUPPORT_HOURS}</strong>.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Bloco Integrado: Rota Internacional + Andamento em 4 Etapas */}
       <div className="p-5 space-y-4">
+        {endedBeforeDispatch(order) ? (
+          <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs">
+            <Ban className="w-4 h-4 text-slate-500 shrink-0" />
+            <span>
+              <span className="font-semibold text-slate-800">Sem despacho nem entrega.</span>
+              <span className="text-slate-500 ml-1">
+                Em caso de dúvida, pergunte ao assistente ao lado.
+              </span>
+            </span>
+          </div>
+        ) : (
+          <DeadlinesBlock order={order} onAskAssistant={onAskAssistant} />
+        )}
+
         {/* Cabeçalho de Rota */}
         <div className="rounded-md border border-slate-200 bg-slate-50/70 px-4 py-3">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
@@ -346,7 +179,7 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
               <p className="text-xs text-slate-500 truncate">{orig.rest}</p>
             </div>
 
-            <div className="flex flex-col items-center justify-center px-2 min-w-[180px]">
+            <div className="flex flex-col items-center justify-center px-2 min-w-[200px]">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="rounded bg-white border border-slate-200 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-slate-700">
                   {order.market}
@@ -355,11 +188,11 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
               </div>
               <div className="w-full flex items-center gap-2">
                 <div className="flex-1 route-line" />
-                <Plane className="w-3.5 h-3.5 text-primary shrink-0" />
+                <RouteIcon className="w-3.5 h-3.5 text-primary shrink-0" />
                 <div className="flex-1 route-line" />
               </div>
-              <span className="mt-1 font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                {order.shippingMode}
+              <span className="mt-1 font-mono text-[10px] uppercase tracking-wider text-slate-400 whitespace-nowrap">
+                {order.shippingMode} · {order.transportMode ?? "Sem despacho"} · {order.routeType}
               </span>
             </div>
 
@@ -376,151 +209,80 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
           </div>
         </div>
 
-        {/* Linha do tempo */}
-        {isTerminalBeforeDispatch(order) ? (
-          <div className="pt-1 flex items-center gap-5">
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="w-8 h-8 rounded bg-slate-800 text-white grid place-items-center">
-                <Check className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Pedido realizado</p>
-                <p className="font-mono text-xs text-slate-500 tabular">
-                  {formatDate(order.orderDate)}
-                </p>
-              </div>
-            </div>
-            <div className="h-px w-8 border-t-2 border-dashed border-slate-300" />
-            <div className="flex-1 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5">
-              <Ban className="w-4 h-4 text-slate-500 shrink-0" />
-              <div className="text-xs">
-                <span className="font-semibold text-slate-800">
-                  {order.status === "Cancelado"
-                    ? "Este pedido foi cancelado."
-                    : "O pagamento não foi confirmado e o pedido expirou."}
-                </span>
-                <span className="text-slate-500 ml-1">
-                  Ele não será despachado. Em caso de dúvida, pergunte ao assistente ao lado.
-                </span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="pt-1">
-            <div className="flex items-center justify-between mb-3">
-              <span className="label-mono">Andamento do trajeto (4 etapas)</span>
-              <span className="font-mono text-[11px] text-slate-400">
-                Dados históricos consolidados
-              </span>
-            </div>
-            <ol className="grid grid-cols-4">
-              {steps.map((step, index) => {
-                const nextStep = steps[index + 1];
-                const isWaitingCurrent = step.state === "current" && isWaitingPayment;
-                const isDelayedCurrent =
-                  step.state === "current" &&
-                  ((order.status === "Em trânsito" && isOrderDelayed) ||
-                    order.status === "Extraviado");
-
-                const connectorClass =
-                  nextStep && nextStep.state !== "pending"
-                    ? nextStep.state === "done"
-                      ? "bg-slate-800"
-                      : isWaitingPayment
-                        ? "bg-accent"
-                        : isDelayedCurrent || (order.status === "Em trânsito" && isOrderDelayed)
-                          ? "bg-red-500"
-                          : "bg-primary"
-                    : null;
-
-                return (
-                  <li
-                    key={step.key}
-                    className={`relative flex flex-col items-start ${index < 3 ? "pr-4" : ""}`}
-                  >
-                    {index < 3 &&
-                      (connectorClass ? (
-                        <div
-                          className={`absolute top-[13px] left-7 right-0 h-0.5 ${connectorClass}`}
-                        />
-                      ) : (
-                        <div className="absolute top-[13px] left-7 right-0 border-t-2 border-dashed border-slate-300" />
-                      ))}
-
-                    {step.state === "done" ? (
-                      <div className="relative z-10 w-7 h-7 rounded bg-slate-900 text-white grid place-items-center">
-                        <Check className="w-4 h-4" />
-                      </div>
-                    ) : step.state === "current" ? (
-                      <div
-                        className={`relative z-10 w-7 h-7 rounded grid place-items-center ring-4 ${
-                          isWaitingCurrent
-                            ? "bg-accent text-slate-900 ring-amber-100"
-                            : isDelayedCurrent
-                              ? "bg-red-600 text-white ring-red-100"
-                              : "bg-primary text-white ring-primary-100"
-                        }`}
-                      >
-                        <StepIcon stepKey={step.key} />
-                      </div>
-                    ) : (
-                      <div className="relative z-10 w-7 h-7 rounded border-2 border-dashed border-slate-300 bg-white text-slate-300 grid place-items-center" />
-                    )}
-
-                    <p
-                      className={`mt-2.5 text-sm ${
-                        step.state === "current"
-                          ? "font-semibold text-slate-900"
-                          : step.state === "pending"
-                            ? "font-medium text-slate-400"
-                            : "font-medium text-slate-800"
-                      }`}
-                    >
-                      {step.label}
-                    </p>
-                    <p className="mt-0.5 leading-none min-h-[14px]">
-                      {step.isCurrent ? (
-                        <span
-                          className={`font-mono text-[10.5px] uppercase tracking-wider font-semibold ${
-                            isWaitingCurrent
-                              ? "text-amber-800"
-                              : isDelayedCurrent
-                                ? "text-red-700"
-                                : "text-primary"
-                          }`}
-                        >
-                          {order.status === "Extraviado" && step.isCurrent
-                            ? (order.lostAtStage?.label ?? step.subtitle)
-                            : isDelayedCurrent && delayDays !== null
-                              ? `Em atraso (+${delayDays}d)`
-                              : step.subtitle}
-                        </span>
-                      ) : step.subtitle ? (
-                        <span
-                          className={`font-mono text-xs tabular ${
-                            step.key === "delivered" && step.state === "done"
-                              ? isOrderDelayed
-                                ? "text-red-700 font-medium"
-                                : "text-emerald-700 font-medium"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {step.subtitle}
-                          {step.key === "delivered" &&
-                            step.state === "done" &&
-                            isOrderDelayed &&
-                            delayDays !== null &&
-                            ` (+${delayDays}d)`}
-                        </span>
-                      ) : null}
-                    </p>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        )}
+        <StageTimelineView order={order} />
       </div>
     </article>
+  );
+}
+
+/** "Onde está agora" (em trânsito), "Último local conhecido" (extravio) ou o local da entrega. */
+function WhereNow({ order }: { order: Order }) {
+  if (!order.currentLocation) {
+    return null;
+  }
+  const since = formatDate(order.events.at(-1)?.date);
+  if (order.status === "Extraviado") {
+    return (
+      <Spot
+        tone="danger"
+        icon={<PackageX className="w-5 h-5" />}
+        label={`Extraviado na etapa ${order.lostAtStage?.label ?? "—"}`}
+        place={order.currentLocation}
+        note={`Extravio confirmado em ${since}`}
+      />
+    );
+  }
+  if (isDelivered(order)) {
+    return (
+      <Spot
+        tone="success"
+        icon={<MapPinCheck className="w-5 h-5" />}
+        label="Local da entrega"
+        place={order.currentLocation}
+        note={`Em ${formatDate(order.delivery.actualDate)}`}
+      />
+    );
+  }
+  const delayed = deliveryDelay(order) !== null;
+  return (
+    <Spot
+      tone={delayed ? "danger" : "transit"}
+      icon={<MapPin className="w-5 h-5" />}
+      label={`Onde está agora · ${order.currentStage?.label ?? ""}`}
+      place={order.currentLocation}
+      note={`Desde ${since}`}
+    />
+  );
+}
+
+const SPOT_STYLE: Record<"danger" | "success" | "transit", { box: string; icon: string }> = {
+  danger: { box: "border-red-300 bg-red-50/70", icon: "bg-red-600 text-white" },
+  success: { box: "border-emerald-300 bg-emerald-50/60", icon: "bg-emerald-600 text-white" },
+  transit: { box: "border-primary-200 bg-primary-50/70", icon: "bg-primary text-white" },
+};
+
+function Spot({
+  tone,
+  icon,
+  label,
+  place,
+  note,
+}: {
+  tone: keyof typeof SPOT_STYLE;
+  icon: React.ReactNode;
+  label: string;
+  place: string;
+  note: string;
+}) {
+  const style = SPOT_STYLE[tone];
+  return (
+    <div className={`flex items-center gap-3 rounded-md border px-3.5 py-2.5 min-w-0 ${style.box}`}>
+      <div className={`w-9 h-9 shrink-0 rounded grid place-items-center ${style.icon}`}>{icon}</div>
+      <div className="min-w-0">
+        <p className="label-mono !text-slate-700 font-semibold truncate">{label}</p>
+        <p className="text-[15px] font-semibold text-slate-900 leading-snug">{place}</p>
+        <p className="font-mono text-[11px] text-slate-500 tabular">{note}</p>
+      </div>
+    </div>
   );
 }

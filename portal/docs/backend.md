@@ -2,7 +2,7 @@
 
 Para quem vai rodar, revisar ou mudar o código do portal. A visão geral, sem detalhes técnicos, está no [README](../README.md).
 
-Estado em 16/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. **Em 16/11 a fonte passou a ser a das tabelas oficiais `consumo_*` da Silver no Databricks** (contrato `Order` novo, seções 5, 8 e 9), lidas direto do Databricks ao subir (`DATA_SOURCE=databricks`) ou dos CSVs exportados (`file`, plano B); a tela e o chat simulado foram só adaptados ao contrato e serão refeitos nas próximas tarefas. O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
+Estado em 16/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. **Em 16/11 a fonte passou a ser a das tabelas oficiais `consumo_*` da Silver no Databricks** (contrato `Order` novo, seções 5, 8 e 9), lidas direto do Databricks ao subir (`DATA_SOURCE=databricks`) ou dos CSVs exportados (`file`, plano B); a tela foi refeita para o contrato novo (seção 13) e o chat simulado só foi adaptado (será reescrito na próxima tarefa). O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
 
 ## Sumário
 
@@ -152,16 +152,19 @@ portal/
         │   └── queries.ts   # useHealth, useOrderSamples, useOrderQuery, useSendChatMessage e shouldRetry
         ├── lib/
         │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD), formatManifestCode
-        │   ├── url-state.ts # leitura e escrita de ?pedido= e presets de apresentação (?t, ?c, ?s, ?r, ?n, ?bar)
+        │   ├── url-state.ts # leitura e escrita de ?pedido= e presets de apresentação (?t, ?c, ?s, ?n, ?bar)
         │   └── utils.ts     # utilitário cn() para classes condicionais
         ├── components/
         │   └── app-header.tsx # cabeçalho com marca TransLog, manifesto e badge de status da API
         └── features/
             ├── tracking/
-            │   ├── timeline.ts            # máquina de estados pura das 4 etapas (buildTimelineSteps)
+            │   ├── order-status.ts        # regras puras: tom do badge, mensagem principal, prazo, motivo da central
+            │   ├── stage-timeline.ts      # regras puras: etapas da rota e estado de cada uma (buildStageTimeline)
+            │   ├── stage-timeline-view.tsx# linha do tempo por etapas, com os eventos de cada uma
+            │   ├── deadlines-block.tsx    # despacho x entrega e faixa "Motivo provável" com a explicação
             │   ├── order-search-form.tsx  # input numérico (1..10 dígitos), validação inline e chips de amostra
             │   ├── tracking-states.tsx    # estados vazio, skeleton, não encontrado, erro de servidor e sem conexão
-            │   ├── order-manifest-card.tsx# manifesto principal, grade de 4 colunas, alerta de causa e rota + 4 etapas
+            │   ├── order-manifest-card.tsx# guia de remessa: situação, onde está agora, central, prazos, rota e etapas
             │   ├── order-items-table.tsx  # tabela de itens declarados e rodapé perfurado (.perf-t) com total em USD
             │   └── tracking-panel.tsx     # orquestração da coluna esquerda (60%)
             ├── chat/
@@ -868,8 +871,8 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
   - Números tabulares forçados com `.tabular { font-variant-numeric: tabular-nums; }` para evitar deslocamento horizontal ao alternar pedidos.
 - **Paleta, contraste e interatividade (`@theme inline` + `@layer base`):**
   - Azul-petróleo `#0F4C81` (`--color-primary`) como cor primária de autoridade e foco;
-  - Âmbar `#F59E0B` (`--color-accent`) reservado exclusivamente para atenção ("Motivo provável" e "Aguardando Liberação");
-  - Vermelho (`red-600` / `red-700` / `red-50`) exclusivo para atrasos reais (`deadlineStatus === "Atrasado"`): etiqueta de prazo, célula de dias de atraso, fita superior do manifesto e destaque da etapa em atraso na linha do tempo;
+  - Âmbar `#F59E0B` (`--color-accent`) reservado para atenção ("Motivo provável" e "Aguardando pagamento");
+  - Vermelho (`red-600` / `red-700` / `red-50`) exclusivo para atraso de entrega e extravio: etiqueta de prazo, dias de atraso, fita superior do manifesto, "Onde está agora" atrasado e etapa atual ou do extravio na linha do tempo;
   - Verde (`emerald-700` / `emerald-50`) para pedidos entregues no prazo ou adiantados;
   - Neutros `slate` (apenas tema claro);
   - Regras em `@layer base` corrigem o cursor padrão de botões do Tailwind v4 (`cursor: pointer` em botões ativos) e padronizam `:focus-visible`.
@@ -898,7 +901,7 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
   - Se for `200 OK`, valida o corpo com `schema.safeParse(body)` usando o próprio esquema Zod de `@translog/contracts` (`orderSchema`, `orderSamplesResponseSchema`, `healthResponseSchema`, `chatResponseSchema`). Respostas fora do contrato lançam `INVALID_RESPONSE`.
 - **`queries.ts` (`@tanstack/react-query`):**
   - `useHealth()`: consulta `/api/health` com `staleTime: 30_000`.
-  - `useOrderSamples()`: consulta `/api/orders/samples` e usa fallback `[15, 375, 562, 1002]` caso a API ainda não tenha respondido.
+  - `useOrderSamples()`: consulta `/api/orders/samples` e usa fallback `[76902, 375, 34, 8]` caso a API ainda não tenha respondido.
   - `useOrderQuery(orderId)`: consulta `/api/orders/:orderId` apenas quando `orderId !== null`.
   - `useSendChatMessage()`: `useMutation` de `POST /api/chat` com `retry: false` (o agente pode já ter processado a mensagem; reenvio só manual).
   - `shouldRetry(failureCount, error)`: política testada unitariamente que **nunca repete erros 4xx** (`404 ORDER_NOT_FOUND` ou `400 VALIDATION_ERROR` falham na hora) e faz **1 retentativa rápida** em erros de rede (`status: 0`) ou `5xx`.
@@ -909,17 +912,30 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
 - **`formatCurrency(value)`:** usa `Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" })` para produzir `US$ 91,34`.
 - **`formatManifestCode(order)`:** gera o código de etiqueta internacional no formato `TL-<ORDER_ID_6_DIGITOS>-<MARKET>` (ex.: `TL-000375-LATAM`, `TL-020322-PACIFICASIA`).
 
-### 13.5. Máquina de estados da linha do tempo (`src/features/tracking/timeline.ts`)
+### 13.5. Pedido na tela (`order-manifest-card.tsx`, refeito em 16/11)
 
-`buildTimelineSteps(order, releaseLabel)` recebe um `Order` e a variante de rótulo (`"waiting"` ou `"payment"`) e devolve os dados das etapas sem efeitos colaterais, mantendo a apresentação visual (conectores e destaque vermelho em atraso) no `OrderManifestCard`:
+De cima para baixo, só com campos do `Order` (nenhuma regra de negócio nova na tela):
 
-| Situação (`trackingStatus`) | Etapa 1 | Etapa 2 | Etapa 3 | Etapa 4 |
-|---|---|---|---|---|
-| **Aguardando Liberação** | Pedido realizado (`done`, `orderDate`) | Pedido liberado / Confirmação pendente (`current`, âmbar, `Etapa atual`) | Em trânsito (`pending`) | Entregue (`pending`, `previsto DD/MM/AAAA`) |
-| **Em Trânsito** (no prazo) | Pedido realizado (`done`, `orderDate`) | Pedido liberado (`done`) | Em trânsito (`current`, azul, `Etapa atual`) | Entregue (`pending`, `previsto DD/MM/AAAA`) |
-| **Em Trânsito** (atrasado) | Pedido realizado (`done`, `orderDate`) | Pedido liberado (`done`) | Em trânsito (`current`, **vermelho**, `Em atraso (+Nd)`) | Entregue (`pending`, `previsto DD/MM/AAAA`) |
-| **Entregue** | Pedido realizado (`done`, `orderDate`) | Pedido liberado (`done`) | Em trânsito (`done`) | Entregue (`done`, `actualDeliveryDate` + `(+Nd)` em vermelho se atrasado) |
-| **Cancelado** | Pedido realizado (`done`, `orderDate`) | — | — | Banner neutro *"Este pedido foi cancelado."* |
+1. **Guia de remessa:** número, badge da situação (7 situações, cor por tom em `order-status.ts`), badge do prazo de entrega (`Atrasado`/`No Prazo`/`Adiantado`, só quando há `delivery.delayDays`), data do pedido e código.
+2. **Mensagem principal** (`statusHeadline`): ex.: "Em trânsito, com 5 dias de atraso / Entrega prevista para 01/02/2018"; "Volume extraviado na etapa Alfândega"; "Pagamento não confirmado".
+3. **Destaque ao lado:** "Onde está agora · <etapa>" com `currentLocation` (em trânsito; vermelho se a entrega atrasou), "Extraviado na etapa X" com o último local conhecido, ou o local da entrega. Pedidos sem despacho não têm destaque.
+4. **Aviso da central** quando `escalateToSupport` (regra calculada na API), com o motivo ("a entrega está 5 dias atrasada" / "o volume foi extraviado") e o horário (segunda a sexta, das 9h às 18h; texto em `SUPPORT_HOURS`). Telefone ou e-mail da central ainda não confirmados.
+5. **Despacho x entrega** (`deadlines-block.tsx`): previsto, realizado e atraso de cada um (prazo prometido da modalidade no despacho; em trânsito, "atraso contado até" a data de referência). Abaixo, a faixa âmbar **"Motivo provável"** com a causa de cada etapa ("No despacho: Promessa irreal · Na entrega: …"), a `explanation` da base e o botão "Perguntar ao assistente". Sem causa, só a explicação, discreta. Cancelado e não pago mostram "Sem despacho nem entrega".
+6. **Rota:** origem, destino, mercado, região, modalidade, modal (ícone de avião ou caminhão) e tipo de rota.
+7. **Linha do tempo por etapas** (`stage-timeline.ts` + `stage-timeline-view.tsx`).
+
+**Linha do tempo por etapas.** `plannedStages(order)` decide as etapas da rota: Pedido e Coleta sempre; Voo só se o modal for aéreo; Alfândega só em rota internacional; Transferência e Última milha sempre (conferido nos dados: rota internacional sempre tem voo e alfândega; doméstica nunca tem alfândega). Uma etapa com evento sempre aparece. Cancelado e não pago mostram só "Pedido". `buildStageTimeline(order)` marca cada etapa:
+
+| Estado | Quando | Visual |
+|---|---|---|
+| `done` | antes da etapa atual, ou pedido entregue | quadrado escuro, "Concluída" |
+| `current` | etapa atual, em trânsito no prazo | azul, "Agora", caixa destacada |
+| `delayed` | etapa atual, em trânsito com entrega atrasada | vermelho, "Agora · com atraso (+N dias)" |
+| `lost` | etapa do extravio | vermelho, ícone de pacote extraviado, "Extraviado aqui" |
+| `pending` | ainda não alcançada | tracejado, "Aguardando" |
+| `not_reached` | depois de um extravio | tracejado claro, "Não alcançada" |
+
+Cada etapa lista seus eventos (data `DD/MM/AAAA`, descrição e local), na ordem da base. O evento `EXTRAVIO_CONFIRMADO` aparece em vermelho.
 
 ### 13.6. Chat ligado à API (`src/features/chat/`)
 
@@ -940,12 +956,11 @@ A tela não tem mais regra de respostas: tudo vem de `POST /api/chat` (a regra d
 - **Presets de demonstração por query string:** para testes ou apresentações guiadas, a URL também lê opcionalmente:
   - `?pedido=375` (ou `?order=375`): abre direto o pedido informado;
   - `?t=empty|loading|notfound|neterr|375`: força um estado de rastreamento;
-  - `?c=conversation|typing|error|empty`: conversa de exemplo com textos fixos sobre o 375 (abre o 375 se nenhum pedido for informado);
+  - `?c=conversation|typing|error|empty`: conversa de exemplo com textos fixos sobre o 76902 (abre o 76902 se nenhum pedido for informado);
   - `?s=keep|divider|clear`: escolhe o comportamento do chat ao trocar de pedido;
-  - `?r=waiting|payment`: alterna o rótulo de `"Aguardando liberação"` vs `"Pagamento pendente"`;
   - `?n=on|off`: simula a rede ligada ou desligada;
   - `?bar=off`: oculta completamente a barra inferior.
-- **Barra de demonstração (`ProtoBar`):** barra recolhível que permite testar ao vivo todos os estados de tela, alternar as 2 decisões de produto em aberto com o time e recolher a barra durante a apresentação para a banca. As conversas de exemplo (`Conversa`, `Digitando`, `Erro`) usam textos fixos de `dev-bar/chat-presets.ts`, abrem o 375 e começam uma conversa nova; o "Digitando" de exemplo não envia nada à API.
+- **Barra de demonstração (`ProtoBar`):** barra recolhível que permite testar ao vivo todos os estados de tela, abrir os 9 pedidos da demo, alternar a decisão em aberto (chat ao trocar de pedido) e recolher a barra durante a apresentação para a banca. A variante "Pagamento não processado" saiu em 16/11: a base já traz `Aguardando pagamento` e `Não pago (expirado)`. As conversas de exemplo (`Conversa`, `Digitando`, `Erro`) usam textos fixos de `dev-bar/chat-presets.ts`, abrem o 76902 e começam uma conversa nova; o "Digitando" de exemplo não envia nada à API.
 
 ## 14. Testes
 
@@ -956,7 +971,7 @@ pnpm --filter @translog/contracts test  # só o contrato
 pnpm --filter @translog/web test        # só o frontend (~1 s)
 ```
 
-Contagem em 16/11: contracts 20, api 287 (+2 desligados: agente real e Databricks real), web 47.
+Contagem em 16/11: contracts 20, api 287 (+2 desligados: agente real e Databricks real), web 68.
 
 ### Testes do contrato (`@translog/contracts`)
 
@@ -992,7 +1007,8 @@ Contagem em 16/11: contracts 20, api 287 (+2 desligados: agente real e Databrick
 | `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-000375-LATAM`) e pluralização de dias |
 | `lib/url-state.test.ts` | Leitura de `?pedido=375`, rejeição de IDs inválidos (`0`, `abc`), presets da `ProtoBar` e atualização limpa da query string |
 | `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo enviado, `409`/`502`/`504`, resposta fora do contrato) |
-| `features/tracking/timeline.test.ts` | Linha do tempo resumida: em trânsito (76902), entregue (375), extraviado (34), terminais antes do despacho (9 e 50), variante "Pagamento não processado" |
+| `features/tracking/order-status.test.ts` | Mensagem principal das 7 situações (76902, 375, 34, 222, 8, 9, 50, aguardando, adiantado, no prazo), prazo de entrega, motivo da central |
+| `features/tracking/stage-timeline.test.ts` | Etapas e estados: 76902 (alfândega com atraso), 76385 (voo com atraso), 375 (entregue), 34 (extravio + não alcançadas), 31298 (doméstica rodoviária sem voo nem alfândega), 8 (Porto Rico → Brasil), 9 e 50 (só o pedido), doméstica aérea, aguardando pagamento |
 | `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, conversa nova só com "Zerar", efeito da troca de pedido nas mensagens, texto de falha por status |
 | `features/chat/chat-suggestions.test.ts` | Sugestões por situação do pedido, sempre citando o número |
 | `features/chat/rich-text.test.ts` | Negrito, listas (`*`, `-`, `•`, subníveis), títulos, linha em branco, asteriscos soltos |
@@ -1088,7 +1104,7 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | A API devolve o view model `Order` pronto | A conversão das tabelas → `Order` fica num arquivo só (`consumo-mapper.ts`); a tela só exibe |
 | Validação Zod também no cliente (`web/src/api/client.ts`) | Garante em tempo de execução que qualquer resposta recebida pela SPA respeita `@translog/contracts` |
 | Formatação de datas por corte de texto (ou no SQL) na API e no Web | Evita `new Date(string)`, que em Brasília deslocaria horários de madrugada (UTC) para o dia anterior |
-| Máquina de estados pura para a linha do tempo (`timeline.ts`) | Separa a regra das 4 etapas e das variantes (`Cancelado`, `releaseLabel`) do JSX, permitindo testes unitários diretos |
+| Regras puras da tela (`order-status.ts`, `stage-timeline.ts`) | Separam do JSX a mensagem principal, as etapas da rota e o estado de cada uma, com testes unitários diretos |
 | Carga completa antes do `listen` | Health honesto sem estado "carregando"; consulta O(1) em memória |
 | Erros de domínio mapeados só em `http/errors.ts` | Status e mensagens num lugar; rotas sem `try/catch` |
 | `orderId` como texto de 1 a 10 dígitos | Mesma regra do campo da tela; recusa `1e3` e `0x1F`, que `Number()` aceitaria |
@@ -1117,8 +1133,7 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 - **Tela e chat simulado no contrato novo:** só adaptados em 16/11 (situações, prazos de entrega, motivo provável com a explicação). A tela nova (despacho x entrega, onde está agora, extravio, aviso da central, linha do tempo por etapas) e o simulado reescrito vêm nas próximas tarefas.
 - **Agente ADK (pendências com o Marco, seção 10.8):** formato do pedido no texto, respostas longas e técnicas, formatação, sobreposição de mensagens depois de um `504`, Dockerfile na `main`. A tela e a API já funcionam com o agente; só `withOrderContext` e a configuração dependem dele.
 - **Tela x chat no motivo provável:** com `AGENT=adk`, o agente lê a base dele; o portal agora lê `consumo_pedidos`, que tem a causa e o `resumo_pedido` feito para a IA. Ficam iguais quando o agente ler a mesma tabela (pendência com o Marco).
-- **Duas decisões de produto em aberto (simuláveis na `ProtoBar`):**
+- **Decisão de produto em aberto (simulável na `ProtoBar`):**
   1. Comportamento do chat ao trocar de pedido (`divider` vs `keep` vs `clear`);
-  2. Rótulo de pedidos com pagamento pendente (`Aguardando liberação` vs `Pagamento pendente`).
 - **Docker do Frontend (Fase 4):** adicionar Dockerfile multi-stage de `@translog/web` (ou servir o `web/dist` pelo Fastify/Nginx) no `docker-compose.yml` para entrega final containerizada.
 - **Fonte final (decidida em 16/11):** tabelas `consumo_*` da Silver no Databricks, com os CSVs em `portal/dados/` como plano B. Sem banco próprio.

@@ -17,19 +17,17 @@ describe("url-state utilities", () => {
       trackerPreset: null,
       chatPreset: null,
       chatOnSwitch: null,
-      releaseLabel: null,
       networkOnline: null,
       hideProtoBarCompletely: false,
     });
   });
 
   it("reads prototype URL presets", () => {
-    expect(readUrlPresets("?t=375&c=conversation&s=divider&r=payment&n=off&bar=off")).toEqual({
+    expect(readUrlPresets("?t=375&c=conversation&s=divider&n=off&bar=off")).toEqual({
       orderId: 375,
       trackerPreset: null,
       chatPreset: "conversation",
       chatOnSwitch: "divider",
-      releaseLabel: "payment",
       networkOnline: false,
       hideProtoBarCompletely: true,
     });

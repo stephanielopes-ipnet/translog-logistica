@@ -1,11 +1,10 @@
-import type { ChatOnSwitchMode, ReleaseLabelMode } from "@/features/dev-bar/proto-bar.tsx";
+import type { ChatOnSwitchMode } from "@/features/dev-bar/proto-bar.tsx";
 
 export interface UrlInitialPresets {
   orderId: number | null;
   trackerPreset: string | null;
   chatPreset: "empty" | "conversation" | "typing" | "error" | null;
   chatOnSwitch: ChatOnSwitchMode | null;
-  releaseLabel: ReleaseLabelMode | null;
   networkOnline: boolean | null;
   hideProtoBarCompletely: boolean;
 }
@@ -26,7 +25,6 @@ export function readUrlPresets(search: string): UrlInitialPresets {
   const tParam = params.get("t");
   const cParam = params.get("c");
   const sParam = params.get("s");
-  const rParam = params.get("r");
   const nParam = params.get("n");
 
   const tOrderId = parseOrderId(tParam);
@@ -39,7 +37,6 @@ export function readUrlPresets(search: string): UrlInitialPresets {
         ? cParam
         : null,
     chatOnSwitch: sParam === "keep" || sParam === "divider" || sParam === "clear" ? sParam : null,
-    releaseLabel: rParam === "waiting" || rParam === "payment" ? rParam : null,
     networkOnline: nParam === "on" ? true : nParam === "off" ? false : null,
     hideProtoBarCompletely: params.get("bar") === "off",
   };

@@ -1,6 +1,5 @@
 import { EyeOff, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
-import type { ReleaseLabelMode } from "@/features/tracking/timeline.ts";
 
 export type { ChatOnSwitchMode } from "@/features/chat/chat-session.ts";
 
@@ -38,13 +37,6 @@ const PROTO_GROUPS = [
       ["s:keep", "Manter"],
       ["s:divider", "Divisor"],
       ["s:clear", "Zerar"],
-    ],
-  },
-  {
-    group: "Aguard. pagamento",
-    items: [
-      ["r:waiting", "Como na base"],
-      ["r:payment", "Pagto. não processado"],
     ],
   },
   {
@@ -126,5 +118,3 @@ export function ProtoBar({ activeKeys, onSelectPreset, defaultHidden = false }: 
     </div>
   );
 }
-
-export type { ReleaseLabelMode };
