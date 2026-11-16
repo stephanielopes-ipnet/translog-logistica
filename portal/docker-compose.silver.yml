@@ -1,15 +1,15 @@
-# Sobreposição para rodar a API com a Silver (DATA_SOURCE=file):
+# Sobreposição para rodar a API com os CSVs das tabelas consumo_* (DATA_SOURCE=file):
 #   docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build
 # ou, para não repetir, no .env: COMPOSE_FILE=docker-compose.yml:docker-compose.silver.yml
 #
-# Exige portal/dados/silver_pedidos_rastreio.csv (fora do Git). O arquivo entra por volume
-# somente leitura e nunca vai para a imagem. Fica separado do docker-compose.yml porque o
+# Exige portal/dados/consumo_*.csv (fora do Git). Os arquivos entram por volume
+# somente leitura e nunca vão para a imagem. Fica separado do docker-compose.yml porque o
 # Docker cria a pasta dados/ como root no host quando ela não existe: com o volume sempre
 # montado, quem acabou de clonar ficaria com uma pasta que só abre com sudo.
 services:
   api:
     environment:
       DATA_SOURCE: file
-      ORDERS_FILE: /data/silver_pedidos_rastreio.csv
+      DATA_DIR: /data
     volumes:
       - ./dados:/data:ro

@@ -2,19 +2,19 @@ import type { ChatMessageItem } from "@/features/chat/chat-session.ts";
 import { chatTimeLabel } from "@/features/chat/chat-session.ts";
 
 // Conversas de exemplo da barra de protótipo (`c=conversation|typing|error`), com textos fixos
-// sobre o pedido 375. Não são regra de resposta: quem responde de verdade é a API.
+// sobre o pedido 76902. Não são regra de resposta: quem responde de verdade é a API.
 
 /** Pedido das conversas de exemplo; a barra abre esse pedido junto com a conversa. */
-export const PRESET_ORDER_ID = 375;
+export const PRESET_ORDER_ID = 76902;
 
 export type ChatPreset = "conversation" | "typing" | "error";
 
 const WHEN_QUESTION = "Quando meu pedido chega?";
 const WHEN_REPLY =
-  "O pedido **#375** está **Em Trânsito**. A entrega estava prevista para **08/01/2015** e acumula **4 dias de atraso**.";
+  "O pedido **#76902** está **Em trânsito**. A entrega estava prevista para **01/02/2018** e acumula **5 dias de atraso**. Agora: **Alfândega Jacarta (Indonésia)**.";
 const WHY_QUESTION = "Por que meu pedido atrasou?";
 const WHY_REPLY =
-  "O motivo provável do atraso do pedido **#375** é **Promessa irreal**: o prazo de 2 dias da modalidade Second Class provavelmente foi curto para a rota internacional Texas → Saltillo (México).";
+  "Motivo provável do atraso do pedido **#76902**: no despacho, **Promessa irreal**; na entrega, **Volume sem atualização de rastreio**. Este caso deve ser tratado pela central de atendimento (segunda a sexta, das 9h às 18h).";
 
 /**
  * - `conversation`: duas perguntas respondidas;

@@ -4,7 +4,10 @@ import { agentModeSchema } from "./chat.ts";
 /** Origem dos pedidos (`DATA_SOURCE`). */
 export const dataSourceSchema = z
   .enum(["fixtures", "file"])
-  .describe("Origem dos pedidos: fixtures (pedidos de exemplo no código) ou file (Silver em CSV)");
+  .describe(
+    "Origem dos pedidos: fixtures (pedidos de exemplo no código) ou file (tabelas consumo_* " +
+      "exportadas em CSV)",
+  );
 export type DataSource = z.infer<typeof dataSourceSchema>;
 
 /** Resposta de `GET /api/health`. */

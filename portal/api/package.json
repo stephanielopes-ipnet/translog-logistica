@@ -6,7 +6,9 @@
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "export:dados": "node scripts/export-dados.ts",
+    "fixtures": "node scripts/generate-fixtures.ts"
   },
   "dependencies": {
     "@fastify/swagger": "9.9.3",

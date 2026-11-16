@@ -15,60 +15,31 @@ async function buildTestServer(env: NodeJS.ProcessEnv = {}) {
 }
 
 describe("GET /api/orders/:orderId", () => {
-  it("responde 200 com o pedido exatamente como no contrato", async () => {
+  it("responde 200 com o pedido 76902 (demo) no contrato novo", async () => {
     const app = await buildTestServer();
 
-    const response = await app.inject({ method: "GET", url: "/api/orders/15" });
+    const response = await app.inject({ method: "GET", url: "/api/orders/76902" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toStrictEqual({
-      orderId: 15,
-      orderDate: "2015-01-01",
-      shippingMode: "Standard Class",
-      trackingStatus: "Entregue",
-      deadlineStatus: "Atrasado",
-      delayDays: 2,
-      delayWindow: "Atraso Leve (1 a 2 dias)",
-      estimatedDeliveryDate: "2015-01-05",
-      actualDeliveryDate: "2015-01-07",
-      origin: "Memphis, Tennessee, Estados Unidos",
-      destination: "Brasília, Distrito Federal, Brasil",
-      region: "América do Sul",
-      market: "LATAM",
-      items: [
-        {
-          productName: "Nike Men's Dri-FIT Victory Golf Polo",
-          category: "Women's Apparel",
-          quantity: 1,
-          total: 37.5,
-        },
-        {
-          productName: "Pelican Sunstream 100 Kayak",
-          category: "Water Sports",
-          quantity: 1,
-          total: 163.99,
-        },
-        {
-          productName: "Bridgestone e6 Straight Distance NFL San Dieg",
-          category: "Electronics",
-          quantity: 3,
-          total: 89.25,
-        },
-        {
-          productName: "Perfect Fitness Perfect Rip Deck",
-          category: "Cleats",
-          quantity: 3,
-          total: 151.17,
-        },
-        {
-          productName: "Field & Stream Sportsman 16 Gun Fire Safe",
-          category: "Fishing",
-          quantity: 1,
-          total: 331.98,
-        },
-      ],
-      total: 773.89,
-      probableCause: null,
+    expect(orderSchema.strict().parse(response.json())).toMatchObject({
+      orderId: 76902,
+      orderDate: "2018-01-27",
+      referenceDate: "2018-02-06",
+      status: "Em trânsito",
+      shippingMode: "First Class",
+      transportMode: "Aéreo expresso",
+      routeType: "Internacional",
+      origin: "San Jose, Califórnia, Estados Unidos",
+      destination: "Jacarta, Jacarta, Indonésia",
+      region: "Sudeste Asiático",
+      market: "Pacific Asia",
+      dispatch: { status: "Atrasado", delayDays: 1, probableCause: "Promessa irreal" },
+      delivery: { expectedDate: "2018-02-01", actualDate: null, delayDays: 5 },
+      currentStage: { number: 3, label: "Alfândega" },
+      currentLocation: "Alfândega Jacarta (Indonésia)",
+      lostAtStage: null,
+      total: 194.24,
+      escalateToSupport: true,
     });
   });
 
@@ -115,10 +86,10 @@ describe("GET /api/orders/:orderId", () => {
   it("aceita zeros à esquerda, como o campo da tela", async () => {
     const app = await buildTestServer();
 
-    const response = await app.inject({ method: "GET", url: "/api/orders/0015" });
+    const response = await app.inject({ method: "GET", url: "/api/orders/00375" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().orderId).toBe(15);
+    expect(response.json().orderId).toBe(375);
   });
 });
 
@@ -130,16 +101,16 @@ describe("GET /api/orders/samples", () => {
 
     expect(response.statusCode).toBe(200);
     expect(orderSamplesResponseSchema.parse(response.json())).toStrictEqual({
-      orderIds: [15, 375, 562, 1002],
+      orderIds: [76902, 375, 34, 8],
     });
   });
 
   it("devolve só os configurados que existem na fonte, mantendo a ordem", async () => {
-    const app = await buildTestServer({ SAMPLE_ORDER_IDS: "1002,99999,16,15" });
+    const app = await buildTestServer({ SAMPLE_ORDER_IDS: "8,99999,34,76902" });
 
     const response = await app.inject({ method: "GET", url: "/api/orders/samples" });
 
-    expect(response.json()).toStrictEqual({ orderIds: [1002, 16, 15] });
+    expect(response.json()).toStrictEqual({ orderIds: [8, 34, 76902] });
   });
 
   it("devolve lista vazia se nenhum configurado existir", async () => {

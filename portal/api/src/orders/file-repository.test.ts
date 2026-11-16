@@ -3,205 +3,244 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Order, orderSchema } from "@translog/contracts";
+import { orderSchema } from "@translog/contracts";
 import { parse } from "csv-parse/sync";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { z } from "zod";
-import { loadFileRepository } from "./file-repository.ts";
+import { type ConsumoTable, FORBIDDEN_COLUMNS } from "./consumo-mapper.ts";
+import { consumoFiles, loadFileRepository } from "./file-repository.ts";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
-import { FORBIDDEN_COLUMNS } from "./silver-mapper.ts";
 
 /**
- * Amostra da Silver com os pedidos 15, 375, 552, 562 e 1002 (15 linhas, 41 colunas).
- * Colunas lidas com os valores reais; proibidas com `FICTICIO-*`; sem uso com `SEM-USO`.
+ * Amostra das 3 tabelas com os 9 pedidos da demo (gerada por `pnpm --filter @translog/api
+ * fixtures`). Colunas lidas com valores reais; proibidas com `FICTICIO-*`; sem uso com `SEM-USO`.
  */
-const SAMPLE_CSV = fileURLToPath(new URL("./fixtures/silver-amostra.csv", import.meta.url));
-const SAMPLE_TEXT = readFileSync(SAMPLE_CSV, "utf8");
-const SAMPLE_IDS = [15, 375, 552, 562, 1002];
+const SAMPLE_DIR = fileURLToPath(new URL("./fixtures/consumo/", import.meta.url));
+const SAMPLE = consumoFiles(SAMPLE_DIR);
 
-/** Cópia local da Silver (fora do Git). O teste de integração só roda se ela existir. */
-const SILVER_CSV = fileURLToPath(
-  new URL("../../../dados/silver_pedidos_rastreio.csv", import.meta.url),
-);
+/** Cópia local das tabelas (fora do Git). O teste de integração só roda se ela existir. */
+const DATA_DIR = fileURLToPath(new URL("../../../dados/", import.meta.url));
 
 const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
-
-/**
- * O que a Silver deve produzir: o pedido dos fixtures (copiados de mocks-silver.json),
- * mas sem motivo provável. "Promessa irreal" no 375 é exemplo da demo; a coluna não existe.
- */
-function expectedFromSilver(orderId: number): Order {
-  const order = fixtures.find((candidate) => candidate.orderId === orderId);
-  if (!order) {
-    throw new Error(`Pedido ${orderId} não está nos fixtures`);
-  }
-  return { ...order, probableCause: null };
-}
+const DEMO_IDS = fixtures.map((order) => order.orderId);
 
 function fakeLog() {
   return { info: vi.fn(), warn: vi.fn() };
 }
 
-async function tempCsv(content: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "translog-silver-"));
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
-  const file = join(dir, "silver.csv");
-  await writeFile(file, content);
-  return file;
-}
+type CsvRecord = Record<string, string>;
+const sampleText = (table: ConsumoTable) => readFileSync(SAMPLE[table], "utf8");
+const sampleRecords = (table: ConsumoTable): CsvRecord[] =>
+  parse(sampleText(table), { columns: true });
 
-/** Linhas da amostra como objetos (cabeçalho completo), para montar CSVs de teste. */
-const sampleRecords: Record<string, string>[] = parse(SAMPLE_TEXT, { columns: true });
-const header = Object.keys(sampleRecords[0] ?? {});
-
-function toCsv(records: readonly Record<string, string>[], columns = header): string {
+function toCsv(records: readonly CsvRecord[], columns: readonly string[]): string {
   const quote = (value = "") => `"${value.replaceAll('"', '""')}"`;
   const lines = records.map((record) => columns.map((column) => quote(record[column])).join(","));
   return `${[columns.join(","), ...lines].join("\n")}\n`;
 }
 
-describe("loadFileRepository (amostra da Silver)", () => {
-  it("monta os pedidos 15, 375, 562, 1002 e 552 iguais aos mocks", async () => {
-    const orders = await loadFileRepository(SAMPLE_CSV, fakeLog());
+/**
+ * Pasta temporária com as 3 tabelas da amostra; `changes` substitui o conteúdo de uma tabela
+ * (texto pronto) ou a omite (`null`).
+ */
+async function tempDir(changes: Partial<Record<ConsumoTable, string | null>> = {}) {
+  const dir = await mkdtemp(join(tmpdir(), "translog-consumo-"));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  const files = consumoFiles(dir);
+  for (const table of ["orders", "items", "events"] as const) {
+    const content = table in changes ? changes[table] : sampleText(table);
+    if (content !== null && content !== undefined) {
+      await writeFile(files[table], content);
+    }
+  }
+  return dir;
+}
 
-    expect(await orders.count()).toBe(SAMPLE_IDS.length);
-    for (const orderId of SAMPLE_IDS) {
-      expect(await orders.findById(orderId), `pedido ${orderId}`).toStrictEqual(
-        expectedFromSilver(orderId),
-      );
+/** Tabela da amostra com linhas a mais (e o mesmo cabeçalho). */
+function withExtraRows(table: ConsumoTable, extra: readonly CsvRecord[]): string {
+  const records = sampleRecords(table);
+  return toCsv([...records, ...extra], Object.keys(records[0] ?? {}));
+}
+
+describe("loadFileRepository (amostra das tabelas consumo_*)", () => {
+  it("monta os 9 pedidos da demo iguais aos fixtures", async () => {
+    const orders = await loadFileRepository(SAMPLE_DIR, fakeLog());
+
+    expect(await orders.count()).toBe(9);
+    for (const order of fixtures) {
+      expect(await orders.findById(order.orderId), `pedido ${order.orderId}`).toStrictEqual(order);
     }
   });
 
-  it("loga ao fim os pedidos carregados, as linhas inválidas e o tempo de carga", async () => {
+  it("loga ao fim a pasta, os pedidos carregados, as linhas inválidas e o tempo", async () => {
     const log = fakeLog();
 
-    await loadFileRepository(SAMPLE_CSV, log);
+    await loadFileRepository(SAMPLE_DIR, log);
 
     expect(log.info).toHaveBeenCalledExactlyOnceWith(
-      { file: SAMPLE_CSV, orders: 5, invalidRows: 0, durationMs: expect.any(Number) },
-      "Pedidos carregados da Silver",
+      { dataDir: SAMPLE_DIR, orders: 9, invalidRows: 0, durationMs: expect.any(Number) },
+      "Pedidos carregados",
     );
     expect(log.warn).not.toHaveBeenCalled();
   });
 
   it("descarta na leitura as colunas proibidas e as sem uso", async () => {
-    // Sanidade: a amostra tem todas as colunas proibidas, com valores fictícios.
-    for (const column of FORBIDDEN_COLUMNS) {
-      expect(header).toContain(column);
-      expect(sampleRecords[0]?.[column]).toMatch(/^FICTICIO-/);
+    // Sanidade: as 3 tabelas da amostra têm todas as colunas proibidas, com valores fictícios.
+    for (const table of ["orders", "items", "events"] as const) {
+      const [first] = sampleRecords(table);
+      for (const column of FORBIDDEN_COLUMNS) {
+        expect(first?.[column], `${table}.${column}`).toMatch(/^FICTICIO-/);
+      }
     }
 
-    const orders = await loadFileRepository(SAMPLE_CSV, fakeLog());
-    const loaded = await Promise.all(SAMPLE_IDS.map((id) => orders.findById(id)));
+    const orders = await loadFileRepository(SAMPLE_DIR, fakeLog());
+    const loaded = await Promise.all(DEMO_IDS.map((id) => orders.findById(id)));
 
+    expect(loaded).not.toContain(null);
     expect(JSON.stringify(loaded)).not.toMatch(/FICTICIO|SEM-USO/);
   });
 
   it("conta e loga linhas inválidas sem conteúdo, e carrega o resto", async () => {
-    const [base] = sampleRecords.filter((record) => record.id_pedido === "552");
-    const invalid = [
-      { ...base, id_pedido: "abc" }, // não dá para agrupar
-      { ...base, id_pedido: "99001", situacao_rastreio: "Extraviado" }, // fora do contrato
-      { ...base, id_pedido: "99001", situacao_rastreio: "Extraviado" },
-    ];
-    const shortLine = "99002,SEM-USO\n"; // colunas faltando
-    const file = await tempCsv(toCsv([...sampleRecords, ...invalid]) + shortLine);
+    const [order375] = sampleRecords("orders").filter((r) => r.id_pedido === "375");
+    const [item375] = sampleRecords("items").filter((r) => r.id_pedido === "375");
+    const events375 = sampleRecords("events").filter((r) => r.id_pedido === "375");
+    const dir = await tempDir({
+      orders: `${withExtraRows("orders", [
+        { ...order375, id_pedido: "abc" }, // registro 10: não dá para agrupar
+        { ...order375 }, // registro 11: pedido repetido
+        { ...order375, id_pedido: "99001", situacao_pedido: "Perdido" }, // fora do contrato
+      ])}99002,SEM-USO\n`, // registro 13: colunas faltando
+      items: withExtraRows("items", [
+        { ...item375, id_pedido: "99001" },
+        { ...item375, id_pedido: "99003" }, // item sem pedido
+      ]),
+      events: withExtraRows(
+        "events",
+        events375.map((event) => ({ ...event, id_pedido: "99001" })),
+      ),
+    });
     const log = fakeLog();
 
-    const orders = await loadFileRepository(file, log);
+    const orders = await loadFileRepository(dir, log);
 
-    expect(await orders.count()).toBe(5);
+    expect(await orders.count()).toBe(9);
     expect(await orders.findById(99001)).toBeNull();
+    expect(await orders.findById(375)).toStrictEqual(fixtures.find((o) => o.orderId === 375));
+    // 3 linhas de pedido + 1 item sem pedido + o 99001 (1 pedido, 1 item, 9 eventos).
     expect(log.info).toHaveBeenCalledWith(
-      expect.objectContaining({ orders: 5, invalidRows: 4 }),
-      "Pedidos carregados da Silver",
+      expect.objectContaining({ orders: 9, invalidRows: 15 }),
+      "Pedidos carregados",
     );
     expect(log.warn.mock.calls).toEqual([
-      [{ record: 16, reason: "id_pedido inválido" }, "Linha inválida na Silver; ignorada"],
-      [{ record: 19, reason: "colunas faltando" }, "Linha inválida na Silver; ignorada"],
       [
-        { orderId: 99001, rows: 2, fields: ["trackingStatus"] },
-        "Pedido inválido na Silver; ignorado",
+        { table: "consumo_pedidos.csv", record: 10, reason: "id_pedido inválido" },
+        "Linha inválida; ignorada",
+      ],
+      [{ table: "consumo_pedidos.csv", record: 11, orderId: 375 }, "Pedido repetido; ignorado"],
+      [
+        { table: "consumo_pedidos.csv", record: 13, reason: "colunas faltando" },
+        "Linha inválida; ignorada",
+      ],
+      [{ orderId: 99001, rows: 11, fields: ["status"] }, "Pedido fora do contrato; ignorado"],
+      [
+        { table: "consumo_itens_pedido.csv", orderId: 99003, rows: 1 },
+        "Linhas sem pedido; ignoradas",
       ],
     ]);
     // Nada do conteúdo das linhas vai para o log.
-    expect(JSON.stringify(log.warn.mock.calls)).not.toMatch(/FICTICIO|Neoprene|Mexico|Extraviado/);
+    expect(JSON.stringify(log.warn.mock.calls)).not.toMatch(/FICTICIO|adidas|Saltillo|Perdido/);
   });
 
   it("limita os avisos detalhados no log, mas conta todas as linhas inválidas", async () => {
-    const [base] = sampleRecords;
+    const [base] = sampleRecords("orders");
     const invalid = Array.from({ length: 25 }, () => ({ ...base, id_pedido: "x" }));
     const log = fakeLog();
 
-    await loadFileRepository(await tempCsv(toCsv([...sampleRecords, ...invalid])), log);
+    await loadFileRepository(await tempDir({ orders: withExtraRows("orders", invalid) }), log);
 
     expect(log.warn).toHaveBeenCalledTimes(10);
     expect(log.info).toHaveBeenCalledWith(
       expect.objectContaining({ invalidRows: 25 }),
-      "Pedidos carregados da Silver",
+      "Pedidos carregados",
     );
   });
 
-  it("agrupa os itens de um pedido mesmo fora de sequência", async () => {
-    const file = await tempCsv(toCsv(sampleRecords.toReversed()));
+  it("agrupa itens e eventos fora de ordem", async () => {
+    const reversed = (table: ConsumoTable) => {
+      const records = sampleRecords(table);
+      return toCsv(records.toReversed(), Object.keys(records[0] ?? {}));
+    };
+    const dir = await tempDir({
+      orders: reversed("orders"),
+      items: reversed("items"),
+      events: reversed("events"),
+    });
 
-    const orders = await loadFileRepository(file, fakeLog());
+    const orders = await loadFileRepository(dir, fakeLog());
 
-    const order15 = await orders.findById(15);
-    expect(order15?.total).toBe(773.89);
-    expect(order15?.items.map((item) => item.total)).toEqual([331.98, 151.17, 89.25, 163.99, 37.5]);
+    for (const order of fixtures) {
+      expect(await orders.findById(order.orderId)).toStrictEqual(order);
+    }
   });
 
-  it("aceita CSV com BOM no início", async () => {
-    const file = await tempCsv(`﻿${SAMPLE_TEXT}`);
+  it("aceita CSV com BOM no início e com quebras de linha CRLF", async () => {
+    const dir = await tempDir({
+      orders: `﻿${sampleText("orders")}`,
+      events: sampleText("events").replaceAll("\n", "\r\n"),
+    });
 
-    expect(await (await loadFileRepository(file, fakeLog())).count()).toBe(5);
+    expect(await (await loadFileRepository(dir, fakeLog())).count()).toBe(9);
   });
 
-  it("arquivo inexistente impede a carga com mensagem clara", async () => {
-    await expect(loadFileRepository("/nao/existe.csv", fakeLog())).rejects.toThrow(
-      "Não foi possível ler ORDERS_FILE (/nao/existe.csv): arquivo não encontrado.",
+  it("pasta inexistente impede a carga com mensagem clara", async () => {
+    await expect(loadFileRepository("/nao/existe", fakeLog())).rejects.toThrow(
+      "Não foi possível ler DATA_DIR (/nao/existe): consumo_pedidos.csv não encontrado.",
     );
   });
 
-  it("pasta no lugar do arquivo impede a carga com mensagem clara", async () => {
-    await expect(loadFileRepository(tmpdir(), fakeLog())).rejects.toThrow(
-      "o caminho é uma pasta, não um arquivo.",
+  it("tabela faltando na pasta impede a carga, citando o arquivo", async () => {
+    const dir = await tempDir({ events: null });
+
+    await expect(loadFileRepository(dir, fakeLog())).rejects.toThrow(
+      `Não foi possível ler DATA_DIR (${dir}): consumo_eventos_logisticos.csv não encontrado.`,
     );
   });
 
-  it("arquivo vazio impede a carga com mensagem clara", async () => {
-    await expect(loadFileRepository(await tempCsv(""), fakeLog())).rejects.toThrow(
-      "o arquivo está vazio.",
+  it("tabela vazia impede a carga com mensagem clara", async () => {
+    await expect(loadFileRepository(await tempDir({ items: "" }), fakeLog())).rejects.toThrow(
+      "consumo_itens_pedido.csv está vazio.",
     );
   });
 
   it("cabeçalho sem uma coluna lida impede a carga, citando a coluna", async () => {
-    const columns = header.filter((column) => column !== "situacao_rastreio");
-    const file = await tempCsv(toCsv(sampleRecords, columns));
+    const records = sampleRecords("orders");
+    const columns = Object.keys(records[0] ?? {}).filter((c) => c !== "situacao_pedido");
+    const dir = await tempDir({ orders: toCsv(records, columns) });
 
-    await expect(loadFileRepository(file, fakeLog())).rejects.toThrow(
-      "o cabeçalho não tem as colunas situacao_rastreio.",
+    await expect(loadFileRepository(dir, fakeLog())).rejects.toThrow(
+      "consumo_pedidos.csv não tem as colunas situacao_pedido.",
     );
   });
 });
 
-describe.skipIf(!existsSync(SILVER_CSV))("loadFileRepository (Silver real em portal/dados)", () => {
-  it("carrega todos os pedidos sem linha inválida, e os 11 dos mocks batem", async () => {
-    const log = fakeLog();
+describe.skipIf(!existsSync(consumoFiles(DATA_DIR).orders))(
+  "loadFileRepository (tabelas reais em portal/dados)",
+  () => {
+    it("carrega os 65.752 pedidos sem linha inválida, e os da demo batem com os fixtures", async () => {
+      const log = fakeLog();
 
-    const orders = await loadFileRepository(SILVER_CSV, log);
+      const orders = await loadFileRepository(DATA_DIR, log);
 
-    // Perfil da cópia de 13/11 (180.519 linhas). Silver nova do Mateus: atualizar o número.
-    expect(await orders.count()).toBe(65_752);
-    expect(log.info).toHaveBeenCalledWith(
-      expect.objectContaining({ orders: 65_752, invalidRows: 0 }),
-      "Pedidos carregados da Silver",
-    );
-    for (const { orderId } of fixtures) {
-      expect(await orders.findById(orderId), `pedido ${orderId}`).toStrictEqual(
-        expectedFromSilver(orderId),
+      expect(await orders.count()).toBe(65_752);
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({ orders: 65_752, invalidRows: 0 }),
+        "Pedidos carregados",
       );
-    }
-  }, 120_000);
-});
+      for (const order of fixtures) {
+        expect(await orders.findById(order.orderId), `pedido ${order.orderId}`).toStrictEqual(
+          order,
+        );
+      }
+    }, 120_000);
+  },
+);

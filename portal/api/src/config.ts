@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { agentModeSchema, dataSourceSchema } from "@translog/contracts";
 import { z } from "zod";
 
-/** Pasta `portal/`: caminhos relativos em `ORDERS_FILE` partem daqui, de onde quer que a API rode. */
+/** Pasta `portal/`: caminhos relativos em `DATA_DIR` partem daqui, de onde quer que a API rode. */
 const PORTAL_DIR = fileURLToPath(new URL("../../", import.meta.url));
 
 /** Número de pedido: só dígitos, até 10 (mesma regra do campo da tela). */
@@ -35,23 +35,18 @@ const envSchema = z
   .object({
     API_PORT: port.default(3333),
     DATA_SOURCE: dataSourceSchema.default("fixtures"),
-    ORDERS_FILE: z.string().optional(),
-    SAMPLE_ORDER_IDS: orderIdList.prefault("15,375,562,1002"),
+    DATA_DIR: z.string().default("dados"),
+    SAMPLE_ORDER_IDS: orderIdList.prefault("76902,375,34,8"),
     AGENT: agentModeSchema.default("mock"),
     AGENT_URL: agentUrl.optional(),
     AGENT_APP_NAME: agentAppName.default("translog_agent"),
     AGENT_TIMEOUT_MS: agentTimeoutMs.default(90_000),
     NODE_ENV: z.string().optional(),
   })
-  .refine((env) => env.DATA_SOURCE !== "file" || env.ORDERS_FILE !== undefined, {
-    path: ["ORDERS_FILE"],
-    message: "obrigatória com DATA_SOURCE=file",
-    // Roda mesmo com outras variáveis inválidas, para a mensagem listar tudo de uma vez.
-    when: () => true,
-  })
   .refine((env) => env.AGENT !== "adk" || env.AGENT_URL !== undefined, {
     path: ["AGENT_URL"],
     message: "obrigatória com AGENT=adk",
+    // Roda mesmo com outras variáveis inválidas, para a mensagem listar tudo de uma vez.
     when: () => true,
   });
 
@@ -64,7 +59,7 @@ const oneOf = (options: readonly string[]) =>
 const expectations: Record<EnvName, string> = {
   API_PORT: "deve ser um número inteiro entre 1 e 65535",
   DATA_SOURCE: oneOf(dataSourceSchema.options),
-  ORDERS_FILE: "é obrigatória com DATA_SOURCE=file: caminho do CSV da Silver",
+  DATA_DIR: "deve ser o caminho da pasta com os CSVs das tabelas consumo_*",
   SAMPLE_ORDER_IDS:
     "deve ser uma lista de números de pedido separados por vírgula (inteiros positivos de até 10 dígitos)",
   AGENT: oneOf(agentModeSchema.options),
@@ -78,8 +73,8 @@ const expectations: Record<EnvName, string> = {
 const configSchema = envSchema.transform((env) => ({
   apiPort: env.API_PORT,
   dataSource: env.DATA_SOURCE,
-  /** Caminho absoluto da Silver; relativo no ambiente = relativo à pasta `portal/`. */
-  ordersFile: env.ORDERS_FILE === undefined ? undefined : resolve(PORTAL_DIR, env.ORDERS_FILE),
+  /** Pasta absoluta dos CSVs (`DATA_SOURCE=file`); relativo no ambiente = relativo a `portal/`. */
+  dataDir: resolve(PORTAL_DIR, env.DATA_DIR),
   /** Pedidos de exemplo da tela, na ordem configurada. */
   sampleOrderIds: env.SAMPLE_ORDER_IDS,
   /** Assistente do chat. */
@@ -95,7 +90,7 @@ export type Config = z.output<typeof configSchema>;
 
 /**
  * Lê e valida a configuração. Variáveis vazias contam como não definidas
- * (o compose repassa `ORDERS_FILE=` vazio, por exemplo).
+ * (o compose repassa `AGENT_URL=` vazio, por exemplo).
  * Lança um erro que lista cada variável inválida com o valor recebido.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {

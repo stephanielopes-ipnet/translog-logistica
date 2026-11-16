@@ -7,12 +7,12 @@ function counter() {
 }
 
 describe("buildPresetConversation", () => {
-  it("conversation: two answered questions about order 375", () => {
+  it("conversation: two answered questions about order 76902", () => {
     const items = buildPresetConversation("conversation", counter());
 
     expect(items.map((item) => item.role)).toEqual(["user", "assistant", "user", "assistant"]);
     expect(items.map((item) => item.id)).toEqual([1, 2, 3, 4]);
-    expect(items[3]).toMatchObject({ text: expect.stringContaining("motivo provável") });
+    expect(items[3]).toMatchObject({ text: expect.stringContaining("Motivo provável") });
   });
 
   it("typing and error: the second question waits or fails", () => {

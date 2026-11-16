@@ -74,10 +74,6 @@ async function createOrderRepository(config: Config, log: LoadLogger): Promise<O
     case "fixtures":
       return createFixturesRepository();
     case "file":
-      // O config.ts já recusa DATA_SOURCE=file sem ORDERS_FILE; isto só satisfaz o tipo.
-      if (config.ordersFile === undefined) {
-        throw new Error("ORDERS_FILE é obrigatória com DATA_SOURCE=file.");
-      }
-      return loadFileRepository(config.ordersFile, log);
+      return loadFileRepository(config.dataDir, log);
   }
 }

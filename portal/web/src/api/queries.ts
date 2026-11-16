@@ -21,7 +21,7 @@ export function useHealth(enabled = true) {
   });
 }
 
-/** Busca os códigos de exemplo em `/api/orders/samples` (fallback para `[15, 375, 562, 1002]`). */
+/** Busca os códigos de exemplo em `/api/orders/samples` (fallback para `DEFAULT_SAMPLE_IDS`). */
 export function useOrderSamples() {
   const query = useQuery({
     queryKey: ["orders", "samples"],

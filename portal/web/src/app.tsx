@@ -26,7 +26,7 @@ export function App() {
     () => readUrlPresets(typeof window !== "undefined" ? window.location.search : ""),
     [],
   );
-  // Conversa de exemplo pela URL (?c=conversation|typing|error): textos fixos sobre o pedido 375.
+  // Conversa de exemplo pela URL (?c=conversation|typing|error): textos fixos sobre o pedido 76902.
   const initialChatPreset =
     initialUrl.chatPreset && initialUrl.chatPreset !== "empty" ? initialUrl.chatPreset : null;
   const initialOrderId = initialUrl.orderId ?? (initialChatPreset ? PRESET_ORDER_ID : null);
@@ -361,14 +361,8 @@ export function App() {
         }
       } else if (kind === "r") {
         if (val === "waiting" || val === "payment") {
+          // Só muda o rótulo de pedidos "Aguardando pagamento" (nenhum entre os fixtures).
           setReleaseLabel(val);
-          if (selectedOrderId !== 562 && selectedOrderId !== 16) {
-            setForcedTrackerView(null);
-            setSelectedOrderId(562);
-            setQueryValue("562");
-            setSubmittedQuery("562");
-            syncUrlOrder(562);
-          }
         }
       } else if (kind === "n") {
         const nextOffline = val === "off";
@@ -383,7 +377,6 @@ export function App() {
       forcedTrackerView,
       nextMsgId,
       queryValue,
-      selectedOrderId,
       startNewConversation,
       syncUrlOrder,
     ],

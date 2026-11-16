@@ -1,11 +1,13 @@
-import type { Order, ShippingMode } from "@translog/contracts";
+import type { Order } from "@translog/contracts";
+import { SUPPORT_HOURS } from "../orders/escalation.ts";
 import type { OrderService } from "../orders/order-service.ts";
 import { citedOrderIds, findCitedOrder } from "./cited-orders.ts";
 import type { SupportAgent } from "./support-agent.ts";
 
 // Assistente simulado (AGENT=mock): regras e textos que antes ficavam na tela
 // (web/src/features/chat/mock-chat-service.ts). Responde cada mensagem sozinha, sem histórico,
-// consultando os pedidos da fonte configurada (fixtures ou Silver).
+// consultando os pedidos da fonte configurada (fixtures ou tabelas consumo_*).
+// Adaptado ao contrato novo em 16/11 com textos simples; a reescrita completa vem depois.
 // Regra fixa: o rótulo é sempre "Motivo provável"; nenhum texto apresenta a causa como comprovada.
 
 export const MODES_REPLY =
@@ -16,18 +18,10 @@ export const MODES_REPLY =
   "• **Same Day**: despacho no mesmo dia do pedido.";
 
 export const ASK_NUMBER_REPLY =
-  "Para consultar, informe o número do pedido no campo ao lado ou aqui na conversa (ex.: 375).";
+  "Para consultar, informe o número do pedido no campo ao lado ou aqui na conversa (ex.: 76902).";
 
 export const FALLBACK_REPLY =
   "Posso informar a situação, o prazo de entrega e o motivo provável de atraso de um pedido, ou explicar as modalidades de envio.";
-
-/** Prazo estimado de cada modalidade, em dias (o mesmo de `MODES_REPLY`). */
-const SHIPPING_DAYS: Record<ShippingMode, number> = {
-  "Standard Class": 4,
-  "Second Class": 2,
-  "First Class": 1,
-  "Same Day": 0,
-};
 
 export interface MockAgentDeps {
   orders: Pick<OrderService, "findOrder">;
@@ -71,23 +65,28 @@ export function createMockAgent({ orders }: MockAgentDeps): SupportAgent {
 
 export function buildWhenReply(order: Order): string {
   const id = order.orderId;
-  const delay = order.delayDays;
+  const { delivery } = order;
+  const delay = delivery.delayDays;
 
-  switch (order.trackingStatus) {
-    case "Em Trânsito":
+  switch (order.status) {
+    case "Em trânsito": {
+      const where = order.currentLocation ? ` Agora: **${order.currentLocation}**.` : "";
       return delay !== null && delay > 0
-        ? `O pedido **#${id}** está **Em Trânsito**. A entrega estava prevista para **${formatDate(order.estimatedDeliveryDate)}** e acumula **${days(delay)} de atraso**.`
-        : `O pedido **#${id}** está **Em Trânsito**, dentro do prazo, com entrega prevista para **${formatDate(order.estimatedDeliveryDate)}**.`;
-    case "Entregue":
-      if (delay !== null && delay > 0) {
-        return `O pedido **#${id}** foi **Entregue** em **${formatDate(order.actualDeliveryDate)}**, ${days(delay)} após a data prevista (${formatDate(order.estimatedDeliveryDate)}).`;
-      }
-      if (delay !== null && delay < 0) {
-        return `O pedido **#${id}** foi **Entregue** em **${formatDate(order.actualDeliveryDate)}**, ${days(-delay)} antes da data prevista.`;
-      }
-      return `O pedido **#${id}** foi **Entregue** em **${formatDate(order.actualDeliveryDate)}**, dentro do prazo previsto.`;
-    case "Aguardando Liberação":
-      return `O pedido **#${id}** está **Aguardando Liberação**. Depois de liberado, a entrega está prevista para **${formatDate(order.estimatedDeliveryDate)}**.`;
+        ? `O pedido **#${id}** está **Em trânsito**. A entrega estava prevista para **${formatDate(delivery.expectedDate)}** e acumula **${days(delay)} de atraso**.${where}`
+        : `O pedido **#${id}** está **Em trânsito**, dentro do prazo, com entrega prevista para **${formatDate(delivery.expectedDate)}**.${where}`;
+    }
+    case "Entregue com atraso":
+      return `O pedido **#${id}** foi **Entregue com atraso** em **${formatDate(delivery.actualDate)}**, ${days(delay ?? 0)} após a data prevista (${formatDate(delivery.expectedDate)}).`;
+    case "Entregue no prazo":
+      return delay !== null && delay < 0
+        ? `O pedido **#${id}** foi **Entregue no prazo** em **${formatDate(delivery.actualDate)}**, ${days(-delay)} antes da data prevista.`
+        : `O pedido **#${id}** foi **Entregue no prazo** em **${formatDate(delivery.actualDate)}**.`;
+    case "Extraviado":
+      return `O volume do pedido **#${id}** foi **Extraviado**${order.lostAtStage ? ` na etapa **${order.lostAtStage.label}**` : ""}.`;
+    case "Aguardando pagamento":
+      return `O pedido **#${id}** está **Aguardando pagamento**. O prazo de despacho começa a contar depois da confirmação.`;
+    case "Não pago (expirado)":
+      return `O pedido **#${id}** está como **Não pago (expirado)** e não foi despachado.`;
     case "Cancelado":
       return `O pedido **#${id}** foi **Cancelado** e não será enviado.`;
   }
@@ -95,49 +94,36 @@ export function buildWhenReply(order: Order): string {
 
 export function buildWhyReply(order: Order): string {
   const id = order.orderId;
+  const causes = [
+    order.dispatch.probableCause && `no despacho, **${order.dispatch.probableCause}**`,
+    order.delivery.probableCause && `na entrega, **${order.delivery.probableCause}**`,
+  ].filter((cause) => cause !== null);
 
-  if (order.probableCause) {
-    const detail = causeDetail(order);
-    return detail
-      ? `O motivo provável do atraso do pedido **#${id}** é **${order.probableCause}**: ${detail}`
-      : `O motivo provável do atraso do pedido **#${id}** é **${order.probableCause}**.`;
+  if (order.status === "Extraviado") {
+    const detail = causes.length > 0 ? ` Motivo provável do atraso: ${causes.join("; ")}.` : "";
+    return `${buildWhenReply(order)}${detail}${supportNote(order)}`;
   }
 
-  if (order.trackingStatus === "Cancelado") {
-    return `O pedido **#${id}** foi **Cancelado**, portanto não há atraso de transporte a analisar.`;
+  if (causes.length > 0) {
+    return `Motivo provável do atraso do pedido **#${id}**: ${causes.join("; ")}.${supportNote(order)}`;
   }
 
-  if (order.trackingStatus === "Aguardando Liberação") {
-    return `O pedido **#${id}** não está atrasado no transporte. Ele está **Aguardando Liberação** com previsão para **${formatDate(order.estimatedDeliveryDate)}**.`;
+  if (order.status === "Cancelado" || order.status === "Não pago (expirado)") {
+    return `O pedido **#${id}** está como **${order.status}**, portanto não há atraso de transporte a analisar.`;
   }
 
-  if (order.delayDays !== null && order.delayDays > 0) {
-    const verb = order.trackingStatus === "Entregue" ? "foi entregue" : "está";
-    return `O pedido **#${id}** ${verb} com **${days(order.delayDays)} de atraso**, mas não há um motivo provável específico registrado na base para esta remessa.`;
+  if (order.status === "Aguardando pagamento") {
+    return `O pedido **#${id}** não está atrasado no transporte. Ele está **Aguardando pagamento**.`;
   }
 
   return `O pedido **#${id}** não apresenta atraso. ${buildWhenReply(order)}`;
 }
 
-/**
- * Explicação do motivo "Promessa irreal" a partir do próprio pedido, sempre como hipótese
- * ("provavelmente"). Ex. (375): "o prazo de 2 dias da modalidade Second Class provavelmente foi
- * curto para a rota internacional Texas → Saltillo (México)." Outros motivos: sem detalhe.
- */
-function causeDetail(order: Order): string | null {
-  if (order.probableCause !== "Promessa irreal") {
-    return null;
-  }
-  const origin = order.origin.split(", ");
-  const destination = order.destination.split(", ");
-  const from = origin[1] ?? origin[0];
-  const to = `${destination[0]} (${destination.at(-1)})`;
-  const route = origin.at(-1) === destination.at(-1) ? "rota" : "rota internacional";
-
-  if (order.shippingMode === "Same Day") {
-    return `o envio no mesmo dia (Same Day) provavelmente tinha prazo curto demais para a ${route} ${from} → ${to}.`;
-  }
-  return `o prazo de ${days(SHIPPING_DAYS[order.shippingMode])} da modalidade ${order.shippingMode} provavelmente foi curto para a ${route} ${from} → ${to}.`;
+/** Aviso de encaminhamento à central (regra calculada na API: `escalateToSupport`). */
+function supportNote(order: Order): string {
+  return order.escalateToSupport
+    ? ` Este caso deve ser tratado pela central de atendimento (${SUPPORT_HOURS}).`
+    : "";
 }
 
 /** Minúsculas e sem acentos, para comparar palavras-chave. */

@@ -3,7 +3,10 @@ import { orderSchema } from "@translog/contracts";
 import { z } from "zod";
 import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
 
-/** 11 pedidos reais da Silver, só com os campos do contrato (sem dados de cliente ou lucro). */
+/**
+ * Os 9 pedidos da demo, gerados das tabelas `consumo_*` por `pnpm --filter @translog/api
+ * fixtures` (só os campos do contrato, sem dados do cliente nem financeiro interno).
+ */
 export const FIXTURES_FILE = new URL("./fixtures/orders.json", import.meta.url);
 
 /**

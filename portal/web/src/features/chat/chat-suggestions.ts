@@ -4,10 +4,12 @@ import type { Order } from "@translog/contracts";
 // quem responde é a API (`POST /api/chat`).
 
 export const CHAT_SUGGESTIONS = [
-  "Onde está o pedido 375?",
-  "Por que o pedido 375 atrasou?",
+  "Onde está o pedido 76902?",
+  "Por que o pedido 76902 atrasou?",
   "Quais são as modalidades de envio?",
 ] as const;
+
+const MODES = "Quais são as modalidades de envio?";
 
 /** Sugestões contextuais de acordo com o pedido aberto no momento. */
 export function getChatSuggestions(order: Order | null): readonly string[] {
@@ -15,34 +17,24 @@ export function getChatSuggestions(order: Order | null): readonly string[] {
     return CHAT_SUGGESTIONS;
   }
   const id = order.orderId;
-  if (order.trackingStatus === "Cancelado") {
-    return [
-      `Qual a situação do pedido #${id}?`,
-      `Por que o pedido #${id} não foi enviado?`,
-      "Quais são as modalidades de envio?",
-    ];
+  const delivered = order.status === "Entregue no prazo" || order.status === "Entregue com atraso";
+  const when = delivered ? `Quando o pedido #${id} foi entregue?` : `Quando o pedido #${id} chega?`;
+
+  switch (order.status) {
+    case "Cancelado":
+    case "Não pago (expirado)":
+      return [
+        `Qual a situação do pedido #${id}?`,
+        `Por que o pedido #${id} não foi enviado?`,
+        MODES,
+      ];
+    case "Aguardando pagamento":
+      return [when, `Por que o pedido #${id} ainda não foi despachado?`, MODES];
+    case "Extraviado":
+      return [`O que aconteceu com o pedido #${id}?`, `Por que o pedido #${id} atrasou?`, MODES];
   }
-  if (order.trackingStatus === "Aguardando Liberação") {
-    return [
-      `Quando o pedido #${id} chega?`,
-      `Por que o pedido #${id} ainda não foi liberado?`,
-      "Quais são as modalidades de envio?",
-    ];
+  if (order.delivery.delayDays !== null && order.delivery.delayDays > 0) {
+    return [`Por que o pedido #${id} atrasou?`, when, MODES];
   }
-  if (order.deadlineStatus === "Atrasado") {
-    return [
-      `Por que o pedido #${id} atrasou?`,
-      order.trackingStatus === "Entregue"
-        ? `Quando o pedido #${id} foi entregue?`
-        : `Quando o pedido #${id} chega?`,
-      "Quais são as modalidades de envio?",
-    ];
-  }
-  return [
-    order.trackingStatus === "Entregue"
-      ? `Quando o pedido #${id} foi entregue?`
-      : `Quando o pedido #${id} chega?`,
-    `Há algum atraso previsto no pedido #${id}?`,
-    "Quais são as modalidades de envio?",
-  ];
+  return [when, `Há algum atraso previsto no pedido #${id}?`, MODES];
 }

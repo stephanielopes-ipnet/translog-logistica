@@ -1,5 +1,8 @@
-import type { Order, TrackingStatus } from "@translog/contracts";
+import type { Order } from "@translog/contracts";
 import { formatDate } from "@/lib/format.ts";
+
+// Linha do tempo resumida em 4 passos, adaptada ao contrato novo (16/11). A linha do tempo por
+// etapas (Pedido, Coleta, Voo, Alfândega, Transferência, Última milha) vem na tarefa da tela.
 
 export type StepState = "done" | "current" | "pending";
 export type ReleaseLabelMode = "waiting" | "payment";
@@ -12,84 +15,73 @@ export interface TimelineStepView {
   isCurrent: boolean;
 }
 
-const TIMELINE_STATES: Record<
-  Exclude<TrackingStatus, "Cancelado">,
-  readonly [StepState, StepState, StepState, StepState]
-> = {
-  Entregue: ["done", "done", "done", "done"],
-  "Em Trânsito": ["done", "done", "current", "pending"],
-  "Aguardando Liberação": ["done", "current", "pending", "pending"],
+type StepStates = readonly [StepState, StepState, StepState, StepState];
+
+/** Situações com os 4 passos; "Cancelado" e "Não pago (expirado)" mostram só o registro. */
+const TIMELINE_STATES: Partial<Record<Order["status"], StepStates>> = {
+  "Entregue no prazo": ["done", "done", "done", "done"],
+  "Entregue com atraso": ["done", "done", "done", "done"],
+  "Em trânsito": ["done", "done", "current", "pending"],
+  Extraviado: ["done", "done", "current", "pending"],
+  "Aguardando pagamento": ["done", "current", "pending", "pending"],
 };
 
-/** Rótulo exibido para a situação do pedido considerando a variante de liberação. */
+/** Rótulo exibido para a situação do pedido considerando a variante da barra de protótipo. */
 export function getDisplayTrackingStatus(
-  order: Pick<Order, "trackingStatus">,
+  order: Pick<Order, "status">,
   releaseLabel: ReleaseLabelMode = "waiting",
 ): string {
-  if (order.trackingStatus === "Aguardando Liberação" && releaseLabel === "payment") {
+  if (order.status === "Aguardando pagamento" && releaseLabel === "payment") {
     return "Pagamento não processado";
   }
-  return order.trackingStatus;
+  return order.status;
 }
 
-/** Constrói as 4 etapas da linha do tempo para pedidos não cancelados. */
+/** Pedido sem os 4 passos (terminal antes do despacho): só "Pedido realizado". */
+export function isTerminalBeforeDispatch(order: Pick<Order, "status">): boolean {
+  return TIMELINE_STATES[order.status] === undefined;
+}
+
+/** Constrói os passos da linha do tempo resumida. */
 export function buildTimelineSteps(
-  order: Pick<
-    Order,
-    "trackingStatus" | "orderDate" | "estimatedDeliveryDate" | "actualDeliveryDate"
-  >,
-  releaseLabel: ReleaseLabelMode = "waiting",
+  order: Pick<Order, "status" | "orderDate" | "dispatch" | "delivery">,
 ): TimelineStepView[] {
-  if (order.trackingStatus === "Cancelado") {
-    return [
-      {
-        key: "placed",
-        label: "Pedido realizado",
-        state: "done",
-        subtitle: formatDate(order.orderDate),
-        isCurrent: false,
-      },
-    ];
+  const placed: TimelineStepView = {
+    key: "placed",
+    label: "Pedido realizado",
+    state: "done",
+    subtitle: formatDate(order.orderDate),
+    isCurrent: false,
+  };
+  const states = TIMELINE_STATES[order.status];
+  if (!states) {
+    return [placed];
   }
 
-  const states = TIMELINE_STATES[order.trackingStatus];
-  const baseSteps: ReadonlyArray<{
-    key: TimelineStepView["key"];
-    label: string;
-  }> = [
+  const steps: ReadonlyArray<Pick<TimelineStepView, "key" | "label">> = [
     { key: "placed", label: "Pedido realizado" },
-    {
-      key: "released",
-      label:
-        order.trackingStatus === "Aguardando Liberação" && releaseLabel === "payment"
-          ? "Confirmação pendente"
-          : "Pedido liberado",
-    },
-    { key: "in_transit", label: "Em trânsito" },
+    { key: "released", label: "Pedido despachado" },
+    { key: "in_transit", label: order.status === "Extraviado" ? "Extraviado" : "Em trânsito" },
     { key: "delivered", label: "Entregue" },
   ];
 
-  return baseSteps.map((step, index) => {
+  return steps.map((step, index) => {
     const state = states[index] ?? "pending";
     let subtitle: string | null = null;
-
     if (index === 0) {
       subtitle = formatDate(order.orderDate);
+    } else if (index === 1 && state === "done") {
+      subtitle = formatDate(order.dispatch.actualDate);
     } else if (index === 3) {
       subtitle =
         state === "done"
-          ? formatDate(order.actualDeliveryDate)
-          : `previsto ${formatDate(order.estimatedDeliveryDate)}`;
+          ? formatDate(order.delivery.actualDate)
+          : order.delivery.expectedDate
+            ? `previsto ${formatDate(order.delivery.expectedDate)}`
+            : null;
     } else if (state === "current") {
       subtitle = "Etapa atual";
     }
-
-    return {
-      key: step.key,
-      label: step.label,
-      state,
-      subtitle,
-      isCurrent: state === "current",
-    };
+    return { ...step, state, subtitle, isCurrent: state === "current" };
   });
 }

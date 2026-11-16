@@ -1,4 +1,4 @@
-import type { DeadlineStatus, Order } from "@translog/contracts";
+import type { Order } from "@translog/contracts";
 import {
   Ban,
   Check,
@@ -23,6 +23,7 @@ import {
 import {
   buildTimelineSteps,
   getDisplayTrackingStatus,
+  isTerminalBeforeDispatch,
   type ReleaseLabelMode,
   type TimelineStepView,
 } from "./timeline.ts";
@@ -33,16 +34,23 @@ interface OrderManifestCardProps {
   onAskAssistant: (question: string) => void;
 }
 
+const DELIVERED_BADGE = {
+  cls: "bg-emerald-50 text-emerald-800 border-emerald-300",
+  dot: "bg-emerald-600",
+};
+
 const STATUS_BADGE_STYLE: Record<string, { cls: string; dot: string }> = {
-  Entregue: {
-    cls: "bg-emerald-50 text-emerald-800 border-emerald-300",
-    dot: "bg-emerald-600",
-  },
-  "Em Trânsito": {
+  "Entregue no prazo": DELIVERED_BADGE,
+  "Entregue com atraso": DELIVERED_BADGE,
+  "Em trânsito": {
     cls: "bg-primary-50 text-primary border-primary-200",
     dot: "bg-primary",
   },
-  "Aguardando Liberação": {
+  Extraviado: {
+    cls: "bg-red-50 text-red-700 border-red-300",
+    dot: "bg-red-600",
+  },
+  "Aguardando pagamento": {
     cls: "bg-amber-50 text-amber-800 border-amber-300",
     dot: "bg-amber-500",
   },
@@ -56,11 +64,24 @@ const STATUS_BADGE_STYLE: Record<string, { cls: string; dot: string }> = {
   },
 };
 
-const DEADLINE_BADGE_STYLE: Partial<Record<DeadlineStatus, string>> = {
+type DeadlineStatus = "Atrasado" | "No Prazo" | "Adiantado";
+
+const DEADLINE_BADGE_STYLE: Record<DeadlineStatus, string> = {
   Atrasado: "bg-red-50 text-red-700 border-red-300",
   "No Prazo": "bg-emerald-50/70 text-emerald-800 border-emerald-300",
   Adiantado: "bg-emerald-50/70 text-emerald-800 border-emerald-300",
 };
+
+/** Situação do prazo de entrega a partir do atraso (null = ainda sem como avaliar). */
+function deliveryDeadline(order: Order): DeadlineStatus | null {
+  const delay = order.delivery.delayDays;
+  if (delay === null) return null;
+  if (delay > 0) return "Atrasado";
+  return delay < 0 ? "Adiantado" : "No Prazo";
+}
+
+const isDelivered = (order: Order) =>
+  order.status === "Entregue no prazo" || order.status === "Entregue com atraso";
 
 function StepIcon({ stepKey }: { stepKey: TimelineStepView["key"] }) {
   switch (stepKey) {
@@ -76,10 +97,10 @@ function StepIcon({ stepKey }: { stepKey: TimelineStepView["key"] }) {
 }
 
 function getCardAccentClass(order: Order): string {
-  if (order.trackingStatus === "Cancelado") return "bg-slate-400";
-  if (order.deadlineStatus === "Atrasado") return "bg-red-600";
-  if (order.trackingStatus === "Aguardando Liberação") return "bg-accent";
-  if (order.trackingStatus === "Entregue") return "bg-emerald-600";
+  if (isTerminalBeforeDispatch(order)) return "bg-slate-400";
+  if (order.status === "Extraviado" || deliveryDeadline(order) === "Atrasado") return "bg-red-600";
+  if (order.status === "Aguardando pagamento") return "bg-accent";
+  if (isDelivered(order)) return "bg-emerald-600";
   return "bg-primary";
 }
 
@@ -105,57 +126,58 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
 
   const statusLabel = getDisplayTrackingStatus(order, releaseLabel);
   const statusStyle = STATUS_BADGE_STYLE[statusLabel] ?? STATUS_BADGE_STYLE.Cancelado;
-  const deadlineCls = DEADLINE_BADGE_STYLE[order.deadlineStatus];
+  const deadline = deliveryDeadline(order);
+  const deadlineCls = deadline ? DEADLINE_BADGE_STYLE[deadline] : undefined;
+  const delayDays = order.delivery.delayDays;
   const orig = splitPlace(order.origin);
   const dest = splitPlace(order.destination);
-  const steps = buildTimelineSteps(order, releaseLabel);
-  const isOrderDelayed =
-    order.deadlineStatus === "Atrasado" && order.delayDays !== null && order.delayDays > 0;
+  const steps = buildTimelineSteps(order);
+  const isOrderDelayed = deadline === "Atrasado" && delayDays !== null && delayDays > 0;
+  const isWaitingPayment = order.status === "Aguardando pagamento";
+  const probableCause = order.dispatch.probableCause ?? order.delivery.probableCause;
+  const showProbableCause =
+    probableCause !== null && (isOrderDelayed || order.status === "Extraviado");
 
   // Célula 1: Previsão / Entrega
   let mainLabel = "Previsão de entrega";
-  let mainDate = formatDate(order.estimatedDeliveryDate);
+  let mainDate = formatDate(order.delivery.expectedDate);
   let mainSub = "Data estimada";
 
-  if (order.trackingStatus === "Entregue") {
+  if (isDelivered(order)) {
     mainLabel = "Entregue em";
-    mainDate = formatDate(order.actualDeliveryDate);
-    mainSub = `Previsto para ${formatDate(order.estimatedDeliveryDate)}`;
-  } else if (order.trackingStatus === "Em Trânsito") {
-    mainLabel = "Previsão de entrega";
-    mainDate = formatDate(order.estimatedDeliveryDate);
+    mainDate = formatDate(order.delivery.actualDate);
+    mainSub = `Previsto para ${formatDate(order.delivery.expectedDate)}`;
+  } else if (order.status === "Em trânsito") {
     mainSub = isOrderDelayed ? "Prazo estimado excedido" : "Dentro da janela prevista";
-  } else if (order.trackingStatus === "Aguardando Liberação") {
-    mainLabel = "Previsão após liberação";
-    mainDate = formatDate(order.estimatedDeliveryDate);
-    mainSub =
-      releaseLabel === "payment"
-        ? "Aguardando confirmação de pagamento"
-        : "Aguardando liberação do pedido";
+  } else if (order.status === "Extraviado") {
+    mainLabel = "Situação";
+    mainDate = "Extraviado";
+    mainSub = order.lostAtStage
+      ? `Na etapa ${order.lostAtStage.label}`
+      : `Previsão original: ${formatDate(order.delivery.expectedDate)}`;
+  } else if (isWaitingPayment) {
+    mainLabel = "Previsão de entrega";
+    mainSub = releaseLabel === "payment" ? "Pagamento não processado" : "Aguardando pagamento";
   } else {
     mainLabel = "Situação final";
-    mainDate = "Cancelado";
-    mainSub = `Previsão original: ${formatDate(order.estimatedDeliveryDate)}`;
+    mainDate = order.status;
+    mainSub = "Sem entrega programada";
   }
 
   // Célula 2: Cumprimento do prazo
   let delayCellCls = "bg-white";
   let delayLabelColor = "";
 
-  if (order.deadlineStatus === "Atrasado" && order.delayDays !== null && order.delayDays > 0) {
+  if (isOrderDelayed) {
     delayCellCls = "bg-red-50/55";
     delayLabelColor = "!text-red-700";
-  } else if (
-    order.deadlineStatus === "Adiantado" &&
-    order.delayDays !== null &&
-    order.delayDays < 0
-  ) {
+  } else if (deadline === "Adiantado") {
     delayCellCls = "bg-emerald-50/40";
     delayLabelColor = "!text-emerald-800";
-  } else if (order.deadlineStatus === "No Prazo") {
+  } else if (deadline === "No Prazo") {
     delayCellCls = "bg-emerald-50/30";
     delayLabelColor = "!text-emerald-800";
-  } else if (order.trackingStatus === "Aguardando Liberação") {
+  } else if (isWaitingPayment) {
     delayCellCls = "bg-amber-50/35";
     delayLabelColor = "!text-amber-800";
   }
@@ -182,7 +204,7 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                 className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${deadlineCls}`}
               >
                 <Clock className="w-3 h-3" />
-                {order.deadlineStatus}
+                {deadline}
               </span>
             )}
           </div>
@@ -217,41 +239,35 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
         <div className={`px-5 py-3.5 ${delayCellCls}`}>
           <dt className={`label-mono ${delayLabelColor}`}>Cumprimento do prazo</dt>
           <dd className="mt-1 leading-tight">
-            {order.deadlineStatus === "Atrasado" &&
-            order.delayDays !== null &&
-            order.delayDays > 0 ? (
+            {isOrderDelayed && delayDays !== null ? (
               <span className="font-mono text-[22px] font-bold text-red-700 tabular">
-                +{pluralize(order.delayDays, "dia", "dias")}
+                +{pluralize(delayDays, "dia", "dias")}
               </span>
-            ) : order.deadlineStatus === "Adiantado" &&
-              order.delayDays !== null &&
-              order.delayDays < 0 ? (
+            ) : deadline === "Adiantado" && delayDays !== null ? (
               <span className="font-mono text-[22px] font-bold text-emerald-700 tabular">
-                {pluralize(-order.delayDays, "dia", "dias")} antes
+                {pluralize(-delayDays, "dia", "dias")} antes
               </span>
-            ) : order.deadlineStatus === "No Prazo" ? (
+            ) : deadline === "No Prazo" ? (
               <span className="text-[18px] font-semibold text-emerald-700">Dentro do prazo</span>
-            ) : order.trackingStatus === "Aguardando Liberação" ? (
+            ) : isWaitingPayment ? (
               <span className="text-[16px] font-semibold text-amber-900">
-                {releaseLabel === "payment" ? "Pagamento pendente" : "Aguardando liberação"}
+                {releaseLabel === "payment" ? "Pagamento pendente" : "Aguardando pagamento"}
               </span>
+            ) : order.status === "Extraviado" ? (
+              <span className="text-[16px] font-semibold text-red-700">Volume extraviado</span>
             ) : (
-              <span className="text-[16px] font-medium text-slate-500">Envio cancelado</span>
+              <span className="text-[16px] font-medium text-slate-500">Sem envio</span>
             )}
           </dd>
           <dd className="mt-0.5">
-            {order.deadlineStatus === "Atrasado" &&
-            order.delayDays !== null &&
-            order.delayDays > 0 ? (
-              <span className="text-xs font-medium text-red-700/90">
-                {order.delayWindow || "Fora do prazo estimado"}
-              </span>
-            ) : order.deadlineStatus === "Adiantado" ? (
-              <span className="text-xs text-emerald-800/80">{order.delayWindow}</span>
-            ) : order.deadlineStatus === "No Prazo" ? (
+            {isOrderDelayed ? (
+              <span className="text-xs font-medium text-red-700/90">Fora do prazo estimado</span>
+            ) : deadline === "Adiantado" ? (
+              <span className="text-xs text-emerald-800/80">Entregue antes do previsto</span>
+            ) : deadline === "No Prazo" ? (
               <span className="text-xs text-slate-500">Sem atraso registrado</span>
-            ) : order.trackingStatus === "Aguardando Liberação" ? (
-              <span className="text-xs text-slate-500">Prazo conta após expedição</span>
+            ) : isWaitingPayment ? (
+              <span className="text-xs text-slate-500">Prazo conta após o despacho</span>
             ) : (
               <span className="text-xs text-slate-400">Sem entrega programada</span>
             )}
@@ -278,7 +294,7 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
       </dl>
 
       {/* Alerta de Motivo Provável (quando houver) */}
-      {order.probableCause && (
+      {showProbableCause && (
         <div className="mx-5 mt-4 flex items-stretch rounded-md border border-amber-300 bg-amber-50/80 shadow-[0_1px_2px_rgba(245,158,11,0.12)] overflow-hidden">
           <div
             className="w-11 shrink-0 bg-accent text-slate-900 grid place-items-center"
@@ -296,13 +312,10 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                 Análise histórica da rota
               </span>
             </div>
-            <p className="mt-0.5 text-base font-bold text-slate-900">{order.probableCause}</p>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Quer entender melhor? O assistente explica por que esse é o motivo provável para a
-              modalidade{" "}
-              <strong className="font-medium text-slate-800">{order.shippingMode}</strong> nesta
-              rota.
-            </p>
+            <p className="mt-0.5 text-base font-bold text-slate-900">{probableCause}</p>
+            {order.explanation && (
+              <p className="text-xs text-slate-600 mt-0.5">{order.explanation}</p>
+            )}
           </div>
           <div className="px-4 py-3 grid place-items-center shrink-0">
             <button
@@ -364,7 +377,7 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
         </div>
 
         {/* Linha do tempo */}
-        {order.trackingStatus === "Cancelado" ? (
+        {isTerminalBeforeDispatch(order) ? (
           <div className="pt-1 flex items-center gap-5">
             <div className="flex items-center gap-3 shrink-0">
               <div className="w-8 h-8 rounded bg-slate-800 text-white grid place-items-center">
@@ -381,10 +394,13 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
             <div className="flex-1 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5">
               <Ban className="w-4 h-4 text-slate-500 shrink-0" />
               <div className="text-xs">
-                <span className="font-semibold text-slate-800">Este pedido foi cancelado.</span>
+                <span className="font-semibold text-slate-800">
+                  {order.status === "Cancelado"
+                    ? "Este pedido foi cancelado."
+                    : "O pagamento não foi confirmado e o pedido expirou."}
+                </span>
                 <span className="text-slate-500 ml-1">
-                  Ele não será liberado nem despachado. Em caso de dúvida, pergunte ao assistente ao
-                  lado.
+                  Ele não será despachado. Em caso de dúvida, pergunte ao assistente ao lado.
                 </span>
               </div>
             </div>
@@ -400,20 +416,19 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
             <ol className="grid grid-cols-4">
               {steps.map((step, index) => {
                 const nextStep = steps[index + 1];
-                const isWaitingCurrent =
-                  step.state === "current" && order.trackingStatus === "Aguardando Liberação";
+                const isWaitingCurrent = step.state === "current" && isWaitingPayment;
                 const isDelayedCurrent =
                   step.state === "current" &&
-                  order.trackingStatus === "Em Trânsito" &&
-                  isOrderDelayed;
+                  ((order.status === "Em trânsito" && isOrderDelayed) ||
+                    order.status === "Extraviado");
 
                 const connectorClass =
                   nextStep && nextStep.state !== "pending"
                     ? nextStep.state === "done"
                       ? "bg-slate-800"
-                      : order.trackingStatus === "Aguardando Liberação"
+                      : isWaitingPayment
                         ? "bg-accent"
-                        : order.trackingStatus === "Em Trânsito" && isOrderDelayed
+                        : isDelayedCurrent || (order.status === "Em trânsito" && isOrderDelayed)
                           ? "bg-red-500"
                           : "bg-primary"
                     : null;
@@ -474,9 +489,11 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                                 : "text-primary"
                           }`}
                         >
-                          {isDelayedCurrent && order.delayDays !== null
-                            ? `Em atraso (+${order.delayDays}d)`
-                            : step.subtitle}
+                          {order.status === "Extraviado" && step.isCurrent
+                            ? (order.lostAtStage?.label ?? step.subtitle)
+                            : isDelayedCurrent && delayDays !== null
+                              ? `Em atraso (+${delayDays}d)`
+                              : step.subtitle}
                         </span>
                       ) : step.subtitle ? (
                         <span
@@ -492,8 +509,8 @@ export function OrderManifestCard({ order, releaseLabel, onAskAssistant }: Order
                           {step.key === "delivered" &&
                             step.state === "done" &&
                             isOrderDelayed &&
-                            order.delayDays !== null &&
-                            ` (+${order.delayDays}d)`}
+                            delayDays !== null &&
+                            ` (+${delayDays}d)`}
                         </span>
                       ) : null}
                     </p>

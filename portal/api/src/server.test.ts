@@ -49,32 +49,32 @@ describe("GET /api/health", () => {
     expect(healthResponseSchema.parse(response.json())).toStrictEqual({
       status: "ok",
       dataSource: "fixtures",
-      orders: 11,
+      orders: 9,
       agent: "mock",
     });
   });
 
   it("com DATA_SOURCE=file, informa a fonte e os pedidos lidos do CSV", async () => {
-    const sample = new URL("./orders/fixtures/silver-amostra.csv", import.meta.url).pathname;
-    const app = await buildTestServer({ DATA_SOURCE: "file", ORDERS_FILE: sample });
+    const sample = new URL("./orders/fixtures/consumo/", import.meta.url).pathname;
+    const app = await buildTestServer({ DATA_SOURCE: "file", DATA_DIR: sample });
 
     const response = await app.inject({ method: "GET", url: "/api/health" });
 
     expect(response.json()).toStrictEqual({
       status: "ok",
       dataSource: "file",
-      orders: 5,
+      orders: 9,
       agent: "mock",
     });
   });
 
-  it("com DATA_SOURCE=file e arquivo ausente, o servidor não sobe", async () => {
+  it("com DATA_SOURCE=file e pasta sem os CSVs, o servidor não sobe", async () => {
     await expect(
-      buildServer(loadConfig({ DATA_SOURCE: "file", ORDERS_FILE: "/nao/existe.csv" }), {
+      buildServer(loadConfig({ DATA_SOURCE: "file", DATA_DIR: "/nao/existe" }), {
         logger: false,
       }),
     ).rejects.toThrow(
-      "Não foi possível ler ORDERS_FILE (/nao/existe.csv): arquivo não encontrado.",
+      "Não foi possível ler DATA_DIR (/nao/existe): consumo_pedidos.csv não encontrado.",
     );
   });
 });

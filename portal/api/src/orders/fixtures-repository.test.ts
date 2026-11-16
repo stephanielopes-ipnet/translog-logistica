@@ -19,40 +19,53 @@ async function readFixtures(): Promise<Record<string, unknown>[]> {
 }
 
 describe("createFixturesRepository", () => {
-  it("carrega os 11 pedidos de exemplo", async () => {
+  it("carrega os 9 pedidos da demo", async () => {
     const orders = await createFixturesRepository();
 
-    expect(await orders.count()).toBe(11);
-    expect((await orders.findById(375))?.probableCause).toBe("Promessa irreal");
+    expect(await orders.count()).toBe(9);
+    expect((await orders.findById(76902))?.dispatch.probableCause).toBe("Promessa irreal");
     expect(await orders.findById(1)).toBeNull();
   });
 
-  it("os pedidos da demo cobrem as quatro situações", async () => {
+  it("os pedidos da demo cobrem as 6 situações dos dados de exemplo e a central", async () => {
     const orders = await createFixturesRepository();
 
-    const statuses = await Promise.all(
-      [15, 375, 562, 1002].map(async (id) => (await orders.findById(id))?.trackingStatus),
+    const view = await Promise.all(
+      [76902, 375, 34, 222, 8, 9, 50, 31298, 76385].map(async (id) => {
+        const order = await orders.findById(id);
+        return [id, order?.status, order?.escalateToSupport];
+      }),
     );
 
-    expect(statuses).toEqual(["Entregue", "Em Trânsito", "Aguardando Liberação", "Cancelado"]);
+    expect(view).toEqual([
+      [76902, "Em trânsito", true],
+      [375, "Entregue com atraso", true],
+      [34, "Extraviado", true],
+      [222, "Entregue com atraso", false],
+      [8, "Entregue no prazo", false],
+      [9, "Não pago (expirado)", false],
+      [50, "Cancelado", false],
+      [31298, "Entregue no prazo", false],
+      [76385, "Em trânsito", true],
+    ]);
   });
 
   it("recusa arquivo com pedido fora do contrato, apontando o campo", async () => {
     const [first, ...rest] = await readFixtures();
-    const file = await tempFile([{ ...first, trackingStatus: "Extraviado" }, ...rest]);
+    const file = await tempFile([{ ...first, status: "Entregue" }, ...rest]);
 
     await expect(createFixturesRepository(file)).rejects.toThrow(
-      /Pedidos de exemplo inválidos.*\n.*trackingStatus/s,
+      /Pedidos de exemplo inválidos.*\n.*status/s,
     );
   });
 
   it("descarta na leitura campos que não estão no contrato", async () => {
     const [first] = await readFixtures();
-    const file = await tempFile([{ ...first, id_cliente: 123, lucro_item: 9.99 }]);
+    const file = await tempFile([{ ...first, id_cliente: 123, preco_unitario: 9.99 }]);
 
-    const order = await (await createFixturesRepository(file)).findById(15);
+    const order = await (await createFixturesRepository(file)).findById(76902);
 
     expect(order).not.toHaveProperty("id_cliente");
-    expect(order).not.toHaveProperty("lucro_item");
+    expect(order).not.toHaveProperty("preco_unitario");
   });
 });

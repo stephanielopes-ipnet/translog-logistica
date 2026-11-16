@@ -1,67 +1,197 @@
 [
   {
-    "orderId": 15,
-    "orderDate": "2015-01-01",
-    "shippingMode": "Standard Class",
-    "trackingStatus": "Entregue",
-    "deadlineStatus": "Atrasado",
-    "delayDays": 2,
-    "delayWindow": "Atraso Leve (1 a 2 dias)",
-    "estimatedDeliveryDate": "2015-01-05",
-    "actualDeliveryDate": "2015-01-07",
-    "origin": "Memphis, Tennessee, Estados Unidos",
-    "destination": "Brasília, Distrito Federal, Brasil",
-    "region": "América do Sul",
-    "market": "LATAM",
-    "items": [
+    "orderId": 76902,
+    "orderDate": "2018-01-27",
+    "referenceDate": "2018-02-06",
+    "status": "Em trânsito",
+    "shippingMode": "First Class",
+    "transportMode": "Aéreo expresso",
+    "routeType": "Internacional",
+    "origin": "San Jose, Califórnia, Estados Unidos",
+    "destination": "Jacarta, Jacarta, Indonésia",
+    "region": "Sudeste Asiático",
+    "market": "Pacific Asia",
+    "dispatch": {
+      "promisedDays": 1,
+      "expectedDate": "2018-01-28",
+      "actualDate": "2018-01-29",
+      "delayDays": 1,
+      "status": "Atrasado",
+      "probableCause": "Promessa irreal"
+    },
+    "delivery": {
+      "expectedDate": "2018-02-01",
+      "actualDate": null,
+      "delayDays": 5,
+      "probableCause": "Volume sem atualização de rastreio"
+    },
+    "explanation": "Despacho em 2 dia(s), 1 dia(s) além do prazo de despacho de 1 dia(s). O prazo de despacho da modalidade First Class é cumprido em apenas 0.0% dos pedidos. Pedido em transporte; o prazo de entrega foi ultrapassado em 5 dia(s).",
+    "currentStage": {
+      "number": 3,
+      "label": "Alfândega"
+    },
+    "currentLocation": "Alfândega Jacarta (Indonésia)",
+    "lostAtStage": null,
+    "events": [
       {
-        "productName": "Nike Men's Dri-FIT Victory Golf Polo",
-        "category": "Women's Apparel",
-        "quantity": 1,
-        "total": 37.5
+        "date": "2018-01-27",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
       },
       {
-        "productName": "Pelican Sunstream 100 Kayak",
-        "category": "Water Sports",
-        "quantity": 1,
-        "total": 163.99
+        "date": "2018-01-29",
+        "code": "PEDIDO_DESPACHADO",
+        "description": "Pedido despachado",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Pedido despachado pela expedição de origem"
       },
       {
-        "productName": "Bridgestone e6 Straight Distance NFL San Dieg",
-        "category": "Electronics",
-        "quantity": 3,
-        "total": 89.25
+        "date": "2018-01-29",
+        "code": "COLETA_GATEWAY",
+        "description": "Recebido no gateway de origem",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Gateway Los Angeles (EUA)"
       },
       {
-        "productName": "Perfect Fitness Perfect Rip Deck",
-        "category": "Cleats",
-        "quantity": 3,
-        "total": 151.17
+        "date": "2018-01-30",
+        "code": "PARTIDA_VOO",
+        "description": "Partida do voo",
+        "stage": 2,
+        "stageLabel": "Voo",
+        "location": "Em voo: Los Angeles -> Jacarta (Indonésia)"
       },
       {
-        "productName": "Field & Stream Sportsman 16 Gun Fire Safe",
-        "category": "Fishing",
-        "quantity": 1,
-        "total": 331.98
+        "date": "2018-01-31",
+        "code": "CHEGADA_ALFANDEGA",
+        "description": "Chegada à alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega Jacarta (Indonésia)"
       }
     ],
-    "total": 773.89,
-    "probableCause": null
+    "items": [
+      {
+        "productName": "Summer dresses",
+        "category": "Women's Clothing",
+        "quantity": 1,
+        "total": 194.24
+      }
+    ],
+    "total": 194.24,
+    "escalateToSupport": true
   },
   {
     "orderId": 375,
     "orderDate": "2015-01-06",
+    "referenceDate": "2018-02-06",
+    "status": "Entregue com atraso",
     "shippingMode": "Second Class",
-    "trackingStatus": "Em Trânsito",
-    "deadlineStatus": "Atrasado",
-    "delayDays": 4,
-    "delayWindow": "Atraso Crítico (3+ dias)",
-    "estimatedDeliveryDate": "2015-01-08",
-    "actualDeliveryDate": null,
+    "transportMode": "Aéreo consolidado",
+    "routeType": "Internacional",
     "origin": "San Benito, Texas, Estados Unidos",
     "destination": "Saltillo, Coahuila, México",
     "region": "América Central",
     "market": "LATAM",
+    "dispatch": {
+      "promisedDays": 2,
+      "expectedDate": "2015-01-08",
+      "actualDate": "2015-01-12",
+      "delayDays": 4,
+      "status": "Atrasado",
+      "probableCause": "Atraso operacional"
+    },
+    "delivery": {
+      "expectedDate": "2015-01-13",
+      "actualDate": "2015-01-17",
+      "delayDays": 4,
+      "probableCause": "Atraso no despacho não recuperado no transporte"
+    },
+    "explanation": "Despacho em 6 dia(s), 4 dia(s) além do prazo de despacho de 2 dia(s). Atraso operacional na expedição. O transporte seguiu o prazo padrão da rota e a entrega ficou 4 dia(s) atrasada.",
+    "currentStage": {
+      "number": 5,
+      "label": "Última milha"
+    },
+    "currentLocation": "Entregue em Saltillo - Coahuila (México)",
+    "lostAtStage": null,
+    "events": [
+      {
+        "date": "2015-01-06",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
+      },
+      {
+        "date": "2015-01-12",
+        "code": "PEDIDO_DESPACHADO",
+        "description": "Pedido despachado",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Pedido despachado pela expedição de origem"
+      },
+      {
+        "date": "2015-01-13",
+        "code": "COLETA_GATEWAY",
+        "description": "Recebido no gateway de origem",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Gateway Miami (EUA)"
+      },
+      {
+        "date": "2015-01-13",
+        "code": "PARTIDA_VOO",
+        "description": "Partida do voo",
+        "stage": 2,
+        "stageLabel": "Voo",
+        "location": "Em voo: Miami -> Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-14",
+        "code": "CHEGADA_ALFANDEGA",
+        "description": "Chegada à alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-15",
+        "code": "LIBERACAO_ALFANDEGA",
+        "description": "Liberado pela alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-16",
+        "code": "CHEGADA_CD",
+        "description": "Chegada ao centro de distribuição",
+        "stage": 4,
+        "stageLabel": "Transferência",
+        "location": "CD Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-16",
+        "code": "SAIU_PARA_ENTREGA",
+        "description": "Saiu para entrega",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Em rota de entrega - Saltillo (saída: CD Cidade do México (México))"
+      },
+      {
+        "date": "2015-01-17",
+        "code": "ENTREGUE",
+        "description": "Entregue",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Entregue em Saltillo - Coahuila (México)"
+      }
+    ],
     "items": [
       {
         "productName": "adidas Youth Germany Black/Red Away Match Soc",
@@ -77,309 +207,671 @@
       }
     ],
     "total": 91.34,
-    "probableCause": "Promessa irreal"
+    "escalateToSupport": true
   },
   {
-    "orderId": 562,
-    "orderDate": "2015-01-09",
-    "shippingMode": "Standard Class",
-    "trackingStatus": "Aguardando Liberação",
-    "deadlineStatus": "Não Avaliado",
-    "delayDays": null,
-    "delayWindow": "Não Avaliado (Aguardando Liberação)",
-    "estimatedDeliveryDate": "2015-01-13",
-    "actualDeliveryDate": null,
-    "origin": "Dallas, Texas, Estados Unidos",
-    "destination": "Belo Horizonte, Minas Gerais, Brasil",
-    "region": "América do Sul",
+    "orderId": 34,
+    "orderDate": "2015-01-01",
+    "referenceDate": "2018-02-06",
+    "status": "Extraviado",
+    "shippingMode": "First Class",
+    "transportMode": "Aéreo expresso",
+    "routeType": "Internacional",
+    "origin": "Los Angeles, Califórnia, Estados Unidos",
+    "destination": "Tegucigalpa, Francisco Morazán, Honduras",
+    "region": "América Central",
     "market": "LATAM",
-    "items": [
+    "dispatch": {
+      "promisedDays": 1,
+      "expectedDate": "2015-01-02",
+      "actualDate": "2015-01-03",
+      "delayDays": 1,
+      "status": "Atrasado",
+      "probableCause": "Promessa irreal"
+    },
+    "delivery": {
+      "expectedDate": "2015-01-05",
+      "actualDate": null,
+      "delayDays": null,
+      "probableCause": null
+    },
+    "explanation": "Despacho em 2 dia(s), 1 dia(s) além do prazo de despacho de 1 dia(s). O prazo de despacho da modalidade First Class é cumprido em apenas 0.0% dos pedidos. Volume extraviado na etapa 3 - Alfândega: Volume retido e não localizado na alfândega.",
+    "currentStage": {
+      "number": 3,
+      "label": "Alfândega"
+    },
+    "currentLocation": "Volume não localizado após: Alfândega Tegucigalpa (Honduras)",
+    "lostAtStage": {
+      "number": 3,
+      "label": "Alfândega"
+    },
+    "events": [
       {
-        "productName": "Nike Men's CJ Elite 2 TD Football Cleat",
-        "category": "Men's Footwear",
-        "quantity": 1,
-        "total": 109.19
+        "date": "2015-01-01",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
       },
       {
-        "productName": "Nike Men's Dri-FIT Victory Golf Polo",
-        "category": "Women's Apparel",
-        "quantity": 3,
-        "total": 144
+        "date": "2015-01-03",
+        "code": "PEDIDO_DESPACHADO",
+        "description": "Pedido despachado",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Pedido despachado pela expedição de origem"
       },
       {
-        "productName": "Field & Stream Sportsman 16 Gun Fire Safe",
-        "category": "Fishing",
-        "quantity": 1,
-        "total": 387.98
+        "date": "2015-01-03",
+        "code": "COLETA_GATEWAY",
+        "description": "Recebido no gateway de origem",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Gateway Miami (EUA)"
+      },
+      {
+        "date": "2015-01-04",
+        "code": "PARTIDA_VOO",
+        "description": "Partida do voo",
+        "stage": 2,
+        "stageLabel": "Voo",
+        "location": "Em voo: Miami -> Tegucigalpa (Honduras)"
+      },
+      {
+        "date": "2015-01-04",
+        "code": "CHEGADA_ALFANDEGA",
+        "description": "Chegada à alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega Tegucigalpa (Honduras)"
+      },
+      {
+        "date": "2015-01-11",
+        "code": "EXTRAVIO_CONFIRMADO",
+        "description": "Extravio confirmado: Volume retido e não localizado na alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Volume não localizado após: Alfândega Tegucigalpa (Honduras)"
       }
     ],
-    "total": 641.17,
-    "probableCause": null
-  },
-  {
-    "orderId": 1002,
-    "orderDate": "2015-01-15",
-    "shippingMode": "Second Class",
-    "trackingStatus": "Cancelado",
-    "deadlineStatus": "Cancelado",
-    "delayDays": null,
-    "delayWindow": "Envios Cancelados",
-    "estimatedDeliveryDate": "2015-01-17",
-    "actualDeliveryDate": null,
-    "origin": "Lynwood, Califórnia, Estados Unidos",
-    "destination": "San Lorenzo, Central, Paraguai",
-    "region": "América do Sul",
-    "market": "LATAM",
     "items": [
       {
         "productName": "Diamondback Women's Serene Classic Comfort Bi",
         "category": "Camping & Hiking",
         "quantity": 1,
-        "total": 287.98
-      },
-      {
-        "productName": "Pelican Sunstream 100 Kayak",
-        "category": "Water Sports",
-        "quantity": 1,
-        "total": 189.99
-      },
-      {
-        "productName": "Nike Men's Dri-FIT Victory Golf Polo",
-        "category": "Women's Apparel",
-        "quantity": 5,
-        "total": 200
-      },
-      {
-        "productName": "Under Armour Girls' Toddler Spine Surge Runni",
-        "category": "Shop By Sport",
-        "quantity": 5,
-        "total": 173.96
+        "total": 278.98
       }
     ],
-    "total": 851.93,
-    "probableCause": null
+    "total": 278.98,
+    "escalateToSupport": true
   },
   {
-    "orderId": 10453,
-    "orderDate": "2015-06-02",
-    "shippingMode": "Standard Class",
-    "trackingStatus": "Entregue",
-    "deadlineStatus": "No Prazo",
-    "delayDays": 0,
-    "delayWindow": "No Prazo (0 dias)",
-    "estimatedDeliveryDate": "2015-06-06",
-    "actualDeliveryDate": "2015-06-06",
-    "origin": "Marietta, Geórgia, Estados Unidos",
-    "destination": "London, Inglaterra, Reino Unido",
-    "region": "Norte da Europa",
-    "market": "Europe",
+    "orderId": 222,
+    "orderDate": "2015-01-04",
+    "referenceDate": "2018-02-06",
+    "status": "Entregue com atraso",
+    "shippingMode": "First Class",
+    "transportMode": "Aéreo expresso",
+    "routeType": "Internacional",
+    "origin": "Caguas, Porto Rico, Porto Rico",
+    "destination": "Toluca, Estado do México, México",
+    "region": "América Central",
+    "market": "LATAM",
+    "dispatch": {
+      "promisedDays": 1,
+      "expectedDate": "2015-01-05",
+      "actualDate": "2015-01-06",
+      "delayDays": 1,
+      "status": "Atrasado",
+      "probableCause": "Promessa irreal"
+    },
+    "delivery": {
+      "expectedDate": "2015-01-08",
+      "actualDate": "2015-01-09",
+      "delayDays": 1,
+      "probableCause": "Atraso no despacho não recuperado no transporte"
+    },
+    "explanation": "Despacho em 2 dia(s), 1 dia(s) além do prazo de despacho de 1 dia(s). O prazo de despacho da modalidade First Class é cumprido em apenas 0.0% dos pedidos. O transporte seguiu o prazo padrão da rota e a entrega ficou 1 dia(s) atrasada.",
+    "currentStage": {
+      "number": 5,
+      "label": "Última milha"
+    },
+    "currentLocation": "Entregue em Toluca - Estado do México (México)",
+    "lostAtStage": null,
+    "events": [
+      {
+        "date": "2015-01-04",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
+      },
+      {
+        "date": "2015-01-06",
+        "code": "PEDIDO_DESPACHADO",
+        "description": "Pedido despachado",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Pedido despachado pela expedição de origem"
+      },
+      {
+        "date": "2015-01-06",
+        "code": "COLETA_GATEWAY",
+        "description": "Recebido no gateway de origem",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Gateway San Juan (Porto Rico)"
+      },
+      {
+        "date": "2015-01-06",
+        "code": "PARTIDA_VOO",
+        "description": "Partida do voo",
+        "stage": 2,
+        "stageLabel": "Voo",
+        "location": "Em voo: San Juan -> Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-07",
+        "code": "CHEGADA_ALFANDEGA",
+        "description": "Chegada à alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-07",
+        "code": "LIBERACAO_ALFANDEGA",
+        "description": "Liberado pela alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-08",
+        "code": "CHEGADA_CD",
+        "description": "Chegada ao centro de distribuição",
+        "stage": 4,
+        "stageLabel": "Transferência",
+        "location": "CD Cidade do México (México)"
+      },
+      {
+        "date": "2015-01-08",
+        "code": "CHEGADA_ARMAZEM",
+        "description": "Chegada ao armazém regional",
+        "stage": 4,
+        "stageLabel": "Transferência",
+        "location": "Armazém Tlalnepantla - Estado do México (México)"
+      },
+      {
+        "date": "2015-01-08",
+        "code": "SAIU_PARA_ENTREGA",
+        "description": "Saiu para entrega",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Em rota de entrega - Toluca (saída: Armazém Tlalnepantla - Estado do México (México))"
+      },
+      {
+        "date": "2015-01-09",
+        "code": "ENTREGUE",
+        "description": "Entregue",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Entregue em Toluca - Estado do México (México)"
+      }
+    ],
     "items": [
       {
-        "productName": "Field & Stream Sportsman 16 Gun Fire Safe",
-        "category": "Fishing",
-        "quantity": 1,
-        "total": 335.98
+        "productName": "Nike Men's Free 5.0+ Running Shoe",
+        "category": "Cardio Equipment",
+        "quantity": 4,
+        "total": 331.97
+      },
+      {
+        "productName": "Perfect Fitness Perfect Rip Deck",
+        "category": "Cleats",
+        "quantity": 2,
+        "total": 113.98
       }
     ],
-    "total": 335.98,
-    "probableCause": null
+    "total": 445.95,
+    "escalateToSupport": false
   },
   {
-    "orderId": 20322,
-    "orderDate": "2015-10-24",
+    "orderId": 8,
+    "orderDate": "2015-01-01",
+    "referenceDate": "2018-02-06",
+    "status": "Entregue no prazo",
     "shippingMode": "Standard Class",
-    "trackingStatus": "Entregue",
-    "deadlineStatus": "Adiantado",
-    "delayDays": -1,
-    "delayWindow": "Adiantado (< 0 dias)",
-    "estimatedDeliveryDate": "2015-10-28",
-    "actualDeliveryDate": "2015-10-27",
+    "transportMode": "Aéreo consolidado",
+    "routeType": "Internacional",
     "origin": "Caguas, Porto Rico, Porto Rico",
-    "destination": "Las Pinas, Região da Capital Nacional, Filipinas",
-    "region": "Sudeste Asiático",
-    "market": "Pacific Asia",
+    "destination": "São Paulo, São Paulo, Brasil",
+    "region": "América do Sul",
+    "market": "LATAM",
+    "dispatch": {
+      "promisedDays": 4,
+      "expectedDate": "2015-01-05",
+      "actualDate": "2015-01-05",
+      "delayDays": 0,
+      "status": "No Prazo",
+      "probableCause": null
+    },
+    "delivery": {
+      "expectedDate": "2015-01-10",
+      "actualDate": "2015-01-10",
+      "delayDays": 0,
+      "probableCause": null
+    },
+    "explanation": "Despacho em 4 dia(s), dentro do prazo de despacho de 4 dia(s). Transporte dentro do prazo padrão da rota.",
+    "currentStage": {
+      "number": 5,
+      "label": "Última milha"
+    },
+    "currentLocation": "Entregue em São Paulo - São Paulo (Brasil)",
+    "lostAtStage": null,
+    "events": [
+      {
+        "date": "2015-01-01",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
+      },
+      {
+        "date": "2015-01-05",
+        "code": "PEDIDO_DESPACHADO",
+        "description": "Pedido despachado",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Pedido despachado pela expedição de origem"
+      },
+      {
+        "date": "2015-01-05",
+        "code": "COLETA_GATEWAY",
+        "description": "Recebido no gateway de origem",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Gateway San Juan (Porto Rico)"
+      },
+      {
+        "date": "2015-01-05",
+        "code": "PARTIDA_VOO",
+        "description": "Partida do voo",
+        "stage": 2,
+        "stageLabel": "Voo",
+        "location": "Em voo: San Juan -> São Paulo (Brasil)"
+      },
+      {
+        "date": "2015-01-06",
+        "code": "CHEGADA_ALFANDEGA",
+        "description": "Chegada à alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega São Paulo (Brasil)"
+      },
+      {
+        "date": "2015-01-07",
+        "code": "LIBERACAO_ALFANDEGA",
+        "description": "Liberado pela alfândega",
+        "stage": 3,
+        "stageLabel": "Alfândega",
+        "location": "Alfândega São Paulo (Brasil)"
+      },
+      {
+        "date": "2015-01-08",
+        "code": "CHEGADA_CD",
+        "description": "Chegada ao centro de distribuição",
+        "stage": 4,
+        "stageLabel": "Transferência",
+        "location": "CD São Paulo (Brasil)"
+      },
+      {
+        "date": "2015-01-09",
+        "code": "CHEGADA_ARMAZEM",
+        "description": "Chegada ao armazém regional",
+        "stage": 4,
+        "stageLabel": "Transferência",
+        "location": "Armazém São Paulo - São Paulo (Brasil)"
+      },
+      {
+        "date": "2015-01-09",
+        "code": "SAIU_PARA_ENTREGA",
+        "description": "Saiu para entrega",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Em rota de entrega - São Paulo (saída: Armazém São Paulo - São Paulo (Brasil))"
+      },
+      {
+        "date": "2015-01-10",
+        "code": "ENTREGUE",
+        "description": "Entregue",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Entregue em São Paulo - São Paulo (Brasil)"
+      }
+    ],
     "items": [
       {
         "productName": "Perfect Fitness Perfect Rip Deck",
         "category": "Cleats",
-        "quantity": 1,
-        "total": 49.79
-      },
-      {
-        "productName": "O'Brien Men's Neoprene Life Vest",
-        "category": "Indoor/Outdoor Games",
-        "quantity": 2,
-        "total": 74.97
-      }
-    ],
-    "total": 124.76,
-    "probableCause": null
-  },
-  {
-    "orderId": 31398,
-    "orderDate": "2016-04-03",
-    "shippingMode": "Standard Class",
-    "trackingStatus": "Em Trânsito",
-    "deadlineStatus": "No Prazo",
-    "delayDays": 0,
-    "delayWindow": "No Prazo (0 dias)",
-    "estimatedDeliveryDate": "2016-04-07",
-    "actualDeliveryDate": null,
-    "origin": "Atlanta, Geórgia, Estados Unidos",
-    "destination": "Chicago, Illinois, Estados Unidos",
-    "region": "Centro dos EUA",
-    "market": "USCA",
-    "items": [
-      {
-        "productName": "Under Armour Women's Ignite Slide",
-        "category": "Electronics",
-        "quantity": 2,
-        "total": 63.34
-      },
-      {
-        "productName": "Nike Men's Free 5.0+ Running Shoe",
-        "category": "Cardio Equipment",
-        "quantity": 2,
-        "total": 191.98
-      },
-      {
-        "productName": "O'Brien Men's Neoprene Life Vest",
-        "category": "Indoor/Outdoor Games",
-        "quantity": 5,
-        "total": 207.42
-      },
-      {
-        "productName": "Nike Men's Free 5.0+ Running Shoe",
-        "category": "Cardio Equipment",
         "quantity": 3,
-        "total": 290.97
+        "total": 149.38
+      },
+      {
+        "productName": "Perfect Fitness Perfect Rip Deck",
+        "category": "Cleats",
+        "quantity": 5,
+        "total": 224.96
+      },
+      {
+        "productName": "O'Brien Men's Neoprene Life Vest",
+        "category": "Indoor/Outdoor Games",
+        "quantity": 4,
+        "total": 163.93
+      },
+      {
+        "productName": "Nike Men's Dri-FIT Victory Golf Polo",
+        "category": "Women's Apparel",
+        "quantity": 1,
+        "total": 49.5
       }
     ],
-    "total": 753.71,
-    "probableCause": null
+    "total": 587.77,
+    "escalateToSupport": false
   },
   {
-    "orderId": 225,
-    "orderDate": "2015-01-04",
-    "shippingMode": "First Class",
-    "trackingStatus": "Entregue",
-    "deadlineStatus": "Atrasado",
-    "delayDays": 1,
-    "delayWindow": "Atraso Leve (1 a 2 dias)",
-    "estimatedDeliveryDate": "2015-01-05",
-    "actualDeliveryDate": "2015-01-06",
-    "origin": "Webster, Nova York, Estados Unidos",
-    "destination": "Toluca, Estado do México, México",
-    "region": "América Central",
+    "orderId": 9,
+    "orderDate": "2015-01-01",
+    "referenceDate": "2018-02-06",
+    "status": "Não pago (expirado)",
+    "shippingMode": "Standard Class",
+    "transportMode": null,
+    "routeType": "Internacional",
+    "origin": "Lakewood, Ohio, Estados Unidos",
+    "destination": "São Paulo, São Paulo, Brasil",
+    "region": "América do Sul",
     "market": "LATAM",
+    "dispatch": {
+      "promisedDays": 4,
+      "expectedDate": null,
+      "actualDate": null,
+      "delayDays": null,
+      "status": "Não Avaliado",
+      "probableCause": null
+    },
+    "delivery": {
+      "expectedDate": null,
+      "actualDate": null,
+      "delayDays": null,
+      "probableCause": null
+    },
+    "explanation": null,
+    "currentStage": null,
+    "currentLocation": null,
+    "lostAtStage": null,
+    "events": [
+      {
+        "date": "2015-01-01",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
+      }
+    ],
     "items": [
+      {
+        "productName": "Nike Men's Free 5.0+ Running Shoe",
+        "category": "Cardio Equipment",
+        "quantity": 2,
+        "total": 189.98
+      },
       {
         "productName": "Pelican Sunstream 100 Kayak",
         "category": "Water Sports",
         "quantity": 1,
-        "total": 167.99
+        "total": 197.99
       },
+      {
+        "productName": "Pelican Sunstream 100 Kayak",
+        "category": "Water Sports",
+        "quantity": 1,
+        "total": 199.99
+      }
+    ],
+    "total": 587.96,
+    "escalateToSupport": false
+  },
+  {
+    "orderId": 50,
+    "orderDate": "2015-01-01",
+    "referenceDate": "2018-02-06",
+    "status": "Cancelado",
+    "shippingMode": "Standard Class",
+    "transportMode": null,
+    "routeType": "Internacional",
+    "origin": "Peabody, Massachusetts, Estados Unidos",
+    "destination": "Medellín, Antioquia, Colômbia",
+    "region": "América do Sul",
+    "market": "LATAM",
+    "dispatch": {
+      "promisedDays": 4,
+      "expectedDate": null,
+      "actualDate": null,
+      "delayDays": null,
+      "status": "Cancelado",
+      "probableCause": null
+    },
+    "delivery": {
+      "expectedDate": null,
+      "actualDate": null,
+      "delayDays": null,
+      "probableCause": null
+    },
+    "explanation": null,
+    "currentStage": null,
+    "currentLocation": null,
+    "lostAtStage": null,
+    "events": [
+      {
+        "date": "2015-01-01",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
+      }
+    ],
+    "items": [
+      {
+        "productName": "Nike Men's CJ Elite 2 TD Football Cleat",
+        "category": "Men's Footwear",
+        "quantity": 1,
+        "total": 129.99
+      },
+      {
+        "productName": "Diamondback Women's Serene Classic Comfort Bi",
+        "category": "Camping & Hiking",
+        "quantity": 1,
+        "total": 290.98
+      }
+    ],
+    "total": 420.97,
+    "escalateToSupport": false
+  },
+  {
+    "orderId": 31298,
+    "orderDate": "2016-04-01",
+    "referenceDate": "2018-02-06",
+    "status": "Entregue no prazo",
+    "shippingMode": "Second Class",
+    "transportMode": "Rodoviário",
+    "routeType": "Doméstica",
+    "origin": "Paramount, Califórnia, Estados Unidos",
+    "destination": "Henderson, Kentucky, Estados Unidos",
+    "region": "Sul dos EUA",
+    "market": "USCA",
+    "dispatch": {
+      "promisedDays": 2,
+      "expectedDate": "2016-04-03",
+      "actualDate": "2016-04-05",
+      "delayDays": 2,
+      "status": "Atrasado",
+      "probableCause": "Atraso operacional"
+    },
+    "delivery": {
+      "expectedDate": "2016-04-06",
+      "actualDate": "2016-04-06",
+      "delayDays": 0,
+      "probableCause": null
+    },
+    "explanation": "Despacho em 4 dia(s), 2 dia(s) além do prazo de despacho de 2 dia(s). Atraso operacional na expedição. O transporte recuperou o atraso (2 dia(s) mais rápido que o padrão) e a entrega ocorreu no prazo.",
+    "currentStage": {
+      "number": 5,
+      "label": "Última milha"
+    },
+    "currentLocation": "Entregue em Henderson - Kentucky (Estados Unidos)",
+    "lostAtStage": null,
+    "events": [
+      {
+        "date": "2016-04-01",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
+      },
+      {
+        "date": "2016-04-05",
+        "code": "PEDIDO_DESPACHADO",
+        "description": "Pedido despachado",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Pedido despachado pela expedição de origem"
+      },
+      {
+        "date": "2016-04-06",
+        "code": "COLETA_GATEWAY",
+        "description": "Recebido no gateway de origem",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Hub de Coleta Memphis (EUA)"
+      },
+      {
+        "date": "2016-04-06",
+        "code": "CHEGADA_CD",
+        "description": "Chegada ao centro de distribuição",
+        "stage": 4,
+        "stageLabel": "Transferência",
+        "location": "CD Nova York (Estados Unidos)"
+      },
+      {
+        "date": "2016-04-06",
+        "code": "SAIU_PARA_ENTREGA",
+        "description": "Saiu para entrega",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Em rota de entrega - Henderson (saída: CD Nova York (Estados Unidos))"
+      },
+      {
+        "date": "2016-04-06",
+        "code": "ENTREGUE",
+        "description": "Entregue",
+        "stage": 5,
+        "stageLabel": "Última milha",
+        "location": "Entregue em Henderson - Kentucky (Estados Unidos)"
+      }
+    ],
+    "items": [
       {
         "productName": "Pelican Sunstream 100 Kayak",
         "category": "Water Sports",
         "quantity": 1,
         "total": 169.99
-      },
-      {
-        "productName": "Nike Men's CJ Elite 2 TD Football Cleat",
-        "category": "Men's Footwear",
-        "quantity": 1,
-        "total": 123.49
       }
     ],
-    "total": 461.47,
-    "probableCause": null
+    "total": 169.99,
+    "escalateToSupport": false
   },
   {
-    "orderId": 41906,
-    "orderDate": "2016-09-03",
-    "shippingMode": "Same Day",
-    "trackingStatus": "Entregue",
-    "deadlineStatus": "Atrasado",
-    "delayDays": 1,
-    "delayWindow": "Atraso Leve (1 a 2 dias)",
-    "estimatedDeliveryDate": "2016-09-03",
-    "actualDeliveryDate": "2016-09-04",
-    "origin": "Porterville, Califórnia, Estados Unidos",
-    "destination": "Bur Sudan, Mar Vermelho, Sudão",
-    "region": "Norte da África",
-    "market": "Africa",
-    "items": [
-      {
-        "productName": "O'Brien Men's Neoprene Life Vest",
-        "category": "Indoor/Outdoor Games",
-        "quantity": 4,
-        "total": 167.93
-      },
-      {
-        "productName": "Field & Stream Sportsman 16 Gun Fire Safe",
-        "category": "Fishing",
-        "quantity": 1,
-        "total": 363.98
-      }
-    ],
-    "total": 531.91,
-    "probableCause": null
-  },
-  {
-    "orderId": 16,
-    "orderDate": "2015-01-01",
+    "orderId": 76385,
+    "orderDate": "2018-01-20",
+    "referenceDate": "2018-02-06",
+    "status": "Em trânsito",
     "shippingMode": "Standard Class",
-    "trackingStatus": "Aguardando Liberação",
-    "deadlineStatus": "Não Avaliado",
-    "delayDays": null,
-    "delayWindow": "Não Avaliado (Aguardando Liberação)",
-    "estimatedDeliveryDate": "2015-01-05",
-    "actualDeliveryDate": null,
-    "origin": "Caguas, Porto Rico, Porto Rico",
-    "destination": "Brasília, Distrito Federal, Brasil",
-    "region": "América do Sul",
-    "market": "LATAM",
-    "items": [
+    "transportMode": "Aéreo consolidado",
+    "routeType": "Internacional",
+    "origin": "Richmond, Texas, Estados Unidos",
+    "destination": "Brisbane, Queensland, Austrália",
+    "region": "Oceania",
+    "market": "Pacific Asia",
+    "dispatch": {
+      "promisedDays": 4,
+      "expectedDate": "2018-01-24",
+      "actualDate": "2018-01-26",
+      "delayDays": 2,
+      "status": "Atrasado",
+      "probableCause": "Atraso operacional"
+    },
+    "delivery": {
+      "expectedDate": "2018-01-31",
+      "actualDate": null,
+      "delayDays": 6,
+      "probableCause": "Volume sem atualização de rastreio"
+    },
+    "explanation": "Despacho em 6 dia(s), 2 dia(s) além do prazo de despacho de 4 dia(s). Atraso operacional na expedição. Pedido em transporte; o prazo de entrega foi ultrapassado em 6 dia(s).",
+    "currentStage": {
+      "number": 2,
+      "label": "Voo"
+    },
+    "currentLocation": "Em voo: Los Angeles -> Sydney (Austrália)",
+    "lostAtStage": null,
+    "events": [
       {
-        "productName": "Perfect Fitness Perfect Rip Deck",
-        "category": "Cleats",
-        "quantity": 2,
-        "total": 111.58
+        "date": "2018-01-20",
+        "code": "PEDIDO_CRIADO",
+        "description": "Pedido registrado",
+        "stage": 0,
+        "stageLabel": "Pedido",
+        "location": "Pedido registrado no sistema"
       },
       {
-        "productName": "Perfect Fitness Perfect Rip Deck",
-        "category": "Cleats",
-        "quantity": 5,
-        "total": 239.96
+        "date": "2018-01-26",
+        "code": "PEDIDO_DESPACHADO",
+        "description": "Pedido despachado",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Pedido despachado pela expedição de origem"
+      },
+      {
+        "date": "2018-01-26",
+        "code": "COLETA_GATEWAY",
+        "description": "Recebido no gateway de origem",
+        "stage": 1,
+        "stageLabel": "Coleta",
+        "location": "Gateway Los Angeles (EUA)"
+      },
+      {
+        "date": "2018-01-27",
+        "code": "PARTIDA_VOO",
+        "description": "Partida do voo",
+        "stage": 2,
+        "stageLabel": "Voo",
+        "location": "Em voo: Los Angeles -> Sydney (Austrália)"
       }
     ],
-    "total": 351.54,
-    "probableCause": null
-  },
-  {
-    "orderId": 552,
-    "orderDate": "2015-01-09",
-    "shippingMode": "Standard Class",
-    "trackingStatus": "Cancelado",
-    "deadlineStatus": "Cancelado",
-    "delayDays": null,
-    "delayWindow": "Envios Cancelados",
-    "estimatedDeliveryDate": "2015-01-13",
-    "actualDeliveryDate": null,
-    "origin": "San Diego, Califórnia, Estados Unidos",
-    "destination": "Mexico City, Distrito Federal, México",
-    "region": "América Central",
-    "market": "LATAM",
     "items": [
       {
-        "productName": "O'Brien Men's Neoprene Life Vest",
-        "category": "Indoor/Outdoor Games",
+        "productName": "Fighting video games",
+        "category": "Video Games",
         "quantity": 1,
-        "total": 41.98
+        "total": 29.81
       }
     ],
-    "total": 41.98,
-    "probableCause": null
+    "total": 29.81,
+    "escalateToSupport": true
   }
 ]

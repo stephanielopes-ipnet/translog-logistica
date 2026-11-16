@@ -12,13 +12,17 @@ import { buildServer } from "./server.ts";
 // Regra fixa do portal: nenhuma resposta traz dado do cliente, de pagamento ou financeiro
 // interno. Estes testes varrem todas as chaves (em qualquer nível) de todas as respostas.
 
-/** Palavras de dados proibidos que não podem aparecer no texto das respostas do chat. */
+/**
+ * Palavras de dados proibidos que não podem aparecer no texto das respostas do chat.
+ * "pagamento" sozinho é permitido: as situações "Aguardando pagamento" e "Não pago (expirado)"
+ * são dados do pedido. Proibido é o tipo/forma de pagamento.
+ */
 const FORBIDDEN_TEXT =
-  /cliente|customer|segment|pagamento|payment|lucro|profit|margem|margin|desconto|discount|latitude|longitude/i;
+  /cliente|customer|segment|tipo de pagamento|forma de pagamento|payment|lucro|profit|margem|margin|desconto|discount|preço unitário|unit price|valor bruto|latitude|longitude/i;
 
-/** Colunas proibidas da Silver e equivalentes que poderiam aparecer em inglês. */
+/** Colunas proibidas (antigas e das tabelas consumo_*) e equivalentes em inglês. */
 const FORBIDDEN_KEY =
-  /cliente|customer|client|segment|pagamento|payment|lucro|profit|margem|margin|desconto|discount|latitude|longitude|^lat$|^lng$|^lon$|resumo/i;
+  /cliente|customer|client|segment|pagamento|payment|lucro|profit|margem|margin|desconto|discount|preco|price|bruto|gross|id_produto|productId|latitude|longitude|^lat$|^lng$|^lon$|resumo/i;
 
 /** Todas as chaves de objetos em qualquer nível de `value` que casam com `FORBIDDEN_KEY`. */
 function forbiddenKeys(value: unknown): string[] {
@@ -36,8 +40,9 @@ function forbiddenKeys(value: unknown): string[] {
 
 const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
 
-/** Amostra da Silver com colunas proibidas preenchidas com valores fictícios. */
-const SAMPLE_CSV = fileURLToPath(new URL("./orders/fixtures/silver-amostra.csv", import.meta.url));
+/** Amostra das tabelas consumo_* com as colunas proibidas preenchidas com valores fictícios. */
+const SAMPLE_DIR = fileURLToPath(new URL("./orders/fixtures/consumo/", import.meta.url));
+const ALL_IDS = fixtures.map((order) => order.orderId);
 
 async function buildTestServer(env: NodeJS.ProcessEnv, overrides?: ContainerOverrides) {
   const app = await buildServer(loadConfig(env), { logger: false, overrides });
@@ -102,8 +107,8 @@ describe("varredura de chaves proibidas", () => {
     { source: "fixtures", env: {}, orderIds: fixtures.map((order) => order.orderId) },
     {
       source: "file",
-      env: { DATA_SOURCE: "file", ORDERS_FILE: SAMPLE_CSV },
-      orderIds: [15, 375, 552, 562, 1002],
+      env: { DATA_SOURCE: "file", DATA_DIR: SAMPLE_DIR },
+      orderIds: ALL_IDS,
     },
   ])("nenhuma resposta tem chave proibida (fonte $source)", async ({ env, orderIds }) => {
     const app = await buildTestServer(env);
@@ -115,27 +120,29 @@ describe("varredura de chaves proibidas", () => {
     }
   });
 
-  it("nenhuma resposta traz valores das colunas proibidas ou sem uso da Silver", async () => {
+  it("nenhuma resposta traz valores das colunas proibidas ou sem uso das tabelas", async () => {
     // Na amostra, essas colunas têm valores FICTICIO-* e SEM-USO.
-    const app = await buildTestServer({ DATA_SOURCE: "file", ORDERS_FILE: SAMPLE_CSV });
+    const app = await buildTestServer({ DATA_SOURCE: "file", DATA_DIR: SAMPLE_DIR });
 
-    const bodies = await responseBodies(app, allUrls([15, 375, 552, 562, 1002]));
+    const bodies = await responseBodies(app, allUrls(ALL_IDS));
 
-    expect(bodies.map(({ body }) => body).filter((body) => body.orderId)).toHaveLength(5);
+    expect(bodies.map(({ body }) => body).filter((body) => body.orderId)).toHaveLength(9);
     for (const { url, body } of bodies) {
       expect(JSON.stringify(body), url).not.toMatch(/FICTICIO|SEM-USO/);
     }
   });
 
   it("campos fora do contrato são descartados na resposta, mesmo se a fonte os trouxer", async () => {
-    const leak = { id_cliente: 123, segmento_cliente: "Consumer", lucro_total_pedido: 99.9 };
+    const leak = { id_cliente: 123, segmento_cliente: "Consumer", valor_desconto: 99.9 };
     const leakyRepository: ContainerOverrides["orderRepository"] = {
       async findById(orderId) {
         const order = fixtures.find((candidate) => candidate.orderId === orderId);
         if (!order) {
           return null;
         }
-        const items = order.items.map((item) => Object.assign({}, item, { lucro_item: 1.5 }));
+        const items = order.items.map((item) =>
+          Object.assign({}, item, { preco_unitario: 1.5, id_produto: 565 }),
+        );
         const leaky: Order = Object.assign({}, order, leak, { items });
         return leaky;
       },
@@ -143,7 +150,7 @@ describe("varredura de chaves proibidas", () => {
     };
     const app = await buildTestServer({}, { orderRepository: leakyRepository });
 
-    const response = await app.inject({ method: "GET", url: "/api/orders/15" });
+    const response = await app.inject({ method: "GET", url: "/api/orders/76902" });
 
     expect(response.statusCode).toBe(200);
     expect(forbiddenKeys(response.json())).toEqual([]);
@@ -156,8 +163,8 @@ describe("privacidade no chat (assistente simulado)", () => {
     { source: "fixtures", env: {}, orderIds: fixtures.map((order) => order.orderId) },
     {
       source: "file",
-      env: { DATA_SOURCE: "file", ORDERS_FILE: SAMPLE_CSV },
-      orderIds: [15, 375, 552, 562, 1002],
+      env: { DATA_SOURCE: "file", DATA_DIR: SAMPLE_DIR },
+      orderIds: ALL_IDS,
     },
   ])(
     "nenhuma resposta do chat tem chave, valor ou texto proibido (fonte $source)",
@@ -186,7 +193,7 @@ describe("privacidade no chat (assistente simulado)", () => {
         const leaky: Order = Object.assign({}, order, {
           id_cliente: 987654,
           segmento_cliente: "Consumer",
-          lucro_total_pedido: 31.415,
+          valor_bruto_venda: 31.415,
         });
         return leaky;
       },
@@ -194,7 +201,7 @@ describe("privacidade no chat (assistente simulado)", () => {
     };
     const app = await buildTestServer({}, { orderRepository: leakyRepository });
 
-    const bodies = await chatBodies(app, chatPayloads([15, 375, 562, 1002]));
+    const bodies = await chatBodies(app, chatPayloads(ALL_IDS));
 
     for (const { payload, body } of bodies) {
       expect(JSON.stringify(body), JSON.stringify(payload)).not.toMatch(/987654|Consumer|31\.415/);

@@ -21,30 +21,30 @@ function ask(message: string, order: Order | null = null) {
   return agent.reply({ sessionId: SESSION, message, order });
 }
 
-describe("mock-agent: pedido 375 (demo)", () => {
-  it("'por que atrasou' explica o motivo provável sem afirmar a causa", async () => {
-    const reply = await ask("Por que meu pedido atrasou?", await fixture(375));
+describe("mock-agent: pedido 76902 (demo)", () => {
+  it("'por que atrasou' traz o motivo provável de cada etapa e o aviso da central", async () => {
+    const reply = await ask("Por que meu pedido atrasou?", await fixture(76902));
 
     expect(reply).toBe(
-      "O motivo provável do atraso do pedido **#375** é **Promessa irreal**: o prazo de 2 dias da " +
-        "modalidade Second Class provavelmente foi curto para a rota internacional " +
-        "Texas → Saltillo (México).",
+      "Motivo provável do atraso do pedido **#76902**: no despacho, **Promessa irreal**; na " +
+        "entrega, **Volume sem atualização de rastreio**. Este caso deve ser tratado pela " +
+        "central de atendimento (segunda a sexta, das 9h às 18h).",
     );
   });
 
-  it("'quando chega' informa a previsão e os dias de atraso", async () => {
-    const reply = await ask("Quando meu pedido chega?", await fixture(375));
+  it("'quando chega' informa a previsão, os dias de atraso e onde está", async () => {
+    const reply = await ask("Quando meu pedido chega?", await fixture(76902));
 
     expect(reply).toBe(
-      "O pedido **#375** está **Em Trânsito**. A entrega estava prevista para **08/01/2015** e " +
-        "acumula **4 dias de atraso**.",
+      "O pedido **#76902** está **Em trânsito**. A entrega estava prevista para **01/02/2018** e " +
+        "acumula **5 dias de atraso**. Agora: **Alfândega Jacarta (Indonésia)**.",
     );
   });
 
   it("o botão 'Perguntar ao assistente' da tela é respondido com o motivo provável", async () => {
-    const reply = await ask("Por que o pedido #375 atrasou?", await fixture(375));
+    const reply = await ask("Por que o pedido #76902 atrasou?", await fixture(76902));
 
-    expect(reply).toMatch(/^O motivo provável do atraso do pedido \*\*#375\*\*/);
+    expect(reply).toMatch(/^Motivo provável do atraso do pedido \*\*#76902\*\*/);
   });
 });
 
@@ -77,52 +77,61 @@ describe("mock-agent: regras gerais", () => {
   });
 
   it("pedido citado existente é consultado na fonte, mesmo sem contexto", async () => {
-    const reply = await ask("Qual o status do pedido 15?");
+    const reply = await ask("Qual o status do pedido 8?");
 
-    expect(reply).toContain("**#15**");
-    expect(reply).toContain("**Entregue**");
+    expect(reply).toContain("**#8**");
+    expect(reply).toContain("**Entregue no prazo**");
   });
 
   it("só o número do pedido: responde a situação", async () => {
-    expect(await ask("#562")).toBe(
-      "O pedido **#562** está **Aguardando Liberação**. Depois de liberado, a entrega está " +
-        "prevista para **13/01/2015**.",
+    expect(await ask("#9")).toBe(
+      "O pedido **#9** está como **Não pago (expirado)** e não foi despachado.",
     );
   });
 
   it("ignora acentos e maiúsculas", async () => {
-    expect(await ask("QUANDO CHEGA?", await fixture(375))).toContain("**Em Trânsito**");
-    expect(await ask("situação", await fixture(1002))).toContain("**Cancelado**");
+    expect(await ask("QUANDO CHEGA?", await fixture(76902))).toContain("**Em trânsito**");
+    expect(await ask("situação", await fixture(50))).toContain("**Cancelado**");
   });
 });
 
 describe("mock-agent: situações", () => {
   it.each([
     {
-      orderId: 15,
-      when: "O pedido **#15** foi **Entregue** em **07/01/2015**, 2 dias após a data prevista (05/01/2015).",
-      why: "O pedido **#15** foi entregue com **2 dias de atraso**, mas não há um motivo provável específico registrado na base para esta remessa.",
+      orderId: 375,
+      when: "O pedido **#375** foi **Entregue com atraso** em **17/01/2015**, 4 dias após a data prevista (13/01/2015).",
+      why:
+        "Motivo provável do atraso do pedido **#375**: no despacho, **Atraso operacional**; na " +
+        "entrega, **Atraso no despacho não recuperado no transporte**. Este caso deve ser " +
+        "tratado pela central de atendimento (segunda a sexta, das 9h às 18h).",
     },
     {
-      orderId: 20322,
-      when: "O pedido **#20322** foi **Entregue** em **27/10/2015**, 1 dia antes da data prevista.",
+      orderId: 222,
+      why:
+        "Motivo provável do atraso do pedido **#222**: no despacho, **Promessa irreal**; na " +
+        "entrega, **Atraso no despacho não recuperado no transporte**.",
     },
     {
-      orderId: 10453,
-      when: "O pedido **#10453** foi **Entregue** em **06/06/2015**, dentro do prazo previsto.",
+      orderId: 34,
+      when: "O volume do pedido **#34** foi **Extraviado** na etapa **Alfândega**.",
     },
     {
-      orderId: 31398,
-      when: "O pedido **#31398** está **Em Trânsito**, dentro do prazo, com entrega prevista para **07/04/2016**.",
+      orderId: 8,
+      when: "O pedido **#8** foi **Entregue no prazo** em **10/01/2015**.",
+      why: "O pedido **#8** não apresenta atraso. O pedido **#8** foi **Entregue no prazo** em **10/01/2015**.",
     },
     {
-      orderId: 562,
-      why: "O pedido **#562** não está atrasado no transporte. Ele está **Aguardando Liberação** com previsão para **13/01/2015**.",
+      orderId: 76385,
+      when: "O pedido **#76385** está **Em trânsito**. A entrega estava prevista para **31/01/2018** e acumula **6 dias de atraso**. Agora: **Em voo: Los Angeles -> Sydney (Austrália)**.",
     },
     {
-      orderId: 1002,
-      when: "O pedido **#1002** foi **Cancelado** e não será enviado.",
-      why: "O pedido **#1002** foi **Cancelado**, portanto não há atraso de transporte a analisar.",
+      orderId: 9,
+      why: "O pedido **#9** está como **Não pago (expirado)**, portanto não há atraso de transporte a analisar.",
+    },
+    {
+      orderId: 50,
+      when: "O pedido **#50** foi **Cancelado** e não será enviado.",
+      why: "O pedido **#50** está como **Cancelado**, portanto não há atraso de transporte a analisar.",
     },
   ])("pedido $orderId", async ({ orderId, when, why }) => {
     const order = await fixture(orderId);
@@ -134,47 +143,33 @@ describe("mock-agent: situações", () => {
     }
   });
 
-  it("pedido sem atraso: diz que não há atraso e repete a previsão", async () => {
-    expect(await ask("Por que atrasou?", await fixture(31398))).toBe(
-      "O pedido **#31398** não apresenta atraso. O pedido **#31398** está **Em Trânsito**, " +
-        "dentro do prazo, com entrega prevista para **07/04/2016**.",
+  it("extravio: explica e encaminha à central", async () => {
+    expect(await ask("Por que atrasou?", await fixture(34))).toBe(
+      "O volume do pedido **#34** foi **Extraviado** na etapa **Alfândega**. Motivo provável " +
+        "do atraso: no despacho, **Promessa irreal**. Este caso deve ser tratado pela central " +
+        "de atendimento (segunda a sexta, das 9h às 18h).",
     );
   });
 
-  it("'Promessa irreal' em rota nacional e em Same Day", async () => {
-    const domestic = { ...(await fixture(31398)), probableCause: "Promessa irreal" };
-    const sameDay = { ...(await fixture(41906)), probableCause: "Promessa irreal" };
+  it("entregue adiantado: diz quantos dias antes", async () => {
+    const early = await fixture(8);
+    const order: Order = { ...early, delivery: { ...early.delivery, delayDays: -2 } };
 
-    expect(await ask("Por que atrasou?", domestic)).toContain(
-      "o prazo de 4 dias da modalidade Standard Class provavelmente foi curto para a rota " +
-        "Geórgia → Chicago (Estados Unidos).",
-    );
-    expect(await ask("Por que atrasou?", sameDay)).toContain(
-      "o envio no mesmo dia (Same Day) provavelmente tinha prazo curto demais para a rota " +
-        "internacional Califórnia → Bur Sudan (Sudão).",
+    expect(await ask("Quando chega?", order)).toBe(
+      "O pedido **#8** foi **Entregue no prazo** em **10/01/2015**, 2 dias antes da data prevista.",
     );
   });
 
-  it("outro motivo provável aparece sem detalhe inventado", async () => {
-    const order = { ...(await fixture(15)), probableCause: "Clima" };
-
-    expect(await ask("Por que atrasou?", order)).toBe(
-      "O motivo provável do atraso do pedido **#15** é **Clima**.",
-    );
-  });
-
-  it("nenhuma resposta apresenta a causa como comprovada nem fala em pagamento", async () => {
-    const all = await Promise.all(
-      [15, 375, 562, 1002, 10453, 20322, 31398, 225, 41906, 16, 552].map(fixture),
-    );
+  it("nenhuma resposta apresenta a causa como comprovada nem fala em tipo de pagamento", async () => {
+    const all = await Promise.all([76902, 375, 34, 222, 8, 9, 50, 31298, 76385].map(fixture));
     const replies = await Promise.all(
       all.flatMap((order) => [ask("Quando chega?", order), ask("Por que atrasou?", order)]),
     );
 
     for (const reply of replies) {
-      expect(reply).not.toMatch(/comprovad|com certeza|causa do atraso|pagamento/i);
+      expect(reply).not.toMatch(/comprovad|com certeza|causa do atraso|tipo de pagamento/i);
       if (/motivo/i.test(reply)) {
-        expect(reply).toMatch(/motivo provável/);
+        expect(reply).toMatch(/[Mm]otivo provável/);
       }
     }
   });

@@ -5,8 +5,8 @@ import { loadConfig } from "./config.ts";
 const defaults = {
   apiPort: 3333,
   dataSource: "fixtures",
-  ordersFile: undefined,
-  sampleOrderIds: [15, 375, 562, 1002],
+  dataDir: join(import.meta.dirname, "..", "..", "dados"),
+  sampleOrderIds: [76902, 375, 34, 8],
   agent: "mock",
   agentUrl: undefined,
   agentAppName: "translog_agent",
@@ -33,7 +33,7 @@ describe("loadConfig", () => {
     const config = loadConfig({
       API_PORT: "",
       DATA_SOURCE: "",
-      ORDERS_FILE: "",
+      DATA_DIR: "",
       SAMPLE_ORDER_IDS: "",
       AGENT: "",
       AGENT_URL: "",
@@ -49,8 +49,8 @@ describe("loadConfig", () => {
     const config = loadConfig({
       API_PORT: "4000",
       DATA_SOURCE: "file",
-      ORDERS_FILE: "/data/silver_pedidos_rastreio.csv",
-      SAMPLE_ORDER_IDS: "1002,15",
+      DATA_DIR: "/data",
+      SAMPLE_ORDER_IDS: "34,375",
       AGENT: "adk",
       AGENT_URL: "http://agent:8001",
       AGENT_APP_NAME: "outro_agente",
@@ -61,8 +61,8 @@ describe("loadConfig", () => {
     expect(config).toStrictEqual({
       apiPort: 4000,
       dataSource: "file",
-      ordersFile: "/data/silver_pedidos_rastreio.csv",
-      sampleOrderIds: [1002, 15],
+      dataDir: "/data",
+      sampleOrderIds: [34, 375],
       agent: "adk",
       agentUrl: "http://agent:8001",
       agentAppName: "outro_agente",
@@ -71,16 +71,16 @@ describe("loadConfig", () => {
     });
   });
 
-  it("resolve ORDERS_FILE relativo a partir da pasta portal/", () => {
-    const { ordersFile } = loadConfig({ ORDERS_FILE: "dados/silver.csv" });
+  it("resolve DATA_DIR relativo a partir da pasta portal/", () => {
+    const { dataDir } = loadConfig({ DATA_DIR: "dados/copia" });
 
-    expect(ordersFile && isAbsolute(ordersFile)).toBe(true);
-    expect(ordersFile).toBe(join(import.meta.dirname, "..", "..", "dados", "silver.csv"));
+    expect(isAbsolute(dataDir)).toBe(true);
+    expect(dataDir).toBe(join(import.meta.dirname, "..", "..", "dados", "copia"));
   });
 
   it("lê SAMPLE_ORDER_IDS com espaços, na ordem dada e sem repetir", () => {
-    expect(loadConfig({ SAMPLE_ORDER_IDS: " 562 , 15,562, 9999999999 " }).sampleOrderIds).toEqual([
-      562, 15, 9999999999,
+    expect(loadConfig({ SAMPLE_ORDER_IDS: " 34 , 8,34, 9999999999 " }).sampleOrderIds).toEqual([
+      34, 8, 9999999999,
     ]);
   });
 
@@ -153,15 +153,14 @@ describe("loadConfig", () => {
     expect(loadConfig({ AGENT_URL: "http://127.0.0.1:8001" }).agent).toBe("mock");
   });
 
-  it("exige ORDERS_FILE com DATA_SOURCE=file", () => {
-    expect(configError({ DATA_SOURCE: "file" })).toBe(
-      "Configuração inválida:\n  - ORDERS_FILE é obrigatória com DATA_SOURCE=file: " +
-        "caminho do CSV da Silver (não definida)",
-    );
+  it("com DATA_SOURCE=file, usa a pasta dados/ por padrão", () => {
+    expect(loadConfig({ DATA_SOURCE: "file" }).dataDir).toBe(defaults.dataDir);
   });
 
-  it("aceita ORDERS_FILE definida com DATA_SOURCE=fixtures (fica sem uso)", () => {
-    expect(loadConfig({ ORDERS_FILE: "/data/x.csv" }).dataSource).toBe("fixtures");
+  it("ignora ORDERS_FILE, que saiu com as tabelas consumo_* (16/11)", () => {
+    expect(loadConfig({ DATA_SOURCE: "file", ORDERS_FILE: "/data/x.csv" })).not.toHaveProperty(
+      "ordersFile",
+    );
   });
 
   it("lista todas as variáveis inválidas, cada uma uma única vez", () => {
@@ -177,12 +176,12 @@ describe("loadConfig", () => {
     ]);
   });
 
-  it("aponta ORDERS_FILE ausente mesmo quando outra variável também é inválida", () => {
-    const lines = configError({ DATA_SOURCE: "file", API_PORT: "abc" }).split("\n");
+  it("aponta AGENT_URL ausente mesmo quando outra variável também é inválida", () => {
+    const lines = configError({ AGENT: "adk", API_PORT: "abc" }).split("\n");
 
     expect(lines.slice(1).map((line) => line.trim().split(" ")[1])).toEqual([
       "API_PORT",
-      "ORDERS_FILE",
+      "AGENT_URL",
     ]);
   });
 });

@@ -61,12 +61,12 @@ describe("chat-service: pedido de contexto", () => {
 
     const result = await chat.send({
       sessionId: SESSION_A,
-      message: "E o pedido #15, já chegou?",
+      message: "E o pedido #8, já chegou?",
       orderId: 375,
     });
 
-    expect(result).toStrictEqual({ reply: "Resposta para #15", mentionedOrderId: 15 });
-    expect(orderIdOf(calls[0]?.order ?? null)).toBe(15);
+    expect(result).toStrictEqual({ reply: "Resposta para #8", mentionedOrderId: 8 });
+    expect(orderIdOf(calls[0]?.order ?? null)).toBe(8);
   });
 
   it("pedido citado inexistente é ignorado: o contexto é o pedido aberto", async () => {
@@ -89,11 +89,11 @@ describe("chat-service: pedido de contexto", () => {
 
     const result = await chat.send({
       sessionId: SESSION_A,
-      message: "Meu telefone é 11987654321, pedidos 99999 e 562",
+      message: "Meu telefone é 11987654321, pedidos 99999 e 34",
       orderId: null,
     });
 
-    expect(result.mentionedOrderId).toBe(562);
+    expect(result.mentionedOrderId).toBe(34);
   });
 
   it("pedido aberto inexistente é ignorado, sem erro", async () => {

@@ -12,7 +12,8 @@
     "test": "pnpm -r --if-present test",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "export:dados": "pnpm --filter @translog/api export:dados"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7"

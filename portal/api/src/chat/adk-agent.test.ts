@@ -347,7 +347,7 @@ describe("POST /api/chat com AGENT=adk (servidor falso)", () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/chat",
-      payload: { sessionId: SESSION_A, message: "E o pedido 15?", orderId: 375 },
+      payload: { sessionId: SESSION_A, message: "E o pedido 8?", orderId: 375 },
     });
     const health = await app.inject({ method: "GET", url: "/api/health" });
 
@@ -355,10 +355,10 @@ describe("POST /api/chat com AGENT=adk (servidor falso)", () => {
     expect(response.json()).toStrictEqual({
       sessionId: SESSION_A,
       reply: "Resposta do agente",
-      mentionedOrderId: 15,
+      mentionedOrderId: 8,
     });
     expect(fake.runs()[0]?.body).toMatchObject({
-      newMessage: { parts: [{ text: "[Pedido aberto no portal: 15] E o pedido 15?" }] },
+      newMessage: { parts: [{ text: "[Pedido aberto no portal: 8] E o pedido 8?" }] },
     });
     expect(health.json().agent).toBe("adk");
   });

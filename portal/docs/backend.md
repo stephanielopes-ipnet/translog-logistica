@@ -2,7 +2,7 @@
 
 Para quem vai rodar, revisar ou mudar o código do portal. A visão geral, sem detalhes técnicos, está no [README](../README.md).
 
-Estado em 15/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
+Estado em 16/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. **Em 16/11 a fonte passou a ser a das tabelas oficiais `consumo_*` da Silver no Databricks** (contrato `Order` novo, seções 5, 8 e 9); a tela e o chat simulado foram só adaptados ao contrato e serão refeitos nas próximas tarefas. O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
 
 ## Sumário
 
@@ -14,7 +14,7 @@ Estado em 15/11/2026: fundação, contrato `@translog/contracts`, API de pedidos
 6. [API (`@translog/api`)](#6-api-translogapi)
 7. [Configuração](#7-configuração)
 8. [Fontes de dados](#8-fontes-de-dados)
-9. [Mapeamento Silver → `Order`](#9-mapeamento-silver--order)
+9. [Mapeamento `consumo_*` → `Order`](#9-mapeamento-consumo_--order)
 10. [Chat e assistente](#10-chat-e-assistente)
 11. [Privacidade em camadas](#11-privacidade-em-camadas)
 12. [Tratamento de erros](#12-tratamento-de-erros)
@@ -31,11 +31,11 @@ Estado em 15/11/2026: fundação, contrato `@translog/contracts`, API de pedidos
 O portal é um monorepo pnpm dividido em três pacotes:
 
 - **`@translog/contracts` (`contracts/`)**: esquemas Zod compartilhados que definem o contrato HTTP, geram o OpenAPI em `/docs` e tipam tanto o backend quanto o frontend.
-- **`@translog/api` (`api/`)**: API HTTP em Fastify que entrega à tela o pedido pronto para exibir (view model `Order`), lendo de 11 pedidos de exemplo versionados (`fixtures`) ou da base Silver em CSV (`file`), e responde o chat (`POST /api/chat`) pelo assistente simulado ou pelo agente ADK do Marco. Os pedidos são carregados uma vez na inicialização e consultados em memória em $O(1)$.
+- **`@translog/api` (`api/`)**: API HTTP em Fastify que entrega à tela o pedido pronto para exibir (view model `Order`), lendo dos 9 pedidos da demo versionados (`fixtures`) ou das tabelas `consumo_*` da Silver exportadas em CSV (`file`), e responde o chat (`POST /api/chat`) pelo assistente simulado ou pelo agente ADK do Marco. Os pedidos são carregados uma vez na inicialização e consultados em memória em $O(1)$.
 - **`@translog/web` (`web/`)**: Single-Page Application em React 19 + Vite 8 + Tailwind CSS v4 que implementa o design da **Direção D** (estética de manifesto de carga internacional combinada com rota e linha do tempo de 4 etapas integradas) e consome a API real via `@tanstack/react-query`, validando todas as respostas no cliente com os esquemas de `@translog/contracts`.
 
 ```
-Navegador (@translog/web, :5173)  ──►  API do portal (@translog/api, :3333)  ──►  Silver CSV / fixtures
+Navegador (@translog/web, :5173)  ──►  API do portal (@translog/api, :3333)  ──►  CSVs consumo_* / fixtures
                                                 │
                                                 └──►  Assistente do chat (AGENT):
                                                         mock: regras na própria API
@@ -55,7 +55,7 @@ A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento
 | Fastify | 5.12.8 | `api` | Servidor HTTP |
 | fastify-type-provider-zod | 7.0.0 | `api` | Liga Zod ao Fastify (validação, serialização, OpenAPI) |
 | @fastify/swagger + swagger-ui | 9.9.3 + 6.1.3 | `api` | OpenAPI em `/docs` |
-| csv-parse | 7.0.3 | `api` | Leitura da Silver em streaming |
+| csv-parse | 7.0.3 | `api` | Leitura dos CSVs em streaming |
 | pino-pretty | 13.2.0 | `api` | Log legível em desenvolvimento (não vai para a imagem) |
 | React + React DOM | 19.3.1 | `web` | Interface declarativa com hooks |
 | Vite + @vitejs/plugin-react | 8.3.8 + 6.2.1 | `web` | Dev server com proxy `/api` e bundler de produção |
@@ -83,23 +83,27 @@ portal/
 ├── .env.example             # todas as variáveis, comentadas
 ├── .dockerignore
 ├── docker-compose.yml       # API com fixtures
-├── docker-compose.silver.yml  # sobreposição: API com a Silver por volume
+├── docker-compose.silver.yml  # sobreposição: API com os CSVs consumo_* por volume (vira docker-compose.dados.yml)
 ├── README.md                # visão geral (não técnica)
 ├── CLAUDE.md                # regras e comandos para o assistente de código
 ├── tasks.md                 # checklist por fase
 ├── docs/backend.md          # este documento técnico (backend + frontend)
 ├── prototipos/              # protótipos HTML da tela (A, B, C e Direção D escolhida)
-├── dados/                   # cópia local da Silver (no .gitignore; nunca versionar)
+├── dados/                   # CSVs das tabelas consumo_* (plano B; no .gitignore; nunca versionar)
 ├── contracts/               # @translog/contracts
 │   └── src/
 │       ├── index.ts         # reexporta tudo
 │       ├── orders.ts        # Order, enums, params e resposta de samples
+│       ├── orders.test.ts   # testes do contrato do pedido
 │       ├── chat.ts          # corpo e resposta de POST /api/chat, AgentMode
 │       ├── health.ts        # resposta do health, DataSource
 │       └── errors.ts        # formato padrão de erro
 ├── api/                     # @translog/api
 │   ├── Dockerfile
 │   ├── vitest.config.ts     # isolate: false, TZ=America/Sao_Paulo
+│   ├── scripts/
+│   │   ├── export-dados.ts    # pnpm export:dados: Databricks → portal/dados/*.csv
+│   │   └── generate-fixtures.ts # pnpm --filter @translog/api fixtures: pedidos da demo
 │   └── src/
 │       ├── main.ts          # bootstrap: .env → config → servidor → listen
 │       ├── server.ts        # Fastify, swagger, error handler, container, rotas (health inline)
@@ -121,11 +125,14 @@ portal/
 │           ├── order-service.ts       # regras de consulta + OrderNotFoundError
 │           ├── order-repository.ts    # porta OrderRepository + repositório em memória
 │           ├── fixtures-repository.ts # adapter fixtures
-│           ├── file-repository.ts     # adapter file (Silver CSV em streaming)
-│           ├── silver-mapper.ts       # linhas da Silver → Order (único arquivo que conhece a Silver)
+│           ├── file-repository.ts     # adapter file (3 CSVs em streaming) + carga comum em CSV
+│           ├── consumo-mapper.ts      # linhas das tabelas consumo_* → Order (único que conhece o formato)
+│           ├── consumo-sql.ts         # SELECT explícito das tabelas (sem colunas proibidas)
+│           ├── databricks-client.ts   # SQL Statement Execution API (fetch, EXTERNAL_LINKS, CSV)
+│           ├── escalation.ts          # regra única de encaminhamento à central
 │           └── fixtures/
-│               ├── orders.json        # 11 pedidos de exemplo (vão para a imagem)
-│               └── silver-amostra.csv # amostra da Silver para testes (não vai para a imagem)
+│               ├── orders.json        # 9 pedidos da demo (vão para a imagem)
+│               └── consumo/           # amostra das 3 tabelas para testes (não vai para a imagem)
 └── web/                     # @translog/web (React 19 + Vite 8 + Tailwind v4)
     ├── index.html           # ponto de entrada HTML (pt-BR, título e fontes IBM Plex Mono)
     ├── package.json
@@ -137,7 +144,8 @@ portal/
         ├── index.css        # @theme inline, @custom-variant dark, classes .label-mono, .perf-t, .route-line
         ├── api/
         │   ├── client.ts    # getJson/postJson + validação Zod com @translog/contracts + classe ApiError
-        │   ├── fixtures.ts  # espelho dos 11 pedidos de exemplo, usado só nos testes da tela
+        │   ├── fixtures.ts  # pedidos de exemplo padrão e dicas dos atalhos
+        │   ├── fixture-orders.ts # lê api/src/orders/fixtures/orders.json, só nos testes da tela
         │   └── queries.ts   # useHealth, useOrderSamples, useOrderQuery, useSendChatMessage e shouldRetry
         ├── lib/
         │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD), formatManifestCode
@@ -186,17 +194,16 @@ O comando `pnpm dev` usa `pnpm --parallel --stream -r --filter @translog/api --f
 - `@translog/api` roda com `node --watch` na porta `3333`;
 - `@translog/web` roda o servidor do Vite na porta `5173`, fazendo proxy automático de qualquer requisição `/api/*` para `http://127.0.0.1:<API_PORT>` (`API_PORT` e `WEB_PORT` vêm do ambiente ou do `portal/.env`; padrões 3333 e 5173).
 
-Sem `.env`, a API sobe com os `fixtures` (11 pedidos). Para usar a Silver real (65.752 pedidos), copie o arquivo para `portal/dados/silver_pedidos_rastreio.csv` e:
+Sem `.env`, a API sobe com os `fixtures` (9 pedidos da demo). Para usar a base inteira (65.752 pedidos), coloque os 3 CSVs das tabelas `consumo_*` em `portal/dados/` (ou baixe-os com `pnpm export:dados`, que precisa das credenciais do Databricks no `portal/.env`) e:
 
 ```bash
 cp .env.example .env
 # no .env:
 #   DATA_SOURCE=file
-#   ORDERS_FILE=dados/silver_pedidos_rastreio.csv
 pnpm dev
 ```
 
-Com `file`, cada recarga do `--watch` na API relê a Silver (~10 s).
+Com `file`, cada recarga do `--watch` na API relê os CSVs (~13 s).
 
 ### Chat com o agente ADK (desenvolvimento)
 
@@ -221,7 +228,7 @@ AGENT_IT_URL=http://127.0.0.1:8001 pnpm --filter @translog/api test adk-agent
 
 ```bash
 docker compose up --build                                                    # fixtures
-docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build # Silver
+docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build # CSVs consumo_*
 docker compose down
 ```
 
@@ -253,7 +260,7 @@ main.ts
      ├─ Fastify + compiladores Zod + error handler + swagger (/docs)
      ├─ createContainer(config, { log: app.log })
      │   ├─ DATA_SOURCE=fixtures → createFixturesRepository()      lê e valida orders.json
-     │   ├─ DATA_SOURCE=file     → loadFileRepository(ORDERS_FILE)  lê a Silver inteira
+     │   ├─ DATA_SOURCE=file     → loadFileRepository(DATA_DIR)     lê os 3 CSVs consumo_*
      │   └─ createOrderService({ orders, sampleOrderIds })
      └─ rotas /api/health e /api/orders
  └─ app.listen(0.0.0.0:API_PORT)         só depois de tudo carregado
@@ -330,7 +337,8 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 | `orderIdSchema` | Inteiro positivo de até 10 dígitos |
 | `orderIdParamsSchema` | Params da rota: texto de 1 a 10 dígitos, maior que zero |
 | `orderSamplesResponseSchema` | `{ orderIds: number[] }` |
-| `trackingStatusSchema`, `deadlineStatusSchema`, `shippingModeSchema`, `marketSchema` | Enums com os valores da base |
+| `orderStatusSchema`, `shippingModeSchema`, `transportModeSchema`, `routeTypeSchema`, `marketSchema`, `dispatchStatusSchema` | Enums com os valores da base |
+| `dispatchSchema`, `deliverySchema`, `stageSchema`, `orderEventSchema` | Partes do `Order` |
 | `healthResponseSchema`, `dataSourceSchema` | `{ status: "ok", dataSource: "fixtures" \| "file", orders, agent }` |
 | `agentModeSchema` / `AgentMode` | `"mock" \| "adk"` (`AGENT`); o health só informa o modo, não consulta o agente |
 | `chatRequestSchema` / `ChatRequest` | Corpo de `POST /api/chat` |
@@ -340,25 +348,32 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 
 ### `Order`
 
+Mudou em 16/11 com as tabelas `consumo_*`: saíram `trackingStatus`, `deadlineStatus`, `delayWindow`, `delayDays`, `estimatedDeliveryDate`, `actualDeliveryDate` e o `probableCause` único. Despacho e entrega têm prazos e causas separados.
+
 | Campo | Tipo | Valores / formato |
 |---|---|---|
-| `orderId` | inteiro positivo, até 10 dígitos | ex.: `375` |
+| `orderId` | inteiro positivo, até 10 dígitos | ex.: `76902` |
 | `orderDate` | texto `AAAA-MM-DD` | data de calendário, sem hora nem fuso |
+| `referenceDate` | texto `AAAA-MM-DD` | "hoje" da base (`data_referencia_base`, 2018-02-06); nada usa a data do computador |
+| `status` | enum | `Entregue no prazo`, `Entregue com atraso`, `Em trânsito`, `Extraviado`, `Cancelado`, `Não pago (expirado)`, `Aguardando pagamento` |
 | `shippingMode` | enum | `Standard Class`, `Second Class`, `First Class`, `Same Day` |
-| `trackingStatus` | enum | `Entregue`, `Em Trânsito`, `Aguardando Liberação`, `Cancelado` |
-| `deadlineStatus` | enum | `Atrasado`, `No Prazo`, `Adiantado`, `Não Avaliado`, `Cancelado` |
-| `delayDays` | inteiro ou `null` | negativo = adiantado; `null` = não se aplica |
-| `delayWindow` | texto | ex.: `Atraso Crítico (3+ dias)` |
-| `estimatedDeliveryDate` | texto `AAAA-MM-DD` | |
-| `actualDeliveryDate` | texto `AAAA-MM-DD` ou `null` | só em pedidos entregues |
+| `transportMode` | enum ou `null` | `Aéreo consolidado`, `Aéreo expresso`, `Rodoviário`; `null` sem despacho |
+| `routeType` | enum | `Internacional`, `Doméstica` (doméstica nunca tem alfândega) |
 | `origin`, `destination` | texto | `Cidade, Estado, País` |
-| `region` | texto | ex.: `América Central` |
+| `region` | texto | em português, ex.: `América Central` |
 | `market` | enum | `LATAM`, `Europe`, `Pacific Asia`, `USCA`, `Africa` |
-| `items` | lista, mínimo 1 | `{ productName, category, quantity, total }` |
+| `dispatch` | objeto | `promisedDays`, `expectedDate`, `actualDate`, `delayDays`, `status` (`Atrasado`, `No Prazo`, `Adiantado`, `Não Avaliado`, `Cancelado`), `probableCause` |
+| `delivery` | objeto | `expectedDate`, `actualDate`, `delayDays` (em trânsito, conta até `referenceDate`), `probableCause` |
+| `explanation` | texto ou `null` | frase pronta da base (`motivo_ocorrencia`) |
+| `currentStage` | `{ number 0..5, label }` ou `null` | etapa atual ou última (`3 - Alfândega` → `{ 3, "Alfândega" }`) |
+| `currentLocation` | texto ou `null` | onde o volume está (ou foi entregue, ou visto pela última vez) |
+| `lostAtStage` | `{ number, label }` ou `null` | etapa do extravio |
+| `events` | lista, mínimo 1 | `{ date, code, description, stage, stageLabel, location }`, em ordem de `sequencia` |
+| `items` | lista, mínimo 1 | `{ productName, category, quantity, total }`; "N itens" = linhas, unidades = soma de `quantity` |
 | `total` | número ≥ 0 | dólar; soma dos itens |
-| `probableCause` | texto ou `null` | motivo provável; nunca causa comprovada |
+| `escalateToSupport` | booleano | atraso de entrega ≥ 3 dias ou extravio (regra em `orders/escalation.ts`) |
 
-`delayWindow`, `region`, `origin` e `destination` são texto livre de propósito (podem mudar com a Silver nova). O contrato não tem regras entre campos (por exemplo, "`actualDeliveryDate` só se Entregue"): quem garante é o mapper, com testes.
+`probableCause` (em `dispatch` e `delivery`) vem como na base: `Promessa irreal`, `Atraso operacional`, `Atraso no despacho não recuperado no transporte`, `Volume sem atualização de rastreio`. "Sem atraso" vira `null`. Na tela o rótulo é sempre "Motivo provável". Etapas: 0 Pedido · 1 Coleta · 2 Voo · 3 Alfândega · 4 Transferência · 5 Última milha. O contrato não tem regras entre campos (ex.: "`actualDate` só se entregue"): quem garante são os dados (conferidos em 16/11) e o mapper, com testes.
 
 ### Chat
 
@@ -382,37 +397,102 @@ O OpenAPI de `/docs` traz um exemplo de corpo e as respostas `200`, `400`, `409`
 | `POST /api/chat` | `200 { sessionId, reply, mentionedOrderId }` | `400 VALIDATION_ERROR`, `409 CHAT_BUSY`, `502 AGENT_UNAVAILABLE`, `504 AGENT_TIMEOUT` |
 | `GET /docs` | Swagger UI (`/docs/json` = OpenAPI) | |
 
-O `orderId` aceita só dígitos (1 a 10), maior que zero; zeros à esquerda passam (`0015` → 15). `1e3`, `0x1F`, `-1`, `1.5`, espaços e 11 dígitos são recusados.
+O `orderId` aceita só dígitos (1 a 10), maior que zero; zeros à esquerda passam (`00375` → 375). `1e3`, `0x1F`, `-1`, `1.5`, espaços e 11 dígitos são recusados.
 
 ```bash
-curl localhost:3333/api/orders/375
+curl localhost:3333/api/orders/76902
 ```
 
 ```json
 {
-  "orderId": 375,
-  "orderDate": "2015-01-06",
-  "shippingMode": "Second Class",
-  "trackingStatus": "Em Trânsito",
-  "deadlineStatus": "Atrasado",
-  "delayDays": 4,
-  "delayWindow": "Atraso Crítico (3+ dias)",
-  "estimatedDeliveryDate": "2015-01-08",
-  "actualDeliveryDate": null,
-  "origin": "San Benito, Texas, Estados Unidos",
-  "destination": "Saltillo, Coahuila, México",
-  "region": "América Central",
-  "market": "LATAM",
-  "items": [
-    { "productName": "adidas Youth Germany Black/Red Away Match Soc", "category": "Girls' Apparel", "quantity": 1, "total": 68.6 },
-    { "productName": "Under Armour Men's Tech II T-Shirt", "category": "Lacrosse", "quantity": 1, "total": 22.74 }
+  "orderId": 76902,
+  "orderDate": "2018-01-27",
+  "referenceDate": "2018-02-06",
+  "status": "Em trânsito",
+  "shippingMode": "First Class",
+  "transportMode": "Aéreo expresso",
+  "routeType": "Internacional",
+  "origin": "San Jose, Califórnia, Estados Unidos",
+  "destination": "Jacarta, Jacarta, Indonésia",
+  "region": "Sudeste Asiático",
+  "market": "Pacific Asia",
+  "dispatch": {
+    "promisedDays": 1,
+    "expectedDate": "2018-01-28",
+    "actualDate": "2018-01-29",
+    "delayDays": 1,
+    "status": "Atrasado",
+    "probableCause": "Promessa irreal"
+  },
+  "delivery": {
+    "expectedDate": "2018-02-01",
+    "actualDate": null,
+    "delayDays": 5,
+    "probableCause": "Volume sem atualização de rastreio"
+  },
+  "explanation": "Despacho em 2 dia(s), 1 dia(s) além do prazo de despacho de 1 dia(s). O prazo de despacho da modalidade First Class é cumprido em apenas 0.0% dos pedidos. Pedido em transporte; o prazo de entrega foi ultrapassado em 5 dia(s).",
+  "currentStage": {
+    "number": 3,
+    "label": "Alfândega"
+  },
+  "currentLocation": "Alfândega Jacarta (Indonésia)",
+  "lostAtStage": null,
+  "events": [
+    {
+      "date": "2018-01-27",
+      "code": "PEDIDO_CRIADO",
+      "description": "Pedido registrado",
+      "stage": 0,
+      "stageLabel": "Pedido",
+      "location": "Pedido registrado no sistema"
+    },
+    {
+      "date": "2018-01-29",
+      "code": "PEDIDO_DESPACHADO",
+      "description": "Pedido despachado",
+      "stage": 1,
+      "stageLabel": "Coleta",
+      "location": "Pedido despachado pela expedição de origem"
+    },
+    {
+      "date": "2018-01-29",
+      "code": "COLETA_GATEWAY",
+      "description": "Recebido no gateway de origem",
+      "stage": 1,
+      "stageLabel": "Coleta",
+      "location": "Gateway Los Angeles (EUA)"
+    },
+    {
+      "date": "2018-01-30",
+      "code": "PARTIDA_VOO",
+      "description": "Partida do voo",
+      "stage": 2,
+      "stageLabel": "Voo",
+      "location": "Em voo: Los Angeles -> Jacarta (Indonésia)"
+    },
+    {
+      "date": "2018-01-31",
+      "code": "CHEGADA_ALFANDEGA",
+      "description": "Chegada à alfândega",
+      "stage": 3,
+      "stageLabel": "Alfândega",
+      "location": "Alfândega Jacarta (Indonésia)"
+    }
   ],
-  "total": 91.34,
-  "probableCause": "Promessa irreal"
+  "items": [
+    {
+      "productName": "Summer dresses",
+      "category": "Women's Clothing",
+      "quantity": 1,
+      "total": 194.24
+    }
+  ],
+  "total": 194.24,
+  "escalateToSupport": true
 }
 ```
 
-(Resposta com `fixtures`. Com a Silver, `probableCause` é `null`; ver seção 9.)
+(Igual com `fixtures` e com `file`.)
 
 ```bash
 curl localhost:3333/api/orders/99999
@@ -432,9 +512,11 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 | Variável | Padrão | Uso |
 |---|---|---|
 | `API_PORT` | `3333` | Porta da API (1 a 65535) |
-| `DATA_SOURCE` | `fixtures` | `fixtures` ou `file` |
-| `ORDERS_FILE` | vazio | CSV da Silver; obrigatório com `file`. Caminho relativo parte de `portal/` |
-| `SAMPLE_ORDER_IDS` | `15,375,562,1002` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
+| `DATA_SOURCE` | `fixtures` | `fixtures` ou `file` (`databricks` na próxima tarefa) |
+| `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` (`file` e `pnpm export:dados`). Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
+| `SAMPLE_ORDER_IDS` | `76902,375,34,8` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
+| `DATABRICKS_HOST`, `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_TOKEN` | vazio | Só no `portal/.env`; hoje usadas pelo `pnpm export:dados` |
+| `DATABRICKS_CATALOG_SCHEMA` | `workspace.silver` | Catálogo e schema das tabelas `consumo_*` (export) |
 | `AGENT` | `mock` | Assistente do chat: `mock` ou `adk` |
 | `AGENT_URL` | vazio | Endereço http(s) do agente; obrigatório com `adk` (dev: `http://127.0.0.1:8001`). Barra final removida |
 | `AGENT_APP_NAME` | `translog_agent` | Nome do app no ADK; só letras, números, `_` e `-` (vai no caminho da URL) |
@@ -451,10 +533,10 @@ Regras (`api/src/config.ts`):
   ```
   Configuração inválida:
     - SAMPLE_ORDER_IDS deve ser uma lista de números de pedido separados por vírgula (inteiros positivos de até 10 dígitos) (recebido: "15,x")
-    - ORDERS_FILE é obrigatória com DATA_SOURCE=file: caminho do CSV da Silver (não definida)
+    - AGENT_URL deve ser o endereço http(s) do agente, obrigatório com AGENT=adk (ex.: http://127.0.0.1:8001) (não definida)
   ```
 
-- No Docker, `DATA_SOURCE` e `ORDERS_FILE` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 15). `AGENT` fica fixo em `mock` no compose.
+- No Docker, `DATA_SOURCE` e `DATA_DIR` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 15). `AGENT` fica fixo em `mock` no compose.
 - A chave do Gemini nunca entra no `.env` do portal: fica só no `.env` do agente.
 
 ## 8. Fontes de dados
@@ -470,97 +552,112 @@ interface OrderRepository {
 
 Os dois adapters montam um `Map<orderId, Order>` e o entregam a `createInMemoryRepository`. A porta é assíncrona para que uma fonte futura (banco ou Parquet) não exija mudar serviço nem rotas.
 
+### Tabelas oficiais (16/11)
+
+A fonte é a **Silver do Databricks, tabelas com prefixo `consumo_`** (feitas pelo Mateus para a aplicação). A Gold é toda agregada (para o dashboard) e não serve para consultar pedido por número. Levantamento completo em `portal/_contexto/databricks.md` (local).
+
+| Tabela | Grão | Linhas |
+|---|---|---|
+| `workspace.silver.consumo_pedidos` | 1 por pedido | 65.752 |
+| `workspace.silver.consumo_itens_pedido` | 1 por item (com valor por item) | 180.519 |
+| `workspace.silver.consumo_eventos_logisticos` | 1 por evento da viagem | 350.416 |
+
+Os três adapters carregam tudo uma vez, ao subir, e servem da memória. Não há consulta ao Databricks por pedido nem atualização periódica.
+
 ### `fixtures`
 
-- `orders/fixtures/orders.json`: 11 pedidos reais da Silver, só com os campos do contrato.
+- `orders/fixtures/orders.json`: os 9 pedidos da demo (76902, 375, 34, 222, 8, 9, 50, 31298, 76385), gerados das tabelas por `pnpm --filter @translog/api fixtures` (`api/scripts/generate-fixtures.ts`), que também gera a amostra de teste `orders/fixtures/consumo/`.
 - Validados contra `z.array(orderSchema)` ao carregar. Arquivo inválido impede a API de subir, com a mensagem do Zod apontando o campo. Campos fora do contrato são descartados na leitura.
 
-### `file` (Silver em CSV)
+### `file` (CSVs das tabelas `consumo_*`, plano B)
 
-`loadFileRepository(file, log)` em `orders/file-repository.ts`, numa passada só:
+`loadFileRepository(dir, log)` lê `DATA_DIR/consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv`. A carga é a de `loadConsumoRepository(sources, log)`, feita para ser reaproveitada pelo adapter `databricks` (os pedaços em CSV do Databricks entram pelo mesmo caminho):
 
-1. `pipeline(createReadStream(file), parse(...), consumidor)`: streaming, com registros como arrays.
-2. O primeiro registro é o cabeçalho. Ele define a posição de cada coluna de `SILVER_COLUMNS` (21 colunas). Se faltar alguma, a carga é interrompida com erro.
-3. Cada registro vira uma `SilverRow` **só com essas 21 colunas**. As demais, inclusive as proibidas, são descartadas ali, antes de qualquer agrupamento.
-4. Linha curta (coluna faltando) ou com `id_pedido` inválido: contada como inválida e ignorada.
-5. Linhas agrupadas por `id_pedido` num `Map`. Os itens de um pedido não precisam estar em linhas seguidas.
-6. Cada grupo passa por `mapSilverOrder`, que já valida com `orderSchema`. Pedido inválido é descartado inteiro (todas as suas linhas contam como inválidas), para não exibir pedido com itens faltando. O grupo é apagado do `Map` assim que o pedido é montado.
+1. Cada tabela é lida numa passada, em streaming (`pipeline(stream, parse(...), consumidor)`), com registros como arrays.
+2. O cabeçalho define a posição de cada coluna de `READ_COLUMNS` da tabela. Se faltar alguma, a carga é interrompida com erro.
+3. Cada registro vira um objeto **só com as colunas lidas**. As demais, inclusive as proibidas, são descartadas ali, antes de qualquer agrupamento.
+4. Pedidos num `Map` por número; itens e eventos agrupados por número do pedido (não precisam estar em ordem).
+5. Cada pedido passa por `mapConsumoOrder` (que valida com `orderSchema`). Pedido fora do contrato é descartado com seus itens e eventos.
+6. São contadas como inválidas: linha curta, `id_pedido` inválido, pedido repetido, pedido fora do contrato (com suas linhas) e itens ou eventos sem pedido.
 7. Log de resumo.
+
+Os CSVs do Mateus (timestamps ISO em UTC, com as colunas proibidas) e os do `pnpm export:dados` (datas já `AAAA-MM-DD`, sem as colunas proibidas) produzem os mesmos pedidos: os testes usam os dois formatos.
 
 Opções do `csv-parse`: `bom: true`, `relax_column_count: true` (linha curta vira inválida em vez de derrubar a carga) e `skip_empty_lines: true`.
 
 #### Log
 
-Até 10 avisos detalhados, depois só a contagem. Os avisos nunca trazem o conteúdo das linhas, só o número do registro, o número do pedido e o nome dos campos:
+Até 10 avisos detalhados, depois só a contagem. Os avisos nunca trazem o conteúdo das linhas, só tabela, número do registro, número do pedido e nome dos campos:
 
 ```json
-{"record":16,"reason":"id_pedido inválido","msg":"Linha inválida na Silver; ignorada"}
-{"orderId":99001,"rows":2,"fields":["trackingStatus"],"msg":"Pedido inválido na Silver; ignorado"}
-{"file":"/data/silver_pedidos_rastreio.csv","orders":65752,"invalidRows":0,"durationMs":10807,"msg":"Pedidos carregados da Silver"}
+{"table":"consumo_pedidos.csv","record":10,"reason":"id_pedido inválido","msg":"Linha inválida; ignorada"}
+{"orderId":99001,"rows":11,"fields":["status"],"msg":"Pedido fora do contrato; ignorado"}
+{"table":"consumo_itens_pedido.csv","orderId":99003,"rows":1,"msg":"Linhas sem pedido; ignoradas"}
+{"dataDir":"/caminho/portal/dados","orders":65752,"invalidRows":0,"durationMs":12583,"msg":"Pedidos carregados"}
 ```
 
 #### Erros fatais (a API não sobe)
 
 | Situação | Mensagem |
 |---|---|
-| Arquivo inexistente | `Não foi possível ler ORDERS_FILE (<caminho>): arquivo não encontrado.` |
-| Caminho é uma pasta | `... o caminho é uma pasta, não um arquivo.` |
-| Sem permissão | `... sem permissão de leitura.` |
-| Arquivo vazio | `... o arquivo está vazio.` |
-| Coluna lida ausente no cabeçalho | `... o cabeçalho não tem as colunas <lista>.` |
+| Pasta ou arquivo inexistente | `Não foi possível ler DATA_DIR (<pasta>): consumo_pedidos.csv não encontrado.` |
+| Caminho é uma pasta | `... consumo_pedidos.csv é uma pasta, não um arquivo.` |
+| Sem permissão | `... consumo_pedidos.csv sem permissão de leitura.` |
+| Arquivo vazio | `... consumo_itens_pedido.csv está vazio.` |
+| Coluna lida ausente no cabeçalho | `... consumo_pedidos.csv não tem as colunas <lista>.` |
 
-#### Desempenho e memória (Silver de 163 MB, 180.519 linhas, medido em 14/11)
+#### Desempenho e memória (16/11, CSVs do export: 83 + 14 + 64 MB)
 
-| Medida | Local (Node 24.21) | Docker |
+| Medida | Local (Node 24.21) |
+|---|---|
+| Carga das 3 tabelas | 12,6 s |
+| RSS com a API no ar | ~213 MB |
+| Pedidos / linhas inválidas | 65.752 / 0 |
+
+Escolhas mantidas da Silver antiga (que reduziram o heap retido de 230 para 47 MB): `Object.fromEntries` para montar cada linha (sem modo dicionário do V8), apagar as linhas de cada pedido do `Map` assim que ele é montado (o closure do `pipeline` mantém o contexto vivo) e um pool de textos (`intern`), já que quase tudo se repete (modalidades, regiões, produtos, datas, locais dos eventos). O pool é limpo no fim.
+
+O tempo de carga é quase todo da `csv-parse`. Alternativa medida em 14/11 e não adotada: `papaparse` (mais rápido, mas sem remover o BOM e com mais código de erro).
+
+### `pnpm export:dados` (Databricks → CSV)
+
+`api/scripts/export-dados.ts` baixa as 3 tabelas para `DATA_DIR` (padrão `portal/dados/`), lendo `DATABRICKS_HOST`, `DATABRICKS_WAREHOUSE_ID` e `DATABRICKS_TOKEN` do ambiente ou do `portal/.env` (nunca impressos). Usa `orders/databricks-client.ts`:
+
+1. `POST https://<host>/api/2.0/sql/statements` com `disposition: "EXTERNAL_LINKS"`, `format: "CSV"`, `wait_timeout: "30s"` e `on_wait_timeout: "CONTINUE"` (o resultado não cabe na resposta direta). O token vai só no header `Authorization` dessas chamadas.
+2. Enquanto `PENDING`/`RUNNING`, consulta `GET /api/2.0/sql/statements/{id}` a cada 2 s, com limite de 3 min (o warehouse da edição gratuita dorme); no limite, cancela a consulta e explica o que fazer. `401`/`403`, `FAILED` (ex.: tabela ausente) e host inacessível viram mensagens em pt-BR que sugerem `DATA_SOURCE=file`.
+3. Baixa os pedaços pelos links pré-assinados **sem** o header `Authorization`, seguindo `next_chunk_internal_link`. O cabeçalho do CSV sai uma vez só.
+4. Cada arquivo vai para um `.parcial` e só substitui o anterior quando o download termina.
+
+O `SELECT` vem de `orders/consumo-sql.ts`: colunas explícitas (`EXPORT_COLUMNS` = todas menos as proibidas), cada uma como `coalesce(CAST(col AS STRING), '')` (o CSV do Databricks escreve NULL como `null`; assim sai vazio, igual aos CSVs do Mateus), timestamps como `date_format(col, 'yyyy-MM-dd')` (a sessão do warehouse é UTC) e `ORDER BY` estável. Schema e nomes de coluna são conferidos antes de entrar no SQL.
+
+**Medido em 16/11:** 58 a 72 s no total (a primeira tabela leva mais quando o warehouse está acordando); `consumo_pedidos` 79,6 MB (40 colunas), `consumo_itens_pedido` 13,5 MB (7), `consumo_eventos_logisticos` 61,1 MB (14). Comparado célula a célula com os CSVs do Mateus: mesmas chaves e mesmos valores nas 596.687 linhas (fora o espaço no fim do `resumo_pedido`, que o CSV do Mateus apara).
+
+## 9. Mapeamento `consumo_*` → `Order`
+
+Tudo em `orders/consumo-mapper.ts`. É o único arquivo que conhece os nomes e formatos das tabelas.
+
+| Campo | Coluna(s) | Regra |
 |---|---|---|
-| Carga | 10,5 a 11,3 s | 10,6 s |
-| Até o health responder | 12,2 s | 12,9 s (healthy) |
-| Heap retido após a carga | ~47 MB (12 MB de base) | |
-| RSS | ~350 MB | ~285 MiB |
-| Consulta | ~0,4 ms (2.000 seguidas em 0,84 s, medido com curl) | |
+| `orderId` | `id_pedido` | Chave dos três agrupamentos |
+| `orderDate`, `referenceDate` | `data_pedido`, `data_referencia_base` | 10 primeiros caracteres |
+| `status`, `shippingMode`, `routeType`, `market`, `region` | `situacao_pedido`, `modo_envio`, `tipo_rota`, `mercado_logistico`, `destino_regiao` (do pedido, em português) | Como vêm |
+| `transportMode` | `modal_transporte` | Vazio → `null` |
+| `origin`, `destination` | `origem_cliente_*`, `destino_*` | `Cidade, Estado, País`, sem partes vazias |
+| `dispatch` | `prazo_despacho_dias`, `data_despacho_prevista`, `data_despacho_real`, `dias_atraso_despacho`, `status_prazo_despacho`, `causa_atraso_despacho` | Vazio → `null`; "Sem atraso" → `null` |
+| `delivery` | `data_entrega_prevista`, `data_entrega_realizada`, `dias_atraso_entrega`, `causa_atraso_entrega` | Idem |
+| `explanation`, `currentLocation` | `motivo_ocorrencia`, `local_atual` | Vazio → `null` |
+| `currentStage`, `lostAtStage` | `etapa_atual_desc`, `etapa_extravio` | `"3 - Alfândega"` → `{ number: 3, label: "Alfândega" }` |
+| `events[]` | `consumo_eventos_logisticos`: `sequencia`, `ts_evento`, `codigo_evento`, `descricao_evento`, `etapa`, `etapa_desc`, `local_evento` | Ordem numérica de `sequencia`; data = 10 primeiros caracteres |
+| `items[]` | `consumo_itens_pedido`: `id_item_pedido`, `nome_produto`, `categoria_produto`, `quantidade_item`, `valor_item_pedido` | Ordem de `id_item_pedido`; valor líquido do item (não usa `lista_itens`, que corta os nomes) |
+| `total` | soma de `valor_item_pedido` | Em centavos inteiros (igual a `valor_total_pedido` em 100% dos pedidos) |
+| `escalateToSupport` | `situacao_pedido`, `dias_atraso_entrega` | `shouldEscalateToSupport` (`orders/escalation.ts`): `Extraviado` ou atraso ≥ 3 dias (`SUPPORT_MIN_DELAY_DAYS`) |
 
-Três escolhas reduziram a memória de 230 MB para 47 MB de heap retido (RSS de 470 para ~350 MB):
+Texto vazio em campo numérico obrigatório vira `NaN` e falha na validação, em vez de virar `0`. `qtd_itens` não é lido: é a soma das quantidades, não o número de linhas.
 
-- **`Object.fromEntries` para montar cada linha.** Atribuir as 21 chaves uma a uma num loop leva o objeto ao modo dicionário do V8 (~800 B por linha).
-- **Apagar cada grupo do `Map` assim que o pedido é montado.** Um heap snapshot mostrou que o closure do `pipeline` mantém vivo o contexto da função depois da carga, e com ele o `Map` de linhas.
-- **Pool de textos (`intern`).** Quase tudo se repete na Silver (4 modalidades, 23 regiões, ~118 produtos, ~1.100 datas), então cada texto é guardado uma vez só. O pool é limpo no fim.
+**Armadilha de fuso.** Os timestamps vêm em UTC (`2018-01-20T00:43:00.000Z`). Com `new Date()`, em Brasília, horários de madrugada cairiam no dia anterior. O mapper corta o texto e nunca cria `Date`; no export, a data já sai cortada no SQL. As datas batem com `data_pedido`, `data_despacho_real` e `data_entrega_realizada` em 100% dos pedidos, e as do 375 com a coluna `linha_do_tempo` (06/01, 12/01, 13/01… 17/01/2015). Os testes rodam com `TZ=America/Sao_Paulo` e o teste do fuso confere antes que `new Date()` de fato mudaria o dia.
 
-O RSS fica acima do heap porque o V8 não devolve ao sistema as páginas usadas no pico da leitura.
+**Colunas proibidas** (`FORBIDDEN_COLUMNS`, nunca lidas nem consultadas): `id_cliente`, `segmento_cliente`, `valor_desconto`, `valor_bruto_venda`, `preco_unitario`, `id_produto`. A descrição da `consumo_pedidos` diz "sem PII", mas ela tem `id_cliente` e `segmento_cliente`.
 
-O tempo de carga é quase todo da `csv-parse` (perfil de CPU: ~8,4 s de ~11 s). Alternativa medida e não adotada: `papaparse` 5.7.0 lê o arquivo em 1,2 s (modo `step`) ou 3,9 s (stream dentro do `pipeline`), mas não remove o BOM e exige `@types/papaparse` e mais código de tratamento de erro. Vale reconsiderar se o boot de ~10 s atrapalhar.
-
-## 9. Mapeamento Silver → `Order`
-
-Tudo em `orders/silver-mapper.ts`. É o único arquivo que conhece os nomes e formatos da Silver; se o contrato de dados mudar, a mudança se concentra nele.
-
-| Campo | Coluna(s) da Silver | Regra |
-|---|---|---|
-| `orderId` | `id_pedido` | Chave do agrupamento das linhas (uma por item) |
-| `orderDate` | `data_pedido` | 10 primeiros caracteres do texto ISO |
-| `shippingMode` | `modo_envio` | Como vem |
-| `trackingStatus` | `situacao_rastreio` | Como vem |
-| `deadlineStatus` | `status_entrega_pt` | Como vem |
-| `delayDays` | `dias_atraso` | Vazio → `null` |
-| `delayWindow` | `janela_atraso` | Sem o prefixo de ordenação: `3. Atraso Leve (1 a 2 dias)` → `Atraso Leve (1 a 2 dias)` |
-| `estimatedDeliveryDate` | `data_prevista_entrega` | 10 primeiros caracteres |
-| `actualDeliveryDate` | `data_envio` | **Só se `situacao_rastreio = Entregue`** (a coluna vem preenchida em todos os pedidos) |
-| `origin` | `origem_cliente_cidade`, `_estado`, `_pais` | `Cidade, Estado, País`, sem partes vazias |
-| `destination` | `destino_cidade`, `_estado`, `_pais` | Idem |
-| `region` | `destino_regiao` | Como vem |
-| `market` | `mercado_logistico` | Como vem (em inglês) |
-| `items[]` | `nome_produto`, `categoria_produto`, `quantidade_item`, `valor_item_pedido` | Valor líquido do item |
-| `total` | soma de `valor_item_pedido` | Somado em centavos inteiros (evita `0.1 + 0.2 = 0.30000000000000004`) |
-| `probableCause` | não existe | Sempre `null` |
-
-Os campos do pedido vêm da primeira linha do grupo (na Silver, todos os itens de um pedido têm a mesma situação, datas e rota). Texto vazio em campo numérico vira `NaN` e falha na validação, em vez de virar `0`.
-
-**Armadilha de fuso.** As datas da Silver vêm em UTC (`2015-01-09T01:02:00.000Z`). Com `new Date()`, em UTC-3, as 22.723 linhas com hora antes de 03:00Z cairiam no dia anterior. Por isso o mapper corta o texto e nunca cria `Date`. Os testes rodam com `TZ=America/Sao_Paulo`, e o teste do fuso confere antes que `new Date()` de fato mudaria o dia.
-
-**Colunas proibidas** (`FORBIDDEN_COLUMNS`, nunca lidas): `id_cliente`, `segmento_cliente`, `tipo_pagamento`, `lucro_item`, `margem_lucro_item`, `lucro_total_pedido`, `valor_desconto`, `latitude_origem`, `longitude_origem`, `resumo_rastreio_rag` (o texto cita "Cliente ID").
-
-**Colunas sem uso** (também não lidas): `id_item_pedido`, `id_produto`, `valor_bruto_venda`, `preco_unitario`, `departamento`, `status_pedido`, `dias_envio_programado`, `dias_envio_real`, `flag_atrasado`, `rota_logistica`.
-
-**Verificação completa (14/11):** os 65.752 pedidos produzidos pela API foram comparados com a implementação de referência em Python que gerou os mocks. São idênticos, exceto o `probableCause` do 375: o script de referência fixa "Promessa irreal" nele como exemplo da demo.
+**Verificação (16/11):** com os CSVs reais, 65.752 pedidos e 0 linhas inválidas; situações com as mesmas contagens do Databricks; 8.337 encaminhados à central (igual ao levantamento); os 9 pedidos da demo iguais aos `fixtures`.
 
 ## 10. Chat e assistente
 
@@ -589,7 +686,7 @@ O serviço guarda as conversas ocupadas num `Set`, conferido e marcado **antes d
 
 ### 10.3. Assistente simulado (`AGENT=mock`)
 
-`mock-agent.ts` tem as regras e os textos que ficavam na tela, consultando a fonte configurada (funciona com a Silver):
+`mock-agent.ts` tem as regras e os textos que ficavam na tela, consultando a fonte configurada (funciona com a base inteira; em 16/11 só adaptado ao contrato novo, com textos simples):
 
 | Pergunta | Resposta |
 |---|---|
@@ -668,16 +765,16 @@ Isolado em `withOrderContext` e na configuração `AGENT*`; o resto do chat não
 
 Regra do projeto: nenhuma resposta traz dados do cliente, de pagamento ou financeiros internos.
 
-1. **Leitura por lista de permitidas.** O adapter `file` copia só `SILVER_COLUMNS`. As colunas proibidas não chegam a nenhuma estrutura da aplicação.
+1. **Leitura e consulta por lista de permitidas.** O adapter `file` copia só `READ_COLUMNS`, e o `SELECT` do Databricks lista colunas explícitas (`consumo-sql.ts` recusa as proibidas). As colunas proibidas não chegam a nenhuma estrutura da aplicação, e o `pnpm export:dados` grava os CSVs já sem elas.
 2. **Contrato sem campos sensíveis.** `orderSchema` não tem esses campos. Os `fixtures` passam por ele ao carregar, o que descarta qualquer extra.
 3. **Serialização pelo contrato.** O serializer do `fastify-type-provider-zod` passa a resposta por `safeEncode` do Zod, que descarta chaves fora do esquema, inclusive dentro de `items`.
 4. **Testes** (`privacy.test.ts`):
    - varre todas as chaves, em qualquer nível, de todas as respostas (sucesso, erros, `/docs/json`), nas duas fontes;
-   - confere que nenhuma resposta contém os valores fictícios das colunas proibidas (`FICTICIO-*`) e sem uso (`SEM-USO`) da amostra;
-   - usa um repositório que devolve `id_cliente`, `lucro_item` etc. para provar a camada 3.
+   - confere que nenhuma resposta contém os valores fictícios das colunas proibidas (`FICTICIO-*`, presentes nas 3 tabelas da amostra) e sem uso (`SEM-USO`);
+   - usa um repositório que devolve `id_cliente`, `preco_unitario` etc. para provar a camada 3.
 5. **Logs sem conteúdo.** Linhas e pedidos inválidos são logados só com número do registro, número do pedido e o nome dos campos. O chat registra só sessão, tamanho, modo, tempo e resultado (seção 10.5). Erros 4xx registram só `statusCode` e `code`: a mensagem de JSON malformado do Node traz um trecho do corpo enviado.
-6. **Chat.** A resposta passa por `chatResponseSchema` (só `sessionId`, `reply`, `mentionedOrderId`). O simulado monta o texto só com campos do `Order`. `privacy.test.ts` pergunta ao simulado sobre todos os pedidos, nas duas fontes e com um repositório que devolve campos proibidos, e confere chaves, valores fictícios e palavras proibidas no texto (cliente, pagamento, lucro, margem, desconto, latitude...). **Limite:** com `AGENT=adk`, o texto é produzido pelo agente a partir da base que ele lê; o portal não filtra esse texto. A privacidade depende do agente ler só colunas permitidas (pendência com o Marco).
-7. **Silver fora do Git e da imagem.** `portal/dados/` está no `.gitignore` da raiz; o `.dockerignore` tira `dados/` e qualquer `*.csv`. No Docker, a Silver entra por volume somente leitura.
+6. **Chat.** A resposta passa por `chatResponseSchema` (só `sessionId`, `reply`, `mentionedOrderId`). O simulado monta o texto só com campos do `Order`. `privacy.test.ts` pergunta ao simulado sobre todos os pedidos, nas duas fontes e com um repositório que devolve campos proibidos, e confere chaves, valores fictícios e palavras proibidas no texto (cliente, tipo de pagamento, lucro, margem, desconto, preço unitário, latitude...). "pagamento" sozinho é permitido desde 16/11: as situações `Aguardando pagamento` e `Não pago (expirado)` são dados do pedido. **Limite:** com `AGENT=adk`, o texto é produzido pelo agente a partir da base que ele lê; o portal não filtra esse texto. A privacidade depende do agente ler só colunas permitidas (pendência com o Marco).
+7. **Dados fora do Git e da imagem.** `portal/dados/` está no `.gitignore` da raiz; o `.dockerignore` tira `dados/` e qualquer `*.csv`. No Docker, os CSVs entram por volume somente leitura. O token do Databricks fica só no `portal/.env`.
 
 ## 12. Tratamento de erros
 
@@ -793,47 +890,61 @@ A tela não tem mais regra de respostas: tudo vem de `POST /api/chat` (a regra d
 ## 14. Testes
 
 ```bash
-pnpm test                         # todos os 254 testes (~15 s com a Silver presente)
-pnpm --filter @translog/api test  # só a API (209 testes + 1 de integração desligado)
-pnpm --filter @translog/web test  # só o frontend (45 testes, ~1 s)
+pnpm test                               # todos os testes (contracts, api e web; ~15 s com os CSVs presentes)
+pnpm --filter @translog/api test        # só a API (1 de integração com o agente desligado)
+pnpm --filter @translog/contracts test  # só o contrato
+pnpm --filter @translog/web test        # só o frontend (~1 s)
 ```
 
-### Testes do Backend (`@translog/api` — 209 testes)
+Contagem em 16/11: contracts 20, api 257 (+1 desligado), web 47.
+
+### Testes do contrato (`@translog/contracts`)
 
 | Arquivo | Cobre |
 |---|---|
-| `config.test.ts` | Padrões, vazios, cada variável inválida (inclusive `AGENT*`), `ORDERS_FILE` relativo, barra final de `AGENT_URL`, lista de erros completa |
-| `server.test.ts` | Health (fixtures, file, arquivo ausente, modo do agente), formato de todos os erros, OpenAPI e Swagger UI |
+| `orders.test.ts` | Pedido não pago e extraviado válidos, 7 situações, campos antigos fora do contrato, extras descartados, 16 casos inválidos (datas com hora, enums, etapa fora de 0 a 5, listas vazias) |
+
+### Testes do Backend (`@translog/api`)
+
+| Arquivo | Cobre |
+|---|---|
+| `config.test.ts` | Padrões, vazios, cada variável inválida (inclusive `AGENT*`), `DATA_DIR` relativo, `ORDERS_FILE` ignorada, barra final de `AGENT_URL`, lista de erros completa |
+| `server.test.ts` | Health (fixtures, file, pasta sem CSV, modo do agente), formato de todos os erros, OpenAPI e Swagger UI |
 | `chat/chat-service.test.ts` | Pedido citado existente e inexistente, primeiro número existente, pedido aberto inexistente ignorado, trava (mesma conversa → `ChatBusyError`; liberada depois de resposta e de falha; conversas diferentes em paralelo), resposta vazia, log sem conteúdo |
-| `chat/mock-agent.test.ts` | 375 "por que atrasou" e "quando chega", modalidades, sem pedido, fora do escopo, pedido inexistente, cada situação, "Promessa irreal" em rota nacional e Same Day, nenhuma causa comprovada nem pagamento |
+| `chat/mock-agent.test.ts` | 76902 "por que atrasou" e "quando chega", modalidades, sem pedido, fora do escopo, pedido inexistente, cada situação, extravio, central, nenhuma causa comprovada nem tipo de pagamento |
 | `chat/routes.test.ts` | `200`, `400` (sem `sessionId`, UUID inválido, mensagem vazia, só espaços, 1001 caracteres, `orderId` inválido), mensagem aparada, `409`, `502`, `504` sem vazar detalhe, OpenAPI com exemplo |
 | `chat/adk-events.test.ts` | Todos os casos de teste de `extract_final_text` + formatos inesperados, `error_code`, `function_call`/`function_response` |
-| `chat/adk-agent.test.ts` | Contra um servidor HTTP falso: sessão criada só na 1ª mensagem com `userId` do servidor, `409` na criação = ok, `404` → recria e reenvia uma vez (e só uma), `500` → `502`, timeout → `504`, sem resposta final, `errorCode`, JSON inválido, conexão recusada, contexto do pedido no texto, expiração e limite do `Map`, rota com `AGENT=adk`. Integração com o agente real só com `AGENT_IT_URL` |
-| `orders/routes.test.ts` | 200 (os 11 fixtures sem alteração), 404, 400 (8 formatos), zeros à esquerda, samples, parâmetro no OpenAPI |
-| `orders/fixtures-repository.test.ts` | Carga, quatro situações da demo, arquivo inválido, campos extras descartados |
-| `orders/silver-mapper.test.ts` | Pedido 375 completo, fuso, entrega por situação, `delayDays`, prefixo da janela, centavos, rota, 11 casos inválidos, colunas proibidas fora da lista lida |
-| `orders/file-repository.test.ts` | Amostra igual aos mocks, log, descarte de colunas, linhas inválidas sem conteúdo no log, limite de avisos, itens fora de sequência, BOM, erros fatais; **integração com a Silver real** |
-| `privacy.test.ts` | Seção 11 (pedidos e chat) |
+| `chat/adk-agent.test.ts` | Contra um servidor HTTP falso: sessão, `409`, `404` → recria e reenvia uma vez, `500` → `502`, timeout → `504`, contexto do pedido no texto, expiração do `Map`. Integração com o agente real só com `AGENT_IT_URL` |
+| `orders/routes.test.ts` | 76902 no contrato novo, os 9 fixtures sem alteração, 404, 400 (8 formatos), zeros à esquerda, samples, parâmetro no OpenAPI |
+| `orders/fixtures-repository.test.ts` | Carga, situações e central dos 9 pedidos da demo, arquivo inválido, campos extras descartados |
+| `orders/consumo-mapper.test.ts` | 375 completo e datas iguais à `linha_do_tempo`; 76902, 34, 9, 31298; linhas x unidades (8); fuso; formato do export; ordem de itens e eventos (10 depois de 9); centavos; "Sem atraso"; casos inválidos; colunas proibidas fora das lidas |
+| `orders/escalation.test.ts` | ≥ 3 dias, 2 dias, extraviado, não pago, cancelado, adiantado |
+| `orders/consumo-sql.test.ts` | SELECT explícito com `coalesce`/`date_format`, nenhuma coluna proibida (leitura e export), export ⊇ leitura, recusa de coluna proibida, schema e nome inválidos |
+| `orders/databricks-client.test.ts` | Contra um servidor HTTP falso: corpo da consulta, token só na API e nunca no link pré-assinado, `PENDING` → `RUNNING` → `SUCCEEDED`, 3 pedaços com cabeçalho uma vez só, `401`/`403`, `FAILED` (tabela ausente), timeout com cancelamento, `404`, host inacessível, falha no download |
+| `orders/file-repository.test.ts` | Amostra igual aos fixtures, log, descarte de colunas nas 3 tabelas, linhas inválidas (id, repetido, curta, fora do contrato, sem pedido) sem conteúdo no log, limite de avisos, fora de ordem, BOM e CRLF, erros fatais; **integração com os CSVs reais** |
+| `privacy.test.ts` | Seção 11 (pedidos e chat, nas duas fontes) |
 
-### Testes do Frontend (`@translog/web` — 45 testes)
+### Testes do Frontend (`@translog/web`)
 
 | Arquivo | Cobre |
 |---|---|
 | `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-000375-LATAM`) e pluralização de dias |
 | `lib/url-state.test.ts` | Leitura de `?pedido=375`, rejeição de IDs inválidos (`0`, `abc`), presets da `ProtoBar` e atualização limpa da query string |
 | `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo enviado, `409`/`502`/`504`, resposta fora do contrato) |
-| `features/tracking/timeline.test.ts` | Máquina de estados das 4 etapas em todas as situações (`Entregue`, `Em Trânsito`, `Aguardando Liberação` com variantes `waiting`/`payment`, e `Cancelado`) |
+| `features/tracking/timeline.test.ts` | Linha do tempo resumida: em trânsito (76902), entregue (375), extraviado (34), terminais antes do despacho (9 e 50), variante "Pagamento não processado" |
 | `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, conversa nova só com "Zerar", efeito da troca de pedido nas mensagens, texto de falha por status |
 | `features/chat/chat-suggestions.test.ts` | Sugestões por situação do pedido, sempre citando o número |
 | `features/chat/rich-text.test.ts` | Negrito, listas (`*`, `-`, `•`, subníveis), títulos, linha em branco, asteriscos soltos |
 | `features/dev-bar/chat-presets.test.ts` | Conversas de exemplo da barra |
 
+Os testes da tela leem os pedidos de `api/src/orders/fixtures/orders.json` (`web/src/api/fixture-orders.ts`), o mesmo arquivo da API.
+
 **Fixtures de teste da API**
 
-- `orders/fixtures/orders.json`: os 11 pedidos no formato `Order`.
-- `orders/fixtures/silver-amostra.csv`: 15 linhas reais da Silver (pedidos 15, 375, 552, 562, 1002) com as 41 colunas. Valores reais só nas 21 colunas lidas; as proibidas têm `FICTICIO-<coluna>-<n>` e as sem uso, `SEM-USO`. O 552 está lá porque tem hora antes de 03:00Z (teste do fuso).
+- `orders/fixtures/orders.json`: os 9 pedidos da demo no formato `Order`.
+- `orders/fixtures/consumo/*.csv`: as linhas reais dos 9 pedidos nas 3 tabelas (9 pedidos, 17 itens, 52 eventos), no formato dos CSVs do Mateus (timestamps ISO). Valores reais só nas colunas lidas; as 6 proibidas aparecem nas 3 tabelas com `FICTICIO-<coluna>-<n>` e as sem uso com `SEM-USO`. Regenerar: `pnpm --filter @translog/api fixtures` (lê `portal/dados/`).
 
-**Integração com a Silver real:** roda só se `portal/dados/silver_pedidos_rastreio.csv` existir (`describe.skipIf`). Confere 65.752 pedidos, 0 linhas inválidas e os 11 pedidos dos mocks. Com uma Silver nova, o número esperado precisa ser atualizado.
+**Integração com os CSVs reais:** roda só se `portal/dados/consumo_pedidos.csv` existir (`describe.skipIf`). Confere 65.752 pedidos, 0 linhas inválidas e os 9 pedidos dos `fixtures`. **Nenhum teste automatizado chama o Databricks.**
 
 **Configuração do Vitest:** `isolate: false` (os testes não compartilham estado global) e `TZ=America/Sao_Paulo`. Rotas são testadas com `app.inject` (sem abrir porta). `buildServer(config, { logger: false, overrides })` aceita `overrides.orderRepository` e `overrides.supportAgent` para injetar um repositório ou um assistente (que demora ou falha) nos testes. **Nenhum teste automatizado chama o Gemini.**
 
@@ -854,25 +965,27 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | Arquivo | Conteúdo |
 |---|---|
 | `docker-compose.yml` | Serviço `api` com `DATA_SOURCE=fixtures`, `AGENT=mock`, porta `${API_PORT:-3333}`, healthcheck em `/api/health` (`start_period: 60s`, `start_interval: 1s`) |
-| `docker-compose.silver.yml` | Sobreposição: `DATA_SOURCE=file`, `ORDERS_FILE=/data/silver_pedidos_rastreio.csv`, volume `./dados:/data:ro` |
+| `docker-compose.silver.yml` | Sobreposição: `DATA_SOURCE=file`, `DATA_DIR=/data`, volume `./dados:/data:ro` (vira `docker-compose.dados.yml` na tarefa de Docker) |
 
 **Chat no Docker sempre simulado:** o agente do Marco ainda não tem imagem na `main`, e, dentro do container da API, `AGENT_URL=http://127.0.0.1:8001` apontaria para o próprio container, não para a máquina. Quando o Dockerfile do agente estiver na `main`, ele entra como serviço no compose e a API usa `AGENT_URL=http://agent:8001`. Para testar com o agente, use `pnpm dev`.
 
-**Por que dois arquivos:** com o volume no `docker-compose.yml`, o Docker cria `portal/dados/` **como root** no host quando a pasta não existe (testado em 14/11). Em um clone novo no Linux, copiar a Silver para lá passaria a exigir `sudo`. A sobreposição só monta o volume quando a Silver é usada.
+**Por que dois arquivos:** com o volume no `docker-compose.yml`, o Docker cria `portal/dados/` **como root** no host quando a pasta não existe (testado em 14/11). Em um clone novo no Linux, copiar os CSVs para lá passaria a exigir `sudo`. A sobreposição só monta o volume quando os CSVs são usados.
 
 ## 16. Como fazer mudanças comuns
 
-**A Silver mudou (coluna renomeada, nova ou removida)**
-1. `orders/silver-mapper.ts`: ajustar `SILVER_COLUMNS` e `mapSilverOrder`.
-2. Regenerar `orders/fixtures/silver-amostra.csv` com o cabeçalho novo, mantendo valores fictícios fora das colunas lidas.
+**As tabelas `consumo_*` mudaram (coluna renomeada, nova ou removida)**
+1. `orders/consumo-mapper.ts`: ajustar `ORDER_COLUMNS`/`ITEM_COLUMNS`/`EVENT_COLUMNS` e `mapConsumoOrder`; `orders/consumo-sql.ts`: ajustar `EXPORT_COLUMNS` (e `TIMESTAMP_COLUMNS`, se for data).
+2. `pnpm export:dados` e depois `pnpm --filter @translog/api fixtures` (regenera `orders.json` e a amostra `fixtures/consumo/`).
 3. Atualizar os testes do mapper e, se mudar o número de pedidos, o teste de integração.
 
-**Campo novo no `Order`** (ex.: `probableCause` passa a vir da base)
-1. `contracts/src/orders.ts`: campo com `.describe()` em pt-BR.
-2. `silver-mapper.ts`: preencher o campo.
-3. `orders/fixtures/orders.json` e `web/src/api/fixtures.ts`: incluir o campo nos 11 pedidos.
-4. Testes: `routes.test.ts` compara o pedido 15 campo a campo; ajustar.
-5. Conferir se o campo não é sensível (seção 11).
+**Campo novo no `Order`**
+1. `contracts/src/orders.ts`: campo com `.describe()` em pt-BR (e caso em `orders.test.ts`).
+2. `consumo-mapper.ts`: preencher o campo.
+3. `pnpm --filter @translog/api fixtures` (a tela lê o mesmo `orders.json` nos testes).
+4. Conferir se o campo não é sensível (seção 11).
+
+**Trocar a regra da central (ex.: `> 3` em vez de `>= 3`)**
+1. `orders/escalation.ts`: `SUPPORT_MIN_DELAY_DAYS` ou `shouldEscalateToSupport`; ajustar `escalation.test.ts` e regenerar os `fixtures`.
 
 **Mudar como o pedido aberto chega ao agente** (acordo com o Marco)
 1. `api/src/chat/adk-agent.ts`: só `withOrderContext`.
@@ -909,36 +1022,39 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | Decisão | Motivo |
 |---|---|
 | Node 24 executando TypeScript na API, sem build | Dispensa `tsx`, bundler e `dist/` no backend |
-| A API devolve o view model `Order` pronto | A conversão Silver → `Order` fica num arquivo só (`silver-mapper.ts`); a tela só exibe |
+| A API devolve o view model `Order` pronto | A conversão das tabelas → `Order` fica num arquivo só (`consumo-mapper.ts`); a tela só exibe |
 | Validação Zod também no cliente (`web/src/api/client.ts`) | Garante em tempo de execução que qualquer resposta recebida pela SPA respeita `@translog/contracts` |
-| Formatação de datas por corte de texto na API e no Web | Evita `new Date(string)`, que em UTC-3 deslocaria 22.723 linhas da Silver para o dia anterior |
+| Formatação de datas por corte de texto (ou no SQL) na API e no Web | Evita `new Date(string)`, que em Brasília deslocaria horários de madrugada (UTC) para o dia anterior |
 | Máquina de estados pura para a linha do tempo (`timeline.ts`) | Separa a regra das 4 etapas e das variantes (`Cancelado`, `releaseLabel`) do JSX, permitindo testes unitários diretos |
 | Carga completa antes do `listen` | Health honesto sem estado "carregando"; consulta O(1) em memória |
 | Erros de domínio mapeados só em `http/errors.ts` | Status e mensagens num lugar; rotas sem `try/catch` |
 | `orderId` como texto de 1 a 10 dígitos | Mesma regra do campo da tela; recusa `1e3` e `0x1F`, que `Number()` aceitaria |
-| `ORDERS_FILE` relativo a `portal/` | O diretório de execução muda entre `pnpm dev`, `pnpm start` e testes |
+| `DATA_DIR` relativo a `portal/` | O diretório de execução muda entre `pnpm dev`, `pnpm start` e testes |
 | `csv-parse` com registros como arrays | ~30% mais rápido que objetos; o descarte das colunas é o mesmo |
 | `Object.fromEntries`, grupos liberados e pool de textos | Memória da carga de 230 para 47 MB de heap (seção 8) |
 | Docker em dois arquivos de compose | Evita a pasta `dados/` criada como root em clones novos |
-| `probableCause` sempre `null` vindo da Silver | A coluna não existe; nada de regra inventada no backend |
+| Tabelas `consumo_*` da Silver, carregadas no boot | A Gold é agregada; uma linha por pedido + itens + eventos cobre a tela, sem consulta por pedido (cota da edição gratuita) |
+| Colunas explícitas no `SELECT` e `coalesce(CAST(...), '')` | Nada proibido sai do Databricks; NULL vira vazio como nos CSVs do Mateus |
+| Regra da central numa função (`escalation.ts`) | O grupo ainda pode trocar `>= 3` por `> 3` |
 | Chat sem histórico no servidor; porta `SupportAgent` recebe o pedido já resolvido | O ADK guarda a conversa; o simulado responde cada mensagem sozinho |
 | Pedido citado detectado pelo portal, não pelo agente | Funciona nos dois modos e não depende do formato da resposta do agente |
 | Trava por conversa marcada antes de qualquer `await` | O ADK exige uma mensagem por vez por sessão; `409 CHAT_BUSY` em vez de fila |
 | Um limite de tempo por resposta (`AGENT_TIMEOUT_MS`, 90 s) | É o tempo que o cliente espera; cobre criação da sessão, `/run` e o reenvio após `404` |
 | Reenvio automático só após `404` "Session not found" | Única situação em que a mensagem comprovadamente não foi processada |
 | `withOrderContext` como único ponto que conhece o formato do contexto | O formato ainda depende do Marco |
-| Regra do simulado só no backend | Uma cópia só; funciona com a Silver, não só com os 11 de exemplo |
+| Regra do simulado só no backend | Uma cópia só; funciona com a base inteira, não só com os pedidos de exemplo |
 | Log do chat sem conteúdo | Só metadados; o motivo técnico é montado pelo adapter, sem corpo HTTP |
 | Chat no Docker sempre `mock` | O agente ainda não tem imagem na `main`; `127.0.0.1` no container é o próprio container |
 | URL limpa por padrão no frontend (`/` sem query string inicial) | Evita poluir a barra de endereços ao abrir o portal; grava `?pedido=` apenas quando o cliente consulta um pedido |
 
 ## 19. Limitações e próximos passos
 
-- **Motivo provável na Silver:** com `DATA_SOURCE=file`, nenhum pedido tem `probableCause` (só os `fixtures` têm os motivos preenchidos, como `"Promessa irreal"` no pedido 375). Depende do Mateus e do Marcelo; quando a coluna existir, a mudança é apenas em `silver-mapper.ts`.
+- **Leitura direta do Databricks (`DATA_SOURCE=databricks`):** próxima tarefa; o cliente (`databricks-client.ts`) e a carga em CSV (`loadConsumoRepository`) já existem e são usados pelo `pnpm export:dados`.
+- **Tela e chat simulado no contrato novo:** só adaptados em 16/11 (situações, prazos de entrega, motivo provável com a explicação). A tela nova (despacho x entrega, onde está agora, extravio, aviso da central, linha do tempo por etapas) e o simulado reescrito vêm nas próximas tarefas.
 - **Agente ADK (pendências com o Marco, seção 10.8):** formato do pedido no texto, respostas longas e técnicas, formatação, sobreposição de mensagens depois de um `504`, Dockerfile na `main`. A tela e a API já funcionam com o agente; só `withOrderContext` e a configuração dependem dele.
-- **Tela x chat no motivo provável:** com `AGENT=adk`, o agente lê a Silver (sem motivo provável), enquanto a tela em `fixtures` mostra "Promessa irreal" no 375. Some quando o motivo provável existir na base (Mateus e Marcelo) e o agente e o portal lerem a mesma fonte.
+- **Tela x chat no motivo provável:** com `AGENT=adk`, o agente lê a base dele; o portal agora lê `consumo_pedidos`, que tem a causa e o `resumo_pedido` feito para a IA. Ficam iguais quando o agente ler a mesma tabela (pendência com o Marco).
 - **Duas decisões de produto em aberto (simuláveis na `ProtoBar`):**
   1. Comportamento do chat ao trocar de pedido (`divider` vs `keep` vs `clear`);
   2. Rótulo de pedidos com pagamento pendente (`Aguardando liberação` vs `Pagamento pendente`).
 - **Docker do Frontend (Fase 4):** adicionar Dockerfile multi-stage de `@translog/web` (ou servir o `web/dist` pelo Fastify/Nginx) no `docker-compose.yml` para entrega final containerizada.
-- **Fonte final:** Silver ou Gold (possivelmente Parquet) ainda não definida pelo grupo. Para Parquet, avaliar DuckDB no mesmo adapter. Sem banco de dados até o grupo decidir.
+- **Fonte final (decidida em 16/11):** tabelas `consumo_*` da Silver no Databricks, com os CSVs em `portal/dados/` como plano B. Sem banco próprio.
