@@ -14,7 +14,6 @@ api/src/testing
 !.env.example
 
 .git
-# Locais e grandes: contexto de desenvolvimento, Silver (163 MB) e protótipos (mockup com node_modules).
+# Locais e grandes: contexto de desenvolvimento e CSVs das tabelas consumo_*.
 _contexto
 dados
-prototipos

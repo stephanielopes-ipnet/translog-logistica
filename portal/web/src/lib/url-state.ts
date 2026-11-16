@@ -1,14 +1,3 @@
-import type { ChatOnSwitchMode } from "@/features/dev-bar/proto-bar.tsx";
-
-export interface UrlInitialPresets {
-  orderId: number | null;
-  trackerPreset: string | null;
-  chatPreset: "empty" | "conversation" | "typing" | "error" | null;
-  chatOnSwitch: ChatOnSwitchMode | null;
-  networkOnline: boolean | null;
-  hideProtoBarCompletely: boolean;
-}
-
 /** Interpreta um código numérico de pedido positivo (até 10 dígitos). */
 export function parseOrderId(value: string | null | undefined): number | null {
   if (!value || !/^\d{1,10}$/.test(value)) {
@@ -18,34 +7,14 @@ export function parseOrderId(value: string | null | undefined): number | null {
   return Number.isSafeInteger(num) && num > 0 ? num : null;
 }
 
-/** Lê parâmetros iniciais da URL (`?pedido=375` ou presets `?t=375&c=conversation&bar=off`). */
-export function readUrlPresets(search: string): UrlInitialPresets {
-  const params = new URLSearchParams(search);
-  const pedidoParam = parseOrderId(params.get("pedido"));
-  const tParam = params.get("t");
-  const cParam = params.get("c");
-  const sParam = params.get("s");
-  const nParam = params.get("n");
-
-  const tOrderId = parseOrderId(tParam);
-
-  return {
-    orderId: tOrderId ?? pedidoParam,
-    trackerPreset: tParam && !tOrderId ? tParam : null,
-    chatPreset:
-      cParam === "empty" || cParam === "conversation" || cParam === "typing" || cParam === "error"
-        ? cParam
-        : null,
-    chatOnSwitch: sParam === "keep" || sParam === "divider" || sParam === "clear" ? sParam : null,
-    networkOnline: nParam === "on" ? true : nParam === "off" ? false : null,
-    hideProtoBarCompletely: params.get("bar") === "off",
-  };
+/** Pedido aberto pela URL (`?pedido=375`), ou `null`. */
+export function readOrderIdFromUrl(search: string): number | null {
+  return parseOrderId(new URLSearchParams(search).get("pedido"));
 }
 
 /** Atualiza `?pedido=<id>` na query string preservando demais parâmetros. */
 export function withOrderQueryParam(search: string, orderId: number | null): string {
   const params = new URLSearchParams(search);
-  params.delete("t");
   if (orderId === null) {
     params.delete("pedido");
   } else {

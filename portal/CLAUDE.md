@@ -15,7 +15,7 @@ Dados (16/11): tabelas oficiais `workspace.silver.consumo_pedidos`, `consumo_ite
 ## Regras
 
 - **Git só pelo humano.** Não rode `git add`, `commit`, `branch`, `push`, `rebase`, `stash` nem similares. Ao fim de cada tarefa: `pnpm lint`, `pnpm typecheck`, `pnpm test`, marque o `tasks.md`, sugira a mensagem de commit e pare.
-- **Não altere** `agent/`, `pipeline/`, `bases/`, `dashboard/`, `docs/` da raiz nem `portal/prototipos/`. O `.gitignore` da raiz só muda com autorização.
+- **Não altere** `agent/`, `pipeline/`, `bases/`, `dashboard/`, `docs/` da raiz. O `.gitignore` da raiz só muda com autorização.
 - `portal/_contexto/` e `portal/dados/` nunca vão para o Git. Confira com `git status` antes de sugerir commit.
 - **Privacidade:** nenhuma resposta da API contém id do cliente, segmento, tipo de pagamento, preço unitário, valor bruto, desconto, id do produto, lucro, margem ou latitude/longitude. Nas tabelas `consumo_*`, `id_cliente`, `segmento_cliente`, `valor_desconto`, `valor_bruto_venda`, `preco_unitario` e `id_produto` nunca entram no `SELECT` e são descartadas **na leitura** dos CSVs, não só na saída.
 - Os CSVs (`portal/dados/consumo_*.csv`) nunca entram no Git nem na imagem Docker. Fixtures de teste em CSV usam valores reais só nas colunas que o portal lê; as proibidas recebem valores fictícios (`FICTICIO-*`).

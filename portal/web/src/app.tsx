@@ -10,22 +10,15 @@ import {
   chatTimeLabel,
   createSessionId,
   messagesAfterOrderSwitch,
-  startsNewConversation,
 } from "@/features/chat/chat-session.ts";
-import { buildPresetConversation, PRESET_ORDER_ID } from "@/features/dev-bar/chat-presets.ts";
-import { type ChatOnSwitchMode, ProtoBar } from "@/features/dev-bar/proto-bar.tsx";
 import { type TrackerViewMode, TrackingPanel } from "@/features/tracking/tracking-panel.tsx";
-import { parseOrderId, readUrlPresets, withOrderQueryParam } from "@/lib/url-state.ts";
+import { parseOrderId, readOrderIdFromUrl, withOrderQueryParam } from "@/lib/url-state.ts";
 
 export function App() {
-  const initialUrl = useMemo(
-    () => readUrlPresets(typeof window !== "undefined" ? window.location.search : ""),
+  const initialOrderId = useMemo(
+    () => readOrderIdFromUrl(typeof window !== "undefined" ? window.location.search : ""),
     [],
   );
-  // Conversa de exemplo pela URL (?c=conversation|typing|error): textos fixos sobre o pedido 76902.
-  const initialChatPreset =
-    initialUrl.chatPreset && initialUrl.chatPreset !== "empty" ? initialUrl.chatPreset : null;
-  const initialOrderId = initialUrl.orderId ?? (initialChatPreset ? PRESET_ORDER_ID : null);
 
   const msgSeqRef = useRef(1);
   const nextMsgId = useCallback(() => {
@@ -42,67 +35,42 @@ export function App() {
     selectedOrderIdRef.current = selectedOrderId;
   }, [selectedOrderId]);
   const [queryValue, setQueryValue] = useState<string>(
-    initialOrderId
-      ? String(initialOrderId)
-      : initialUrl.trackerPreset === "notfound"
-        ? "9999"
-        : initialUrl.trackerPreset === "loading" || initialUrl.trackerPreset === "error"
-          ? "375"
-          : "",
+    initialOrderId ? String(initialOrderId) : "",
   );
   const [submittedQuery, setSubmittedQuery] = useState<string>(queryValue);
 
-  // Sobreposições da barra de protótipo (null = usa API real normalmente)
-  const [forcedTrackerView, setForcedTrackerView] = useState<
-    "loading" | "notfound" | "error" | null
-  >(
-    initialUrl.trackerPreset === "loading" ||
-      initialUrl.trackerPreset === "notfound" ||
-      initialUrl.trackerPreset === "error"
-      ? initialUrl.trackerPreset
-      : null,
-  );
-  const [forcedOffline, setForcedOffline] = useState<boolean>(initialUrl.networkOnline === false);
-
-  // Ponto em aberto configurável na barra: o chat ao trocar de pedido
-  const [chatOnSwitch, setChatOnSwitch] = useState<ChatOnSwitchMode>(
-    initialUrl.chatOnSwitch ?? "keep",
-  );
+  // Número digitado fora do formato: mostra "não encontrado" sem consultar a API.
+  const [invalidQuery, setInvalidQuery] = useState(false);
 
   // Estado do Chat
-  const [messages, setMessages] = useState<ChatMessageItem[]>(() =>
-    initialChatPreset ? buildPresetConversation(initialChatPreset, () => msgSeqRef.current++) : [],
-  );
-  const [typing, setTyping] = useState<boolean>(initialChatPreset === "typing");
+  const [messages, setMessages] = useState<ChatMessageItem[]>([]);
+  const [typing, setTyping] = useState(false);
   // Conversa atual no backend. null = a próxima mensagem começa uma conversa nova.
   const sessionIdRef = useRef<string | null>(null);
   const { mutateAsync: sendChatMessage } = useSendChatMessage();
 
   // Consultas à API real (@translog/api)
-  const healthQuery = useHealth(!forcedOffline);
+  const healthQuery = useHealth();
   const samplesQuery = useOrderSamples();
-  const orderQuery = useOrderQuery(selectedOrderId, !forcedOffline && forcedTrackerView === null);
+  const orderQuery = useOrderQuery(selectedOrderId);
 
-  const isConnected = !forcedOffline && !healthQuery.isError;
+  const isConnected = !healthQuery.isError;
 
   // Pedido ativo resolvido pela API real
   const activeOrder: Order | null = useMemo(() => {
-    if (forcedTrackerView !== null || selectedOrderId === null) {
+    if (invalidQuery || selectedOrderId === null) {
       return null;
     }
     return orderQuery.data ?? null;
-  }, [forcedTrackerView, selectedOrderId, orderQuery.data]);
+  }, [invalidQuery, selectedOrderId, orderQuery.data]);
 
   // View mode calculado da coluna de rastreio
   const trackerView: TrackerViewMode = useMemo(() => {
-    if (forcedTrackerView) {
-      return forcedTrackerView;
+    if (invalidQuery) {
+      return "notfound";
     }
     if (selectedOrderId === null) {
       return "empty";
-    }
-    if (forcedOffline) {
-      return "error";
     }
     if (orderQuery.isPending) {
       return "loading";
@@ -119,9 +87,8 @@ export function App() {
     }
     return "empty";
   }, [
-    forcedTrackerView,
+    invalidQuery,
     selectedOrderId,
-    forcedOffline,
     orderQuery.isPending,
     orderQuery.isError,
     orderQuery.error,
@@ -145,18 +112,15 @@ export function App() {
     setTyping(false);
   }, []);
 
-  // Aplica regra de troca de pedido no chat (keep | divider | clear)
+  // Troca de pedido: a conversa continua, com um divisor marcando o pedido novo.
   const applyOrderSwitchToChat = useCallback(
     (nextOrderId: number | null) => {
       const previousOrderId = selectedOrderIdRef.current;
-      if (startsNewConversation(chatOnSwitch, previousOrderId, nextOrderId)) {
-        startNewConversation();
-      }
       setMessages((prev) =>
-        messagesAfterOrderSwitch(prev, chatOnSwitch, previousOrderId, nextOrderId, nextMsgId),
+        messagesAfterOrderSwitch(prev, previousOrderId, nextOrderId, nextMsgId),
       );
     },
-    [chatOnSwitch, nextMsgId, startNewConversation],
+    [nextMsgId],
   );
 
   // Busca um pedido pelo formulário, pelos chips ou pelo pedido citado no chat
@@ -165,11 +129,10 @@ export function App() {
       const parsed = parseOrderId(rawOrderId);
       setSubmittedQuery(rawOrderId);
       setQueryValue(rawOrderId);
-      setForcedTrackerView(null);
+      setInvalidQuery(parsed === null);
 
       if (parsed === null) {
         setSelectedOrderId(null);
-        setForcedTrackerView("notfound");
         syncUrlOrder(null);
         return;
       }
@@ -182,7 +145,7 @@ export function App() {
   );
 
   const handleClearOrder = useCallback(() => {
-    setForcedTrackerView(null);
+    setInvalidQuery(false);
     setSelectedOrderId(null);
     setQueryValue("");
     setSubmittedQuery("");
@@ -190,8 +153,7 @@ export function App() {
   }, [syncUrlOrder]);
 
   const handleRetryTracking = useCallback(() => {
-    setForcedOffline(false);
-    setForcedTrackerView(null);
+    setInvalidQuery(false);
     if (selectedOrderId !== null) {
       void orderQuery.refetch();
     } else {
@@ -216,11 +178,6 @@ export function App() {
   // Envia a pergunta à API (POST /api/chat) e mostra a resposta. Sem reenvio automático.
   const deliverChatReply = useCallback(
     async (question: string, userMessageId: number) => {
-      if (forcedOffline) {
-        markMessageFailed(userMessageId, "Não enviada");
-        return;
-      }
-
       sessionIdRef.current ??= createSessionId();
       const sessionId = sessionIdRef.current;
       setTyping(true);
@@ -231,7 +188,7 @@ export function App() {
           orderId: activeOrder?.orderId ?? null,
         });
         if (sessionIdRef.current !== sessionId) {
-          return; // A conversa mudou enquanto esperava ("Nova conversa" ou troca com "Zerar").
+          return; // O cliente começou uma "Nova conversa" enquanto esperava.
         }
         setTyping(false);
         // Pedido citado na mensagem: abre no rastreio (mesma troca de pedido do formulário).
@@ -253,7 +210,7 @@ export function App() {
         markMessageFailed(userMessageId, chatFailureLabel(error));
       }
     },
-    [activeOrder, forcedOffline, handleSelectOrder, markMessageFailed, nextMsgId, sendChatMessage],
+    [activeOrder, handleSelectOrder, markMessageFailed, nextMsgId, sendChatMessage],
   );
 
   const handleSendMessage = useCallback(
@@ -292,104 +249,8 @@ export function App() {
     setMessages([]);
   }, [startNewConversation]);
 
-  // Aplicação de presets da barra de controle
-  const handleSelectPreset = useCallback(
-    (presetKey: string) => {
-      const [kind, val] = presetKey.split(":");
-      if (!kind || !val) return;
-
-      if (kind === "t") {
-        if (/^\d+$/.test(val)) {
-          const id = Number(val);
-          setForcedOffline(false);
-          setForcedTrackerView(null);
-          applyOrderSwitchToChat(id);
-          setSelectedOrderId(id);
-          setQueryValue(val);
-          setSubmittedQuery(val);
-          syncUrlOrder(id);
-        } else if (val === "empty") {
-          setForcedTrackerView(null);
-          setSelectedOrderId(null);
-          setQueryValue("");
-          setSubmittedQuery("");
-          syncUrlOrder(null);
-        } else if (val === "loading") {
-          setForcedTrackerView("loading");
-          if (!queryValue) setQueryValue("375");
-        } else if (val === "notfound") {
-          setForcedTrackerView("notfound");
-          setSelectedOrderId(null);
-          setQueryValue("9999");
-          setSubmittedQuery("9999");
-          syncUrlOrder(null);
-        } else if (val === "error") {
-          setForcedOffline(true);
-          setForcedTrackerView("error");
-          if (!queryValue) {
-            setQueryValue("375");
-            setSubmittedQuery("375");
-          }
-        }
-      } else if (kind === "c") {
-        // Conversa de exemplo substitui a atual: começa outra conversa no backend.
-        startNewConversation();
-        if (val === "empty") {
-          setMessages([]);
-        } else if (val === "conversation" || val === "typing" || val === "error") {
-          if (selectedOrderIdRef.current !== PRESET_ORDER_ID) {
-            setForcedTrackerView(null);
-            setSelectedOrderId(PRESET_ORDER_ID);
-            setQueryValue(String(PRESET_ORDER_ID));
-            setSubmittedQuery(String(PRESET_ORDER_ID));
-            syncUrlOrder(PRESET_ORDER_ID);
-          }
-          setMessages(buildPresetConversation(val, nextMsgId));
-          // "Digitando" de exemplo: nenhuma pergunta foi enviada à API.
-          setTyping(val === "typing");
-        }
-      } else if (kind === "s") {
-        if (val === "keep" || val === "divider" || val === "clear") {
-          setChatOnSwitch(val);
-        }
-      } else if (kind === "n") {
-        const nextOffline = val === "off";
-        setForcedOffline(nextOffline);
-        if (!nextOffline && forcedTrackerView === "error") {
-          setForcedTrackerView(null);
-        }
-      }
-    },
-    [
-      applyOrderSwitchToChat,
-      forcedTrackerView,
-      nextMsgId,
-      queryValue,
-      startNewConversation,
-      syncUrlOrder,
-    ],
-  );
-
-  const activeProtoKeys = useMemo(() => {
-    const tk =
-      trackerView === "result" && activeOrder ? `t:${activeOrder.orderId}` : `t:${trackerView}`;
-    const hasFailed = messages.some((m) => m.role === "user" && m.status === "failed");
-    const ck = typing
-      ? "c:typing"
-      : hasFailed
-        ? "c:error"
-        : messages.length > 0
-          ? "c:conversation"
-          : "c:empty";
-    return [tk, ck, `s:${chatOnSwitch}`, isConnected ? "n:on" : "n:off"];
-  }, [activeOrder, chatOnSwitch, isConnected, messages, trackerView, typing]);
-
   return (
     <div className="flex flex-col h-full min-w-[1280px] bg-slate-100/80 text-slate-900 antialiased overflow-hidden">
-      {!initialUrl.hideProtoBarCompletely && (
-        <ProtoBar activeKeys={activeProtoKeys} onSelectPreset={handleSelectPreset} />
-      )}
-
       <AppHeader connected={isConnected} />
 
       <main className="flex-1 min-h-0">

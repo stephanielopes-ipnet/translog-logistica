@@ -1,4 +1,4 @@
-import type { Order, ShippingMode } from "@translog/contracts";
+import type { Order } from "@translog/contracts";
 
 /**
  * Formatação para a tela em pt-BR.
@@ -52,26 +52,4 @@ export function formatManifestCode(order: Pick<Order, "orderId" | "market">): st
   const paddedId = String(order.orderId).padStart(6, "0");
   const marketCode = order.market.replace(/\s+/g, "").toUpperCase();
   return `TL-${paddedId}-${marketCode}`;
-}
-
-/** Prazo estimado por modalidade de envio (coerente com a base: 4, 2, 1 e 0 dias). */
-export const SHIPPING_MODE_SLA: Record<ShippingMode, string> = {
-  "Standard Class": "Prazo estimado: 4 dias",
-  "Second Class": "Prazo estimado: 2 dias",
-  "First Class": "Prazo estimado: 1 dia",
-  "Same Day": "Despacho no mesmo dia",
-};
-
-/** Rótulo resumido de atraso/adiantamento. */
-export function formatDelayLabel(delayDays: number | null): string | null {
-  if (delayDays === null) {
-    return null;
-  }
-  if (delayDays > 0) {
-    return `${pluralize(delayDays, "dia", "dias")} de atraso`;
-  }
-  if (delayDays < 0) {
-    return `${pluralize(-delayDays, "dia", "dias")} adiantado`;
-  }
-  return "dentro do prazo";
 }

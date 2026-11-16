@@ -25,12 +25,9 @@ export type ChatMessageItem =
       orderId: number;
     };
 
-/** O que acontece com a conversa ao trocar de pedido (decisão em aberto, simulada na barra). */
-export type ChatOnSwitchMode = "keep" | "divider" | "clear";
-
-/** Horário da mensagem (`HH:MM`); `minutesAgo` serve às conversas de exemplo da barra. */
-export function chatTimeLabel(minutesAgo = 0): string {
-  return new Date(Date.now() - minutesAgo * 60_000).toLocaleTimeString("pt-BR", {
+/** Horário da mensagem (`HH:MM`). */
+export function chatTimeLabel(): string {
+  return new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -41,48 +38,29 @@ export function createSessionId(): string {
   return crypto.randomUUID();
 }
 
-function isOrderSwitch(previousOrderId: number | null, nextOrderId: number | null): boolean {
-  return previousOrderId !== null && nextOrderId !== null && previousOrderId !== nextOrderId;
-}
-
 /**
- * A troca de pedido começa uma conversa nova (novo `sessionId`) só quando limpa a conversa
- * (`clear`). Nos outros modos a conversa e o `sessionId` continuam.
+ * Mensagens depois de trocar de pedido (decidido em 17/11): a conversa continua, com um divisor
+ * marcando o pedido novo. Chat vazio, mesmo pedido ou sem pedido anterior: nada muda.
  */
-export function startsNewConversation(
-  mode: ChatOnSwitchMode,
-  previousOrderId: number | null,
-  nextOrderId: number | null,
-): boolean {
-  return mode === "clear" && isOrderSwitch(previousOrderId, nextOrderId);
-}
-
-/** Mensagens depois de trocar de pedido: `keep` mantém, `divider` insere um divisor, `clear` limpa. */
 export function messagesAfterOrderSwitch(
   messages: ChatMessageItem[],
-  mode: ChatOnSwitchMode,
   previousOrderId: number | null,
   nextOrderId: number | null,
   nextId: () => number,
 ): ChatMessageItem[] {
   if (
+    previousOrderId === null ||
     nextOrderId === null ||
-    !isOrderSwitch(previousOrderId, nextOrderId) ||
+    previousOrderId === nextOrderId ||
     messages.length === 0
   ) {
     return messages;
   }
-  if (mode === "clear") {
-    return [];
+  const last = messages.at(-1);
+  if (last?.role === "divider" && last.orderId === nextOrderId) {
+    return messages;
   }
-  if (mode === "divider") {
-    const last = messages.at(-1);
-    if (last?.role === "divider" && last.orderId === nextOrderId) {
-      return messages;
-    }
-    return [...messages, { id: nextId(), role: "divider", orderId: nextOrderId }];
-  }
-  return messages;
+  return [...messages, { id: nextId(), role: "divider", orderId: nextOrderId }];
 }
 
 /** Texto ao lado de "Tentar novamente" conforme a falha de `POST /api/chat`. */

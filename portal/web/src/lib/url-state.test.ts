@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseOrderId, readUrlPresets, withOrderQueryParam } from "./url-state.ts";
+import { parseOrderId, readOrderIdFromUrl, withOrderQueryParam } from "./url-state.ts";
 
 describe("url-state utilities", () => {
   it("parses valid positive order IDs up to 10 digits", () => {
@@ -11,26 +11,10 @@ describe("url-state utilities", () => {
     expect(parseOrderId("12345678901")).toBeNull();
   });
 
-  it("reads empty URL as empty initial state", () => {
-    expect(readUrlPresets("")).toEqual({
-      orderId: null,
-      trackerPreset: null,
-      chatPreset: null,
-      chatOnSwitch: null,
-      networkOnline: null,
-      hideProtoBarCompletely: false,
-    });
-  });
-
-  it("reads prototype URL presets", () => {
-    expect(readUrlPresets("?t=375&c=conversation&s=divider&n=off&bar=off")).toEqual({
-      orderId: 375,
-      trackerPreset: null,
-      chatPreset: "conversation",
-      chatOnSwitch: "divider",
-      networkOnline: false,
-      hideProtoBarCompletely: true,
-    });
+  it("reads the order opened by the URL", () => {
+    expect(readOrderIdFromUrl("")).toBeNull();
+    expect(readOrderIdFromUrl("?pedido=76902")).toBe(76902);
+    expect(readOrderIdFromUrl("?pedido=abc")).toBeNull();
   });
 
   it("updates ?pedido query parameter cleanly", () => {

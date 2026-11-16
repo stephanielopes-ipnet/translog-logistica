@@ -6,7 +6,6 @@ import {
   chatFailureLabel,
   createSessionId,
   messagesAfterOrderSwitch,
-  startsNewConversation,
 } from "./chat-session.ts";
 
 const conversation: ChatMessageItem[] = [
@@ -29,44 +28,19 @@ describe("createSessionId", () => {
   });
 });
 
-describe("startsNewConversation", () => {
-  it("starts a new conversation only when switching orders clears the chat", () => {
-    expect(startsNewConversation("clear", 375, 15)).toBe(true);
-    expect(startsNewConversation("keep", 375, 15)).toBe(false);
-    expect(startsNewConversation("divider", 375, 15)).toBe(false);
-  });
-
-  it("keeps the conversation when the order does not actually change", () => {
-    expect(startsNewConversation("clear", 375, 375)).toBe(false);
-    expect(startsNewConversation("clear", null, 375)).toBe(false);
-    expect(startsNewConversation("clear", 375, null)).toBe(false);
-  });
-});
-
 describe("messagesAfterOrderSwitch", () => {
-  it("keep: leaves the conversation untouched", () => {
-    expect(messagesAfterOrderSwitch(conversation, "keep", 375, 15, counter(3))).toBe(conversation);
-  });
-
-  it("clear: empties the conversation", () => {
-    expect(messagesAfterOrderSwitch(conversation, "clear", 375, 15, counter(3))).toEqual([]);
-  });
-
-  it("divider: appends one divider for the new order, without repeating it", () => {
-    const withDivider = messagesAfterOrderSwitch(conversation, "divider", 375, 15, counter(3));
+  it("appends one divider for the new order, without repeating it", () => {
+    const withDivider = messagesAfterOrderSwitch(conversation, 375, 15, counter(3));
 
     expect(withDivider.at(-1)).toEqual({ id: 3, role: "divider", orderId: 15 });
-    expect(messagesAfterOrderSwitch(withDivider, "divider", 562, 15, counter(4))).toBe(withDivider);
+    expect(messagesAfterOrderSwitch(withDivider, 562, 15, counter(4))).toBe(withDivider);
   });
 
-  it("does nothing for an empty chat or when the order stays the same", () => {
-    expect(messagesAfterOrderSwitch([], "divider", 375, 15, counter(1))).toEqual([]);
-    expect(messagesAfterOrderSwitch(conversation, "clear", 375, 375, counter(3))).toBe(
-      conversation,
-    );
-    expect(messagesAfterOrderSwitch(conversation, "clear", null, 375, counter(3))).toBe(
-      conversation,
-    );
+  it("does nothing for an empty chat, the same order or no previous order", () => {
+    expect(messagesAfterOrderSwitch([], 375, 15, counter(1))).toEqual([]);
+    expect(messagesAfterOrderSwitch(conversation, 375, 375, counter(3))).toBe(conversation);
+    expect(messagesAfterOrderSwitch(conversation, null, 375, counter(3))).toBe(conversation);
+    expect(messagesAfterOrderSwitch(conversation, 375, null, counter(3))).toBe(conversation);
   });
 });
 

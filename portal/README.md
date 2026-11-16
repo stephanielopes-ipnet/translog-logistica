@@ -115,7 +115,7 @@ Pedidos de exemplo para mostrar cada situação:
 | **31298** | Entregue no prazo, rota dentro dos EUA por caminhão | Sem voo nem alfândega |
 | **76385** | Em trânsito, em voo para a Austrália, 6 dias de atraso | Outro caso em trânsito |
 
-Os atalhos da tela são 76902, 375, 34 e 8 (`SAMPLE_ORDER_IDS`). A barra escura no topo da tela (some com `?bar=off` no endereço) abre qualquer um deles e simula carregamento, erro e conversas de exemplo.
+Os atalhos da tela são 76902, 375, 34 e 8 (`SAMPLE_ORDER_IDS`). Qualquer pedido pode ser aberto direto pelo endereço, por exemplo `http://localhost:5173/?pedido=76902`.
 
 ## Privacidade
 
@@ -160,4 +160,3 @@ Nenhuma resposta do portal traz dados do cliente (id, segmento) nem valores inte
 | `dados/` | CSVs das tabelas (só no seu computador, nunca no GitHub) |
 | `docs/backend.md` | Documentação técnica completa |
 | `tasks.md` | Checklist do que foi feito |
-| `prototipos/` | Protótipos visuais (a Direção D foi a escolhida) |

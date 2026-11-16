@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   formatCurrency,
   formatDate,
-  formatDelayLabel,
   formatManifestCode,
   onlyDigits,
   pluralize,
@@ -44,13 +43,5 @@ describe("format utilities", () => {
     expect(formatManifestCode({ orderId: 20322, market: "Pacific Asia" })).toBe(
       "TL-020322-PACIFICASIA",
     );
-  });
-
-  it("formats delay labels", () => {
-    expect(formatDelayLabel(4)).toBe("4 dias de atraso");
-    expect(formatDelayLabel(1)).toBe("1 dia de atraso");
-    expect(formatDelayLabel(-1)).toBe("1 dia adiantado");
-    expect(formatDelayLabel(0)).toBe("dentro do prazo");
-    expect(formatDelayLabel(null)).toBeNull();
   });
 });

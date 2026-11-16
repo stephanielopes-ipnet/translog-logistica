@@ -8,8 +8,7 @@
       "!pnpm-lock.yaml",
       "!**/*.md",
       "!!_contexto",
-      "!!dados",
-      "!!prototipos"
+      "!!dados"
     ]
   },
   "formatter": {

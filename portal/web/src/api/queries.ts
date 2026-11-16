@@ -11,11 +11,10 @@ import { getJson, postJson, shouldRetry } from "./client.ts";
 import { DEFAULT_SAMPLE_IDS } from "./fixtures.ts";
 
 /** Verifica periodicamente `/api/health` para o indicador de conexão do cabeçalho. */
-export function useHealth(enabled = true) {
+export function useHealth() {
   return useQuery({
     queryKey: ["health"],
     queryFn: () => getJson("/health", healthResponseSchema),
-    enabled,
     refetchInterval: 15_000,
     retry: shouldRetry,
   });
@@ -37,11 +36,11 @@ export function useOrderSamples() {
 }
 
 /** Busca um pedido em `/api/orders/:orderId` quando há um `orderId` selecionado. */
-export function useOrderQuery(orderId: number | null, enabled = true) {
+export function useOrderQuery(orderId: number | null) {
   return useQuery<Order>({
     queryKey: ["orders", orderId],
     queryFn: () => getJson(`/orders/${orderId}`, orderSchema),
-    enabled: enabled && orderId !== null && orderId > 0,
+    enabled: orderId !== null && orderId > 0,
     retry: shouldRetry,
   });
 }

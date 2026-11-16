@@ -78,7 +78,7 @@ portal/
 ├── pnpm-workspace.yaml      # pacotes (api, contracts, web), catalog de versões, savePrefix ""
 ├── pnpm-lock.yaml
 ├── tsconfig.base.json       # opções de TypeScript compartilhadas
-├── biome.json               # regras de lint/format; ignora _contexto/, dados/, prototipos/, dist/ e *.md
+├── biome.json               # regras de lint/format; ignora _contexto/, dados/, dist/ e *.md
 ├── .nvmrc                   # 24
 ├── .env.example             # todas as variáveis, comentadas
 ├── .dockerignore
@@ -89,7 +89,6 @@ portal/
 ├── CLAUDE.md                # regras e comandos para o assistente de código
 ├── tasks.md                 # checklist por fase
 ├── docs/backend.md          # este documento técnico (backend + frontend)
-├── prototipos/              # protótipos HTML da tela (A, B, C e Direção D escolhida)
 ├── dados/                   # CSVs das tabelas consumo_* (plano B; no .gitignore; nunca versionar)
 ├── contracts/               # @translog/contracts
 │   └── src/
@@ -175,9 +174,6 @@ portal/
             │   ├── chat-messages.tsx      # mensagens, divisor de troca, "digitando…" e falha com "Tentar novamente"
             │   ├── chat-input.tsx         # chips de sugestão contextual + textarea com Enter / Shift+Enter
             │   └── chat-panel.tsx         # coluna direita fixa (400 px) com contexto do pedido ativo
-            └── dev-bar/
-                ├── chat-presets.ts        # conversas de exemplo da barra, com textos fixos sobre o 375
-                └── proto-bar.tsx          # barra recolhível para simular estados e as decisões em aberto
 ```
 
 Testes ficam ao lado do arquivo testado (`*.test.ts`) tanto em `api/src/` quanto em `web/src/`.
@@ -870,7 +866,7 @@ As mensagens de validação do Zod saem em pt-BR (`z.config(z.locales.ptBR())` n
 
 ## 13. Frontend (`@translog/web`)
 
-A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implementando fielmente o protótipo **Direção D** (`portal/prototipos/translog-prototipo-direcao-d.html`).
+A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implementando fielmente o protótipo **Direção D** (o HTML do protótipo saiu do repositório em 17/11; está no histórico do Git, em `portal/prototipos/translog-prototipo-direcao-d.html`).
 
 ### 13.1. Identidade visual e Design System (`src/index.css`)
 
@@ -952,26 +948,20 @@ A tela não tem mais regra de respostas: tudo vem de `POST /api/chat` (a regra d
 
 - **Envio (`app.tsx`):** a pergunta entra na conversa, o "digitando…" aparece (sem tempo artificial) e `useSendChatMessage` envia `{ sessionId, message, orderId }`, com o `orderId` do pedido exibido (o mesmo do chip "Falando sobre o pedido"). Enquanto espera, a caixa de texto fica bloqueada.
 - **`sessionId` por conversa (`chat-session.ts`):** criado na primeira mensagem (`createSessionId`, UUID v4). Volta a vazio (conversa nova) em "Nova conversa", na troca de pedido com "Zerar" (`startsNewConversation`) e ao aplicar uma conversa de exemplo da barra. A resposta que chega depois de a conversa mudar é descartada.
-- **Pedido citado:** `mentionedOrderId` diferente do pedido aberto abre esse pedido pela mesma função do formulário (`handleSelectOrder`), aplicando a regra de troca do chat.
-- **Falha:** a pergunta fica "Não enviada · Tentar novamente"; no `504`, "O assistente demorou demais · Tentar novamente" (`chatFailureLabel`). Reenvio só manual. Com a rede simulada desligada na barra (`n=off`), a mensagem falha na hora, sem chamar a API.
+- **Pedido citado:** `mentionedOrderId` diferente do pedido aberto abre esse pedido pela mesma função do formulário (`handleSelectOrder`), que insere o divisor de troca no chat.
+- **Falha:** a pergunta fica "Não enviada · Tentar novamente"; no `504`, "O assistente demorou demais · Tentar novamente" (`chatFailureLabel`). Reenvio só manual.
 - **Formatação (`rich-text.ts`):** `parseRichText` transforma o texto em linhas (texto, título `#`/`##`/`###`, item de lista `*`/`-`/`•` com até 2 níveis, linha em branco) com trechos em `**negrito**`; `chat-messages.tsx` monta os elementos React, sem `dangerouslySetInnerHTML`. Tabelas, links, `---`, `*itálico*` e crases aparecem como texto.
 - **Sem pedido aberto:** o estado vazio diz "Olá! <nome> por aqui." e convida a informar o número; o campo de texto mostra "Digite o número do pedido (ex.: 76902)"; as sugestões são "Quero acompanhar meu pedido" (o assistente pede o número), as modalidades e a central.
 - **Sugestões (`chat-suggestions.ts`):** com pedido aberto e a conversa vazia, 3 perguntas adaptadas à situação; sempre citam o número do pedido.
 - **Nome do assistente:** `ASSISTANT_NAME` em `contracts/src/chat.ts` (cabeçalho, mensagens e respostas do simulado). Ainda não confirmado pelo grupo.
 - **Limite:** a caixa de texto aceita até `CHAT_MESSAGE_MAX_LENGTH` (1000) caracteres. `Enter` envia, `Shift+Enter` quebra linha.
-- **Três modos ao trocar de pedido (`chatOnSwitch`, decisão em aberto):** `keep` (padrão) mantém a conversa; `divider` insere `Alternado para o pedido #N`; `clear` limpa a conversa e começa outra no backend.
+- **Troca de pedido (decidido em 17/11):** a conversa continua, no mesmo `sessionId`, com um divisor `Alternado para o pedido #N` (`messagesAfterOrderSwitch`). "Nova conversa" limpa e começa outra no backend.
 
-### 13.7. Estado na URL e Barra de Apresentação (`src/lib/url-state.ts` e `ProtoBar`)
+### 13.7. Estado na URL (`src/lib/url-state.ts`)
 
-- **URL limpa por padrão:** ao abrir `http://localhost:5173`, a URL permanece limpa (`/`) e a tela abre no estado inicial vazio. Ao buscar um pedido, apenas `?pedido=<id>` é gravado via `window.history.replaceState` (se for o pedido padrão ou se limpar a busca, o parâmetro é removido).
-- **Presets de demonstração por query string:** para testes ou apresentações guiadas, a URL também lê opcionalmente:
-  - `?pedido=375` (ou `?order=375`): abre direto o pedido informado;
-  - `?t=empty|loading|notfound|neterr|375`: força um estado de rastreamento;
-  - `?c=conversation|typing|error|empty`: conversa de exemplo com textos fixos sobre o 76902 (abre o 76902 se nenhum pedido for informado);
-  - `?s=keep|divider|clear`: escolhe o comportamento do chat ao trocar de pedido;
-  - `?n=on|off`: simula a rede ligada ou desligada;
-  - `?bar=off`: oculta completamente a barra inferior.
-- **Barra de demonstração (`ProtoBar`):** barra recolhível que permite testar ao vivo todos os estados de tela, abrir os 9 pedidos da demo, alternar a decisão em aberto (chat ao trocar de pedido) e recolher a barra durante a apresentação para a banca. A variante "Pagamento não processado" saiu em 16/11: a base já traz `Aguardando pagamento` e `Não pago (expirado)`. As conversas de exemplo (`Conversa`, `Digitando`, `Erro`) usam textos fixos de `dev-bar/chat-presets.ts`, abrem o 76902 e começam uma conversa nova; o "Digitando" de exemplo não envia nada à API.
+- **URL limpa por padrão:** ao abrir `http://localhost:5173`, a tela abre no estado inicial vazio. Ao buscar um pedido, `?pedido=<id>` é gravado via `window.history.replaceState` (e removido ao limpar a busca).
+- **Abrir um pedido pelo endereço:** `?pedido=76902` abre direto o pedido informado.
+- A barra de protótipo (presets `?t=`, `?c=`, `?s=`, `?n=`, `?bar=`) saiu em 17/11: o design foi fechado e a banca não deve ver a barra. Os estados de carregamento, não encontrado e erro aparecem naturalmente (número inexistente, API parada).
 
 ## 14. Testes
 
@@ -1016,14 +1006,13 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 | Arquivo | Cobre |
 |---|---|
 | `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-000375-LATAM`) e pluralização de dias |
-| `lib/url-state.test.ts` | Leitura de `?pedido=375`, rejeição de IDs inválidos (`0`, `abc`), presets da `ProtoBar` e atualização limpa da query string |
+| `lib/url-state.test.ts` | Leitura de `?pedido=76902`, rejeição de IDs inválidos (`0`, `abc`) e atualização limpa da query string |
 | `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo enviado, `409`/`502`/`504`, resposta fora do contrato) |
 | `features/tracking/order-status.test.ts` | Mensagem principal das 7 situações (76902, 375, 34, 222, 8, 9, 50, aguardando, adiantado, no prazo), prazo de entrega, motivo da central |
 | `features/tracking/stage-timeline.test.ts` | Etapas e estados: 76902 (alfândega com atraso), 76385 (voo com atraso), 375 (entregue), 34 (extravio + não alcançadas), 31298 (doméstica rodoviária sem voo nem alfândega), 8 (Porto Rico → Brasil), 9 e 50 (só o pedido), doméstica aérea, aguardando pagamento |
-| `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, conversa nova só com "Zerar", efeito da troca de pedido nas mensagens, texto de falha por status |
+| `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, divisor na troca de pedido (sem repetir), texto de falha por status |
 | `features/chat/chat-suggestions.test.ts` | Sem pedido, convida a informar o número; com pedido, sugestões por situação, sempre citando o número |
 | `features/chat/rich-text.test.ts` | Negrito, listas (`*`, `-`, `•`, subníveis), títulos, linha em branco, asteriscos soltos |
-| `features/dev-bar/chat-presets.test.ts` | Conversas de exemplo da barra |
 
 Os testes da tela leem os pedidos de `api/src/orders/fixtures/orders.json` (`web/src/api/fixture-orders.ts`), o mesmo arquivo da API.
 
@@ -1154,7 +1143,5 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 - **Nome do assistente e contato da central:** o nome (`ASSISTANT_NAME`) ainda não foi confirmado; o aviso da central mostra só o horário (sem telefone ou e-mail).
 - **Agente ADK (pendências com o Marco, seção 10.8):** formato do pedido no texto, respostas longas e técnicas, formatação, sobreposição de mensagens depois de um `504`, Dockerfile na `main`. A tela e a API já funcionam com o agente; só `withOrderContext` e a configuração dependem dele.
 - **Tela x chat no motivo provável:** com `AGENT=adk`, o agente lê a base dele; o portal agora lê `consumo_pedidos`, que tem a causa e o `resumo_pedido` feito para a IA. Ficam iguais quando o agente ler a mesma tabela (pendência com o Marco).
-- **Decisão de produto em aberto (simulável na `ProtoBar`):**
-  1. Comportamento do chat ao trocar de pedido (`divider` vs `keep` vs `clear`);
 - **Docker do Frontend (Fase 4):** adicionar Dockerfile multi-stage de `@translog/web` (ou servir o `web/dist` pelo Fastify/Nginx) no `docker-compose.yml` para entrega final containerizada.
 - **Fonte final (decidida em 16/11):** tabelas `consumo_*` da Silver no Databricks, com os CSVs em `portal/dados/` como plano B. Sem banco próprio.
