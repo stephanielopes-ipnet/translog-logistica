@@ -55,5 +55,5 @@ class Settings:
             knowledge_dir=resolve_path(os.getenv("TRANSLOG_KNOWLEDGE_DIR", ".state/chroma")),
             model_cache=resolve_path(os.getenv("TRANSLOG_MODEL_CACHE", ".cache/models")),
             allow_demo=os.getenv("TRANSLOG_ALLOW_DEMO_KNOWLEDGE", "false").lower() == "true",
-            model=os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
         )

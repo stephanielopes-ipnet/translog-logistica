@@ -65,6 +65,8 @@ Corpo JSON, com os mesmos identificadores da sessão criada:
 
 O campo `text` contém a mensagem completa em linguagem natural. Não é necessário um campo separado de código do pedido neste contrato. O agente solicita o código quando estiver ausente.
 
+Quando a tela de detalhes fornecer um pedido aberto, o backend pode prefixar a mensagem com `[Pedido aberto no portal: 375] ` (substituindo `375` pelo código da tela). O prompt do agente trata esse marcador como contexto: não o repete ao cliente e ainda consulta `consultar_pedido` antes de afirmar informações. O texto da pergunta vem depois do prefixo, por exemplo: `[Pedido aberto no portal: 375] Quando chega?`.
+
 O backend deve aguardar o término dessa chamada antes de enviar outra mensagem à mesma sessão. O cliente de exemplo usa timeout de 60 segundos; esse valor é uma configuração do cliente, não um prazo de resposta garantido do Gemini.
 
 ## 3. Ler o retorno e entregar a resposta ao portal

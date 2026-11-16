@@ -54,7 +54,7 @@ TRANSLOG_DATA_ORIGIN=sample
 TRANSLOG_ALLOW_DEMO_KNOWLEDGE=false
 ```
 
-O texto após `GOOGLE_API_KEY=` é um marcador: substituir pelo valor real somente no arquivo local. Preservar as demais configurações do modelo de arquivo. A `.env.example` ainda traz o modelo inicialmente proposto `gemini-3.8-flash`; ajustar a `.env` como acima para repetir o modelo que funcionou com Marco. Acesso ao modelo e cota continuam sujeitos ao projeto Google usado pela chave.
+O texto após `GOOGLE_API_KEY=` é um marcador: substituir pelo valor real somente no arquivo local. Preservar as demais configurações do modelo de arquivo. O modelo padrão da `.env.example` agora é `gemini-3.5-flash-lite`, o mesmo usado por Marco e nesta integração. Acesso e disponibilidade continuam sujeitos à cota e à capacidade do serviço Google no momento da apresentação.
 
 A chave fica no processo do agente e não deve ser enviada ao navegador, ao grupo ou ao GitHub. Usar a mesma chave compartilha a cota do mesmo projeto. Se houver uma variável `GOOGLE_API_KEY` ou `GEMINI_MODEL` já configurada no ambiente do processo, ela tem precedência sobre `.env`; conferir isso localmente sem imprimir o segredo se a configuração não corresponder ao esperado.
 
