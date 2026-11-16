@@ -4,6 +4,9 @@
 -- ETAPA 3: CAMADA GOLD (INDICADORES DE NEGÓCIO E PERFORMANCE LOGÍSTICA)
 -- Responsável: Engenharia de Dados (Mateus)
 -- Consumidores desta camada: BI & Analytics (Databricks AI/BI Dashboard) e PMO
+-- [LEGADO] Ainda conta atraso pelo Delivery Status original (status_entrega_original), que
+-- marca atraso até em pedido não pago. Usar a Gold v3 (03b_gold_insights_entrega).
+-- Mantido só com os nomes de colunas atualizados para não quebrar.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -16,10 +19,10 @@ SELECT
     COUNT(DISTINCT id_cliente)                                                     AS total_clientes_atendidos,
     ROUND(AVG(dias_envio_programado), 2)                                           AS tempo_medio_programado_dias,
     ROUND(AVG(dias_envio_real), 2)                                                 AS tempo_medio_transito_real_dias,
-    ROUND(AVG(CASE WHEN dias_atraso > 0 THEN dias_atraso END), 2)                  AS atraso_medio_quando_atrasa_dias,
-    ROUND(100.0 * SUM(CASE WHEN dias_atraso <= 0 AND status_entrega_original != 'Shipping canceled' THEN 1 ELSE 0 END) / COUNT(*), 2) AS pct_entregas_no_prazo_otd,
+    ROUND(AVG(CASE WHEN dias_atraso_despacho > 0 THEN dias_atraso_despacho END), 2)                  AS atraso_medio_quando_atrasa_dias,
+    ROUND(100.0 * SUM(CASE WHEN dias_atraso_despacho <= 0 AND status_entrega_original != 'Shipping canceled' THEN 1 ELSE 0 END) / COUNT(*), 2) AS pct_entregas_no_prazo_otd,
     ROUND(100.0 * SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END) / COUNT(*), 2)                           AS pct_entregas_em_atraso,
-    ROUND(100.0 * SUM(CASE WHEN janela_atraso = '4. Atraso Crítico (3+ dias)' THEN 1 ELSE 0 END) / COUNT(*), 2)                       AS pct_atraso_critico,
+    ROUND(100.0 * SUM(CASE WHEN janela_atraso_despacho = '4. Atraso Crítico (3+ dias)' THEN 1 ELSE 0 END) / COUNT(*), 2)                       AS pct_atraso_critico,
     ROUND(SUM(valor_item_pedido), 2)                                               AS faturamento_total_logistico,
     ROUND(SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN valor_item_pedido ELSE 0 END), 2) AS valor_pedidos_impactados_por_atraso
 FROM silver.pedidos_rastreio;
@@ -35,13 +38,13 @@ SELECT
     DATE_FORMAT(data_pedido, 'yyyy-MM')                                            AS safra_ano_mes,
     COUNT(DISTINCT id_pedido)                                                      AS total_pedidos,
     COUNT(*)                                                                       AS total_entregas,
-    SUM(CASE WHEN dias_atraso <= 0 AND status_entrega_original != 'Shipping canceled' THEN 1 ELSE 0 END) AS qtd_no_prazo,
+    SUM(CASE WHEN dias_atraso_despacho <= 0 AND status_entrega_original != 'Shipping canceled' THEN 1 ELSE 0 END) AS qtd_no_prazo,
     SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END)     AS qtd_atrasadas,
-    ROUND(100.0 * SUM(CASE WHEN dias_atraso <= 0 AND status_entrega_original != 'Shipping canceled' THEN 1 ELSE 0 END) / COUNT(*), 2) AS taxa_pontualidade_otd_pct,
+    ROUND(100.0 * SUM(CASE WHEN dias_atraso_despacho <= 0 AND status_entrega_original != 'Shipping canceled' THEN 1 ELSE 0 END) / COUNT(*), 2) AS taxa_pontualidade_otd_pct,
     ROUND(100.0 * SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END) / COUNT(*), 2)                           AS taxa_atraso_pct,
     ROUND(AVG(dias_envio_programado), 2)                                           AS media_dias_programado,
     ROUND(AVG(dias_envio_real), 2)                                                 AS media_dias_real,
-    ROUND(AVG(dias_atraso), 2)                                                     AS saldo_medio_dias_atraso,
+    ROUND(AVG(dias_atraso_despacho), 2)                                                     AS saldo_medio_dias_atraso,
     ROUND(SUM(valor_item_pedido), 2)                                               AS receita_total_mes
 FROM silver.pedidos_rastreio
 WHERE data_pedido IS NOT NULL
@@ -65,10 +68,10 @@ SELECT
     COUNT(*)                                                                       AS total_itens_rota,
     ROUND(AVG(dias_envio_programado), 2)                                           AS prazo_medio_prometido,
     ROUND(AVG(dias_envio_real), 2)                                                 AS tempo_medio_real_transito,
-    ROUND(AVG(dias_atraso), 2)                                                     AS media_dias_atraso,
+    ROUND(AVG(dias_atraso_despacho), 2)                                                     AS media_dias_atraso,
     SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END)     AS total_entregas_atrasadas,
     ROUND(100.0 * SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END) / COUNT(*), 2) AS taxa_atraso_rota_pct,
-    SUM(CASE WHEN janela_atraso = '4. Atraso Crítico (3+ dias)' THEN 1 ELSE 0 END) AS qtd_atraso_critico,
+    SUM(CASE WHEN janela_atraso_despacho = '4. Atraso Crítico (3+ dias)' THEN 1 ELSE 0 END) AS qtd_atraso_critico,
     ROUND(SUM(valor_item_pedido), 2)                                               AS valor_total_transportado,
     ROUND(SUM(lucro_item), 2)                                                AS lucro_total_rota
 FROM silver.pedidos_rastreio
@@ -90,21 +93,21 @@ ORDER BY total_entregas_atrasadas DESC;
 CREATE OR REPLACE TABLE gold.performance_modo_envio AS
 SELECT
     modo_envio,
-    janela_atraso,
-    status_entrega_pt,
+    janela_atraso_despacho,
+    status_prazo_despacho,
     COUNT(DISTINCT id_pedido)                                                      AS total_pedidos,
     COUNT(*)                                                                       AS total_itens,
     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY modo_envio), 2)      AS pct_dentro_do_modo_envio,
     ROUND(AVG(dias_envio_programado), 2)                                           AS media_dias_programado,
     ROUND(AVG(dias_envio_real), 2)                                                 AS media_dias_real,
-    ROUND(AVG(dias_atraso), 2)                                                     AS media_dias_atraso,
+    ROUND(AVG(dias_atraso_despacho), 2)                                                     AS media_dias_atraso,
     ROUND(SUM(valor_item_pedido), 2)                                               AS valor_total_movimentado
 FROM silver.pedidos_rastreio
 GROUP BY
     modo_envio,
-    janela_atraso,
-    status_entrega_pt
-ORDER BY modo_envio, janela_atraso;
+    janela_atraso_despacho,
+    status_prazo_despacho
+ORDER BY modo_envio, janela_atraso_despacho;
 
 -- COMMAND ----------
 

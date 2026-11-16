@@ -1,22 +1,20 @@
 -- Databricks notebook source
 -- =============================================================================
 -- PROJETO INTEGRADOR ACADEMY - GRUPO 3 (TRANSLOG BRASIL)
--- ETAPA 2d: MALHA DE HUBS + RASTREIO SIMULADO (Silver v2)
+-- ETAPA 2d: MALHA DE HUBS SIMULADA (silver.dim_hubs)
 -- Responsável: Engenharia de Dados (Mateus)
 -- Rodar depois de 02a (precisa de silver.pedidos_rastreio e silver.dim_traducao).
--- Ordem: 01 -> 01b -> 02a -> 02d -> 02e (view) -> 02b (testes)
+-- Ordem: 01 -> 01b -> 02a -> 02d -> 02g (eventos, chama 02f) -> 02i -> 02e -> 02b -> 02h
 --
--- POR QUE SIMULAR: o DataCo só tem datas macro (pedido, entrega, dias programados/reais).
--- Não existe "onde o pedido está". Para o portal e o agente de IA responderem
--- "cadê meu pedido?", simulamos APENAS A POSIÇÃO do pedido numa malha de hubs:
---   - só pedidos despachados têm posição (sem pagamento não há despacho);
---   - entregues estão no destino; em trânsito (PROCESSING) recebem uma etapa sorteada por
---     hash de id_pedido (determinístico: rodar de novo dá o mesmo resultado);
---   - a posição NÃO afirma nada sobre atraso: atraso e motivo vêm só de dados reais
---     (flag_atrasado, dias, causa_provavel). Não há gargalo nem motivo sorteado.
--- Malha e posição levam hub_simulado = true / dado_simulado = true.
+-- POR QUE SIMULAR: o DataCo mede só até o DESPACHO (doc 04). Não existe "por onde o pedido
+-- passou" depois disso. A malha de hubs é a base física da jornada simulada no 02g.
+-- Todos os hubs levam hub_simulado = true.
 --
--- Saídas: silver.dim_hubs (malha) e silver.rastreio_pedidos (1 linha por id_pedido)
+-- [Silver v3] A posição do pedido (etapa_atual, local_atual) NÃO é mais sorteada aqui:
+-- ela vem do último evento logístico (02g) e é consolidada em silver.rastreio_pedidos no 02i.
+-- Assim existe uma única fonte de posição (antes 02d e 02g sorteavam posições diferentes).
+--
+-- Saída: silver.dim_hubs (malha)
 -- =============================================================================
 
 
@@ -132,211 +130,22 @@ LEFT JOIN silver.dim_traducao tc ON tc.coluna = 'destino_cidade' AND tc.valor_or
 -- COMMAND ----------
 
 -- -----------------------------------------------------------------------------
--- 2. RASTREIO SIMULADO (silver.rastreio_pedidos) — 1 linha por id_pedido
---    Etapas: 1 Coleta (gateway) · 2 Voo · 3 Alfândega · 4 Transferência (CD -> armazém)
---            5 Última milha / entregue
---    Rotas:  internacional = 1-2-3-4-5
---            doméstica aérea (origem Porto Rico ou Same Day/First Class) = 1-2-4-5
---              (sem alfândega: Porto Rico é território dos EUA)
---            doméstica rodoviária (EUA -> EUA, Second/Standard) = 1-4-5
---    Matriz (validada no 02b):
---      não despachado (pendente, em análise, em espera) e cancelado -> tudo NULL
---      PROCESSING (em trânsito)  -> etapa sorteada entre as etapas da rota, local = hub/voo
---      COMPLETE/CLOSED (entregue) -> etapa 5, local = cidade de destino
---    motivo_ocorrencia: texto FACTUAL montado só com números reais (dias, prazo, % no prazo
---    da modalidade). Não é simulado.
+-- 2. CONFERÊNCIAS RÁPIDAS (testes PASS/FAIL completos em 02b)
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE TABLE silver.rastreio_pedidos
-COMMENT 'Silver v2: posição SIMULADA de cada pedido despachado na malha de hubs + motivo factual. Grão = id_pedido'
-AS
-WITH taxa_modalidade AS (
-    -- % de itens ENTREGUES no prazo por modalidade (evidência para "Promessa irreal")
-    SELECT modo_envio,
-           ROUND(100.0 * AVG(no_prazo), 1) AS pct_no_prazo_modalidade
-    FROM silver.pedidos_rastreio
-    WHERE status_pedido IN ('COMPLETE', 'CLOSED') AND no_prazo IS NOT NULL
-    GROUP BY modo_envio
-),
-pedidos AS (
-    SELECT
-        p.id_pedido, p.status_pedido, p.pedido_cancelado, p.avaliado_prazo,
-        p.modo_envio, p.mercado_logistico, p.origem_cliente_pais,
-        p.destino_pais, p.destino_estado, p.destino_cidade,
-        p.dias_envio_programado, p.dias_envio_real, p.dias_atraso,
-        p.flag_atrasado, p.causa_provavel,
-        t.pct_no_prazo_modalidade,
-        p.destino_pais = 'Estados Unidos'                    AS domestico,
-        p.origem_cliente_pais = 'Puerto Rico'                AS origem_porto_rico,
-        p.status_pedido IN ('COMPLETE', 'CLOSED') AND NOT p.pedido_cancelado AS entregue,
-        p.status_pedido = 'PROCESSING' AND NOT p.pedido_cancelado            AS em_transito,
-        -- Sorteio determinístico (0-99) da etapa de quem está em trânsito
-        pmod(xxhash64(p.id_pedido, 'etapa'), 100)            AS sorteio_etapa
-    FROM silver.pedidos_rastreio p
-    LEFT JOIN taxa_modalidade t USING (modo_envio)
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY p.id_pedido ORDER BY p.id_item_pedido) = 1
-),
-etapa AS (
-    SELECT
-        *,
-        -- Etapas que existem na rota do pedido (doméstico nunca passa pela alfândega;
-        -- só voa se for aéreo: origem Porto Rico ou Same Day/First Class)
-        CASE
-            WHEN NOT domestico THEN array(1, 2, 3, 4, 5)
-            WHEN origem_porto_rico OR modo_envio IN ('Same Day', 'First Class')
-                               THEN array(1, 2, 4, 5)
-            ELSE                    array(1, 4, 5)
-        END AS etapas_rota
-    FROM pedidos
-),
-posicao AS (
-    SELECT
-        *,
-        CASE
-            WHEN entregue    THEN 5
-            WHEN em_transito THEN element_at(etapas_rota,
-                                             CAST(pmod(sorteio_etapa, size(etapas_rota)) AS INT) + 1)
-        END AS etapa_atual,     -- NULL = não despachado ou cancelado
-        CASE
-            WHEN origem_porto_rico                         THEN 'GW-SJU'
-            WHEN mercado_logistico = 'LATAM'               THEN 'GW-MIA'
-            WHEN mercado_logistico IN ('Europe', 'Africa') THEN 'GW-NYC'
-            WHEN mercado_logistico = 'Pacific Asia'        THEN 'GW-LAX'
-            ELSE 'GW-MEM'
-        END AS id_gateway
-    FROM etapa
-),
-com_hubs AS (
-    SELECT
-        e.*,
-        COALESCE(tp.valor_pt, e.destino_pais)   AS pais_pt,
-        COALESCE(te.valor_pt, e.destino_estado) AS estado_pt,
-        COALESCE(tc.valor_pt, e.destino_cidade) AS cidade_pt,
-        gw.id_hub AS gw_id, gw.nome_hub AS gw_nome, gw.cidade AS gw_cidade,
-        cd.id_hub AS cd_id, cd.nome_hub AS cd_nome, cd.cidade AS cd_cidade,
-        af.id_hub AS af_id, af.nome_hub AS af_nome,
-        ar.id_hub AS ar_id, ar.nome_hub AS ar_nome
-    FROM posicao e
-    LEFT JOIN silver.dim_hubs gw ON gw.id_hub = e.id_gateway
-    LEFT JOIN silver.dim_hubs cd ON cd.tipo_hub = 'CD_NACIONAL' AND cd.pais_original = e.destino_pais
-    LEFT JOIN silver.dim_hubs af ON af.tipo_hub = 'ALFANDEGA'   AND af.pais_original = e.destino_pais
-    LEFT JOIN silver.dim_hubs ar ON ar.tipo_hub = 'ARMAZEM_ESTADUAL'
-                                AND ar.pais_original = e.destino_pais AND ar.estado_original = e.destino_estado
-    LEFT JOIN silver.dim_traducao tp ON tp.coluna = 'destino_pais'   AND tp.valor_original = e.destino_pais
-    LEFT JOIN silver.dim_traducao te ON te.coluna = 'destino_estado' AND te.valor_original = e.destino_estado
-                                    AND te.contexto = e.destino_pais
-    LEFT JOIN silver.dim_traducao tc ON tc.coluna = 'destino_cidade' AND tc.valor_original = e.destino_cidade
-                                    AND tc.contexto = e.destino_pais
-)
-SELECT
-    id_pedido,
-    IF(domestico, 'Doméstica', 'Internacional') AS tipo_rota,
-    CASE
-        WHEN NOT (entregue OR em_transito)                       THEN NULL
-        WHEN modo_envio IN ('Same Day', 'First Class')           THEN 'Aéreo expresso'
-        WHEN domestico AND NOT origem_porto_rico                 THEN 'Rodoviário'
-        ELSE 'Aéreo consolidado'
-    END AS modal_transporte,
-
-    etapa_atual,
-    CASE etapa_atual
-        WHEN 1 THEN '1 - Coleta'
-        WHEN 2 THEN '2 - Voo'
-        WHEN 3 THEN '3 - Alfândega'
-        WHEN 4 THEN '4 - Transferência'
-        WHEN 5 THEN '5 - Última milha'
-    END AS etapa_atual_desc,
-
-    -- Último ponto físico (hub) do pedido
-    CASE
-        WHEN etapa_atual IN (1, 2) THEN gw_id
-        WHEN etapa_atual = 3       THEN af_id
-        WHEN etapa_atual = 4       THEN cd_id
-        WHEN etapa_atual = 5       THEN COALESCE(ar_id, cd_id)
-    END AS id_hub_atual,
-    CASE
-        WHEN etapa_atual IS NULL THEN NULL
-        WHEN entregue            THEN CONCAT('Entregue em ', cidade_pt, ' - ', estado_pt, ' (', pais_pt, ')')
-        WHEN etapa_atual = 1     THEN gw_nome
-        WHEN etapa_atual = 2     THEN CONCAT('Em voo: ', gw_cidade, ' -> ', cd_cidade, ' (', pais_pt, ')')
-        WHEN etapa_atual = 3     THEN af_nome
-        WHEN etapa_atual = 4     THEN COALESCE(CONCAT('Em transferência: ', cd_nome, ' -> ', ar_nome),
-                                               CONCAT('Transferência direta a partir do ', cd_nome))
-        WHEN etapa_atual = 5     THEN CONCAT('Em rota de entrega - ', cidade_pt,
-                                             ' (saída: ', COALESCE(ar_nome, cd_nome), ')')
-    END AS local_atual,
-
-    -- Motivo FACTUAL (só números reais). NULL para não despachados e cancelados.
-    CASE
-        WHEN NOT avaliado_prazo THEN NULL
-        ELSE CONCAT(
-            IF(entregue,
-               CONCAT('Entregue em ', CAST(dias_envio_real AS STRING), ' dia(s)'),
-               CONCAT('Em trânsito há ', CAST(dias_envio_real AS STRING), ' dia(s)')),
-            CASE
-                WHEN flag_atrasado = 0
-                    THEN CONCAT(', dentro do prazo prometido de ', CAST(dias_envio_programado AS STRING), ' dia(s).')
-                ELSE CONCAT(', ', CAST(dias_atraso AS STRING), ' dia(s) além do prazo prometido de ',
-                            CAST(dias_envio_programado AS STRING), ' dia(s).')
-            END,
-            CASE
-                WHEN causa_provavel = 'Promessa irreal'
-                    THEN CONCAT(' Prazo irreal para a modalidade ', modo_envio, ': só ',
-                                COALESCE(CAST(pct_no_prazo_modalidade AS STRING), 'N/A'),
-                                '% das entregas dela cumprem o prazo prometido.')
-                WHEN causa_provavel = 'Atraso operacional'
-                    THEN ' A base não registra o motivo do atraso.'
-                ELSE ''
-            END)
-    END AS motivo_ocorrencia,
-
-    -- A posição (etapa/local/hub) é simulada; o motivo, não.
-    etapa_atual IS NOT NULL AS dado_simulado,
-    current_timestamp()     AS dt_processamento_rastreio
-FROM com_hubs;
-
--- COMMAND ----------
-
--- -----------------------------------------------------------------------------
--- 3. CONFERÊNCIAS RÁPIDAS (testes PASS/FAIL completos em 02b)
--- -----------------------------------------------------------------------------
--- 3a. Hubs por tipo (esperado: 5 gateways, 164 CDs, 163 alfândegas, 370 armazéns)
+-- 2a. Hubs por tipo (esperado: 5 gateways, 164 CDs, 163 alfândegas, até 492 armazéns)
 SELECT tipo_hub, COUNT(*) AS hubs FROM silver.dim_hubs GROUP BY tipo_hub ORDER BY tipo_hub;
 
 -- COMMAND ----------
 
--- 3b. Causa provável dos itens atrasados por modalidade
+-- 2b. Causa provável dos itens com atraso no DESPACHO por modalidade
 --     (esperado: Same Day e First Class só em "Promessa irreal")
-SELECT causa_provavel, modo_envio, COUNT(*) AS itens
+SELECT causa_atraso_despacho, modo_envio, COUNT(*) AS itens
 FROM silver.pedidos_rastreio
-WHERE flag_atrasado = 1
-GROUP BY ALL ORDER BY causa_provavel, modo_envio;
-
--- COMMAND ----------
-
--- 3c. Situação x etapa (esperado: Aguardando Liberação/Cancelado sem etapa; Entregue só na 5)
-SELECT s.situacao_rastreio, r.tipo_rota, r.etapa_atual_desc, COUNT(*) AS pedidos
-FROM silver.rastreio_pedidos r
-JOIN (SELECT id_pedido, situacao_rastreio FROM silver.pedidos_rastreio
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY id_pedido ORDER BY id_item_pedido) = 1) s
-  USING (id_pedido)
-GROUP BY ALL ORDER BY 1, 2, 3;
-
--- COMMAND ----------
-
--- 3d. Modal x tipo de rota (esperado: Rodoviário só em doméstica; Porto Rico -> EUA aéreo)
-SELECT tipo_rota, modal_transporte, COUNT(*) AS pedidos
-FROM silver.rastreio_pedidos
-GROUP BY ALL ORDER BY 1, 2;
-
--- COMMAND ----------
-
--- 3e. Amostra legível: um pedido por etapa (NULL = não despachado/cancelado)
-SELECT etapa_atual_desc, local_atual, motivo_ocorrencia
-FROM silver.rastreio_pedidos
-QUALIFY ROW_NUMBER() OVER (PARTITION BY etapa_atual_desc ORDER BY id_pedido) = 1;
+WHERE flag_atraso_despacho = 1
+GROUP BY ALL ORDER BY causa_atraso_despacho, modo_envio;
 
 -- -----------------------------------------------------------------------------
--- 4. (OPCIONAL) VERSÃO LLM DOS HUBS — para comparar com a derivada
+-- 3. (OPCIONAL) VERSÃO LLM DOS HUBS — para comparar com a derivada
 --    1) Gere o CSV com o prompt em pipeline/contexto/prompt_hubs_llm.md
 --    2) Suba o arquivo para /Volumes/workspace/silver/insumos/hubs_llm.csv
 --    3) Descomente e rode o bloco abaixo.

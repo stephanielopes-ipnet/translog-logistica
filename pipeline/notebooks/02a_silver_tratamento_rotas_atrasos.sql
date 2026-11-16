@@ -9,14 +9,18 @@
 --   4. Colunas redundantes/vazias não são selecionadas (provas em 02b)
 --   5. Regras de consistência -> registros inválidos vão para a QUARENTENA
 --   6. Regras de negócio (atraso, janela, rota, texto RAG)
---   7. [Silver v2] Indicadores da PMO (no_prazo, faixa_atraso, periodo_pico,
---      receita_em_risco, causa_provavel, data_entrega_real)
--- PREMISSA DE DATAS: dias_envio_programado = prazo de ENTREGA prometido; dias_envio_real =
--- tempo até a ENTREGA (PROCESSING: dias em trânsito até a foto); data_envio (Shipping date) =
--- data_pedido + dias_envio_real = data da entrega para os entregues. Ver doc 03, seção 13.
+--   7. [Silver v2] Indicadores da PMO (despacho_no_prazo, faixa_atraso_despacho, periodo_pico,
+--      causa_atraso_despacho, data_despacho_real)
+-- PREMISSA DE DATAS (Silver v3, doc 04_decisao_premissa_despacho.md, validada com o instrutor):
+--   o DataCo mede o DESPACHO, não a entrega.
+--   dias_envio_programado = prazo de DESPACHO prometido; dias_envio_real = tempo real até o
+--   DESPACHO; data_envio (Shipping date) = data do despacho (= data_pedido + dias_envio_real).
+--   flag_atraso_despacho / dias_atraso_despacho / faixa_atraso_despacho / despacho_no_prazo / causa_atraso_despacho
+--   medem o ATRASO NO DESPACHO (dado real). Entrega, atraso na entrega e extravio são
+--   SIMULADOS (02g -> silver.entregas_simuladas) e nunca são calculados aqui.
 -- Saídas: silver.pedidos_rastreio (válidos), silver.pedidos_quarentena (inválidos + motivo)
--- Ordem de execução: 01 -> 01b -> 02a -> 02d (hubs + rastreio simulado) -> 02e (view de consumo)
---                    -> 02b (testes) -> 02c (auditoria/exportação)
+-- Ordem de execução: 01 -> 01b -> 02a -> 02d (hubs) -> 02g (eventos, chama 02f) -> 02i (rastreio)
+--                    -> 02e (view de consumo) -> 02b (testes Silver) -> 02h (testes eventos)
 -- =============================================================================
 
 
@@ -61,7 +65,7 @@ base_limpa AS (
         NULLIF(TRIM(`Delivery Status`), '')              AS status_entrega_original,
         NULLIF(TRIM(`Order Status`), '')                 AS status_pedido,
 
-        -- Prazos de Entrega e Flag de Risco
+        -- Prazos de DESPACHO (programado x real) e flag de risco original
         TRY_CAST(`Days for shipment (scheduled)` AS INT) AS dias_envio_programado,
         TRY_CAST(`Days for shipping (real)` AS INT)      AS dias_envio_real,
         TRY_CAST(`Late_delivery_risk` AS INT)            AS risco_atraso_flag,
@@ -122,10 +126,11 @@ base_limpa AS (
     FROM bronze_dedup
 ),
 avaliacao AS (
-    -- REGRA DE NEGÓCIO DO ATRASO:
-    -- Só avaliamos prazo de pedidos entregues ou em trânsito (COMPLETE, CLOSED, PROCESSING).
+    -- REGRA DE NEGÓCIO DO ATRASO NO DESPACHO:
+    -- Só avaliamos o prazo de despacho de pedidos pagos e despachados (COMPLETE, CLOSED, PROCESSING).
     -- Pedidos aguardando pagamento/liberação ainda não têm prazo a cobrar -> "Não Avaliado".
-    -- O Delivery Status original NÃO é usado: ele marca "Late delivery" até em pedidos PENDING.
+    -- O Delivery Status original NÃO é usado: é só real x programado e marca "Late delivery"
+    -- até em pedidos PENDING (não pagos). Leitura adotada: status do prazo de DESPACHO.
     SELECT
         *,
         COALESCE(status_pedido IN ('CANCELED', 'SUSPECTED_FRAUD')
@@ -141,17 +146,22 @@ regras_negocio AS (
         -- Não avaliados e cancelados ficam NULL para não distorcer médias.
         CASE WHEN avaliado_prazo
              THEN dias_envio_real - dias_envio_programado
-        END AS dias_atraso,
+        END AS dias_atraso_despacho,
 
         -- Flag de atraso: 1 = atrasado (real > programado), 0 = no prazo/adiantado, NULL = não avaliado.
         CASE WHEN avaliado_prazo
              THEN CASE WHEN dias_envio_real > dias_envio_programado THEN 1 ELSE 0 END
-        END AS flag_atrasado,
+        END AS flag_atraso_despacho,
 
-        -- Data prevista: data do pedido + prazo programado (derivada das colunas originais;
-        -- o DataCo não traz essa data pronta). Vale para todos os pedidos, inclusive pendentes,
-        -- pois é a promessa feita ao cliente. Observação: data_envio = data_pedido + dias_envio_real.
-        TIMESTAMPADD(DAY, dias_envio_programado, data_pedido) AS data_prevista_entrega,
+        -- Data prevista de DESPACHO: data do pedido + prazo programado (derivada das colunas
+        -- originais). DATE: a base só tem precisão de dia (a hora do Shipping date repete a do pedido).
+        -- Vale para todos os pedidos, inclusive pendentes (é a promessa feita ao cliente).
+        -- A previsão de ENTREGA é simulada (silver.entregas_simuladas).
+        DATE_ADD(CAST(data_pedido AS DATE), dias_envio_programado) AS data_despacho_prevista,
+
+        -- Tipo de rota (derivado de dado real): destino EUA = doméstica; resto = internacional
+        -- (Canadá inclusive). Origem é sempre EUA ou Porto Rico.
+        CASE WHEN destino_pais = 'Estados Unidos' THEN 'Doméstica' ELSE 'Internacional' END AS tipo_rota,
 
         -- Janela de Atraso (Entregável Obrigatório Eng. de Dados)
         CASE
@@ -161,23 +171,24 @@ regras_negocio AS (
             WHEN (dias_envio_real - dias_envio_programado) = 0  THEN '2. No Prazo (0 dias)'
             WHEN (dias_envio_real - dias_envio_programado) BETWEEN 1 AND 2 THEN '3. Atraso Leve (1 a 2 dias)'
             ELSE '4. Atraso Crítico (3+ dias)'
-        END AS janela_atraso,
+        END AS janela_atraso_despacho,
 
-        -- Status do prazo em português (mesma regra da janela, versão curta).
+        -- Status do prazo de DESPACHO em português (mesma regra da janela, versão curta).
         CASE
             WHEN pedido_cancelado    THEN 'Cancelado'
             WHEN NOT avaliado_prazo  THEN 'Não Avaliado'
             WHEN dias_envio_real <  dias_envio_programado THEN 'Adiantado'
             WHEN dias_envio_real =  dias_envio_programado THEN 'No Prazo'
             ELSE 'Atrasado'
-        END AS status_entrega_pt,
+        END AS status_prazo_despacho,
 
-        -- Situação do rastreio (Portal FullStack / Agente IA).
-        -- PREMISSA DE SIMULAÇÃO: o DataCo é histórico e não tem status "em trânsito";
-        -- usamos Order Status para separar entregues, aguardando, em trânsito e cancelados.
+        -- Situação do pedido na base REAL (até o despacho). Usa Order Status:
+        --   COMPLETE/CLOSED = pedido concluído e despachado; PROCESSING = despachado, pedido
+        --   ainda aberto (em trânsito); pendentes = aguardando liberação; cancelados.
+        -- A situação da ENTREGA (entregue, atrasada, extraviada) é simulada: situacao_entrega.
         CASE
             WHEN pedido_cancelado                                       THEN 'Cancelado'
-            WHEN status_pedido IN ('COMPLETE', 'CLOSED')                THEN 'Entregue'
+            WHEN status_pedido IN ('COMPLETE', 'CLOSED')                THEN 'Despachado'
             WHEN status_pedido = 'PROCESSING'                           THEN 'Em Trânsito'
             WHEN status_pedido IN ('PENDING', 'PENDING_PAYMENT',
                                    'PAYMENT_REVIEW', 'ON_HOLD')         THEN 'Aguardando Liberação'
@@ -216,46 +227,42 @@ regras_negocio AS (
 ),
 indicadores_pmo AS (
     -- [Silver v2] Indicadores pedidos pela PMO. Ficam num CTE próprio porque dependem de
-    -- flag_atrasado/dias_atraso, calculados no CTE anterior.
+    -- flag_atraso_despacho/dias_atraso_despacho, calculados no CTE anterior.
     SELECT
         *,
-        -- no_prazo: inverso de flag_atrasado (NULL = pedido não avaliado: pendente ou cancelado).
-        CASE flag_atrasado WHEN 0 THEN 1 WHEN 1 THEN 0 END AS no_prazo,
+        -- despacho_no_prazo: inverso de flag_atraso_despacho (NULL = pedido não avaliado: pendente ou cancelado).
+        CASE flag_atraso_despacho WHEN 0 THEN 1 WHEN 1 THEN 0 END AS despacho_no_prazo,
 
-        -- faixa_atraso: versão simplificada da janela_atraso, no formato pedido pela PMO.
+        -- faixa_atraso_despacho: versão simplificada da janela_atraso_despacho, no formato pedido pela PMO.
         CASE
-            WHEN dias_atraso IS NULL THEN NULL
-            WHEN dias_atraso <= 0    THEN 'No prazo'
-            WHEN dias_atraso <= 2    THEN '1-2 dias'
+            WHEN dias_atraso_despacho IS NULL THEN NULL
+            WHEN dias_atraso_despacho <= 0    THEN 'No prazo'
+            WHEN dias_atraso_despacho <= 2    THEN '1-2 dias'
             ELSE '3+ dias'
-        END AS faixa_atraso,
+        END AS faixa_atraso_despacho,
 
-        -- data_entrega_real: data em que o pedido chegou. Só existe para ENTREGUES (COMPLETE/CLOSED).
-        -- PREMISSA DE DATAS (Silver v2): Shipping date = data_pedido + dias_envio_real (100% das
-        -- linhas, por dia) = data da ENTREGA. Usar só a data: a hora tem erro de ±12h em ~5% das linhas.
-        -- PROCESSING ainda não chegou: para ele, dias_envio_real = dias em trânsito até a foto e
-        -- data_entrega_real = NULL. Pendentes/cancelados não foram despachados: NULL.
-        CASE WHEN status_pedido IN ('COMPLETE', 'CLOSED') AND NOT pedido_cancelado
-             THEN data_envio
-        END AS data_entrega_real,
+        -- data_despacho_real: data em que o pedido foi DESPACHADO (Shipping date), só para
+        -- pedidos pagos e despachados (COMPLETE, CLOSED, PROCESSING). DATE: a hora do Shipping
+        -- date repete a hora do pedido (Same Day: +12h), então não é um horário observado.
+        -- Pendentes/cancelados não foram despachados: NULL.
+        CASE WHEN avaliado_prazo THEN CAST(data_envio AS DATE) END AS data_despacho_real,
 
         -- periodo_pico: pedidos de novembro e dezembro. Só DIMENSÃO para o BI investigar;
         -- não é usada como causa (no DataCo o atraso em nov/dez é 58,1% contra 57,1% no resto do ano).
         CASE WHEN MONTH(data_pedido) IN (11, 12) THEN 1 ELSE 0 END AS periodo_pico,
 
-        -- receita_em_risco: valor bruto (Sales) dos itens atrasados; 0 nos demais.
-        CASE WHEN flag_atrasado = 1 THEN valor_bruto_venda ELSE 0 END AS receita_em_risco,
+        -- receita_em_risco agora é da ENTREGA (atrasada ou extraviada) e fica só na Gold (03b).
 
-        -- causa_provavel (derivada só de dados reais):
-        --   Promessa irreal = atrasado com prazo prometido <= 1 dia (Same Day e First Class), em
-        --   qualquer destino. First Class promete 1 dia e leva sempre 2 (0% no prazo).
+        -- causa_atraso_despacho do atraso no DESPACHO (derivada só de dados reais):
+        --   Promessa irreal = atrasado com prazo de despacho prometido <= 1 dia (Same Day e
+        --   First Class), em qualquer destino. First Class promete 1 dia e despacha sempre em 2.
         --   Atraso operacional = demais atrasados (a base não registra o motivo).
         CASE
-            WHEN flag_atrasado IS NULL      THEN NULL
-            WHEN flag_atrasado = 0          THEN 'Sem atraso'
+            WHEN flag_atraso_despacho IS NULL      THEN NULL
+            WHEN flag_atraso_despacho = 0          THEN 'Sem atraso'
             WHEN dias_envio_programado <= 1 THEN 'Promessa irreal'
             ELSE 'Atraso operacional'
-        END AS causa_provavel
+        END AS causa_atraso_despacho
     FROM regras_negocio
 )
 SELECT
@@ -270,13 +277,13 @@ SELECT
         ' | Modalidade: ', COALESCE(modo_envio, 'N/A'),
         ' | Rota: ', rota_logistica,
         ' | Situação: ', situacao_rastreio, ' (Status Pedido: ', COALESCE(status_pedido, 'N/A'), ')',
-        ' | Prazo do Envio: ', status_entrega_pt,
-        ' | Prazo Programado: ', COALESCE(CAST(dias_envio_programado AS STRING), 'N/A'), ' dias',
-        -- Dias reais e atraso só para pedidos despachados (não pagos/cancelados não têm trânsito)
+        ' | Prazo de despacho: ', status_prazo_despacho,
+        ' | Prazo de despacho prometido: ', COALESCE(CAST(dias_envio_programado AS STRING), 'N/A'), ' dias',
+        -- Dias reais e atraso só para pedidos despachados (não pagos/cancelados não foram despachados)
         COALESCE(CASE WHEN avaliado_prazo
-                      THEN CONCAT(' | Tempo Real de Trânsito: ', CAST(dias_envio_real AS STRING), ' dias',
-                                  ' | Diferença/Atraso: ', CAST(dias_atraso AS STRING), ' dias') END, ''),
-        ' | Janela: ', janela_atraso, '.'
+                      THEN CONCAT(' | Tempo real até o despacho: ', CAST(dias_envio_real AS STRING), ' dias',
+                                  ' | Atraso no despacho: ', CAST(dias_atraso_despacho AS STRING), ' dias') END, ''),
+        ' | Janela: ', janela_atraso_despacho, '.'
     ) AS resumo_rastreio_rag,
     current_timestamp() AS dt_processamento_silver
 FROM indicadores_pmo;
@@ -308,25 +315,25 @@ WHERE motivo_quarentena IS NOT NULL;
 -- COMMAND ----------
 
 -- -----------------------------------------------------------------------------
--- 3b. VIEW DE CONSUMO: movida para 02e_silver_view_consumo.sql (Silver v2).
---     Motivo: a view agora junta o rastreio simulado (silver.rastreio_pedidos, criado
---     no 02d), que depende desta tabela. Ordem: 02a -> 02d -> 02e.
+-- 3b. VIEW DE CONSUMO: movida para 02e_silver_view_consumo.sql.
+--     Motivo: a view junta o rastreio simulado (silver.rastreio_pedidos, criado no 02i a
+--     partir dos eventos do 02g), que depende desta tabela.
 -- -----------------------------------------------------------------------------
 
 -- -----------------------------------------------------------------------------
 -- 4. Validação rápida das Janelas de Atraso (testes completos em 02b)
 -- -----------------------------------------------------------------------------
 SELECT
-    janela_atraso,
-    status_entrega_pt,
+    janela_atraso_despacho,
+    status_prazo_despacho,
     COUNT(DISTINCT id_pedido) AS total_pedidos,
     COUNT(*) AS total_itens,
     ROUND(AVG(dias_envio_programado), 2) AS media_prazo_programado,
     ROUND(AVG(dias_envio_real), 2) AS media_tempo_real,
-    ROUND(AVG(dias_atraso), 2) AS media_dias_atraso
+    ROUND(AVG(dias_atraso_despacho), 2) AS media_dias_atraso
 FROM silver.pedidos_rastreio
-GROUP BY janela_atraso, status_entrega_pt
-ORDER BY janela_atraso;
+GROUP BY janela_atraso_despacho, status_prazo_despacho
+ORDER BY janela_atraso_despacho;
 
 -- COMMAND ----------
 

@@ -18,7 +18,7 @@ print(f"{TABELA}: {total} linhas, {len(df.columns)} colunas")
 
 # COMMAND ----------
 # A. PRONTIDÃO PARA UI: nulos por coluna (Fullstack renderiza sem tratar NULL?)
-#    Esperado: só colunas "não aplicável" com nulo (dias_atraso, flag_atrasado).
+#    Esperado: só colunas "não aplicável" com nulo (dias_atraso_despacho, flag_atraso_despacho).
 nulos = df.select([F.sum(F.col(c).isNull().cast("int")).alias(c) for c in df.columns]).first().asDict()
 display(spark.createDataFrame(
     [(c, int(n), round(100.0 * n / total, 2)) for c, n in nulos.items() if n],
@@ -75,7 +75,7 @@ FROM (
 
 # COMMAND ----------
 # F. SEMÂNTICA DAS DATAS. Resultado anterior: data_envio = data_pedido + dias_envio_real
-#    em 100% das linhas. data_prevista_entrega (= data_pedido + dias_envio_programado)
+#    em 100% das linhas. data_despacho_prevista (= data_pedido + dias_envio_programado)
 #    é validada no 02b.
 display(spark.sql(f"""
 SELECT
@@ -91,13 +91,13 @@ FROM {TABELA}
 # COMMAND ----------
 # G. ARMADILHA PARA TEXT-TO-SQL: colunas originais x regra nova
 #    Um agente que use risco_atraso_flag ou status_entrega_original responde 98.976 atrasos;
-#    a regra de negócio (flag_atrasado) dá 57.810.
+#    a regra de negócio (flag_atraso_despacho) dá 57.810.
 display(spark.sql(f"""
 SELECT
     SUM(risco_atraso_flag)                                                     AS atrasos_via_risco_atraso_flag,
     SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END) AS atrasos_via_status_original,
-    SUM(flag_atrasado)                                                         AS atrasos_via_regra_negocio,
-    SUM(CASE WHEN situacao_rastreio = 'Em Trânsito' AND status_entrega_pt = 'Atrasado' THEN 1 ELSE 0 END)
+    SUM(flag_atraso_despacho)                                                         AS atrasos_via_regra_negocio,
+    SUM(CASE WHEN situacao_rastreio = 'Em Trânsito' AND status_prazo_despacho = 'Atrasado' THEN 1 ELSE 0 END)
                                                                                AS em_transito_ja_marcados_atrasados
 FROM {TABELA}
 """))
@@ -105,7 +105,7 @@ FROM {TABELA}
 # COMMAND ----------
 # H. QUALIDADE DO TEXTO RAG: tamanho, N/A, termos não traduzidos e PII
 #    Esperado: rag_nulo = 0; com_nome_cliente_pii = 0 (LGPD);
-#    com_n_a = itens não avaliados/cancelados (dias_atraso nulo);
+#    com_n_a = itens não avaliados/cancelados (dias_atraso_despacho nulo);
 #    com_termos_em_ingles = todas as linhas enquanto não houver tradução.
 display(spark.sql(f"""
 SELECT
@@ -162,15 +162,15 @@ VIEW = "silver.vw_pedidos_rastreio"
 # L1. Fullstack: buscar um pedido em trânsito pelo id (deve trazer os itens com
 #     situação, janela, data prevista e texto RAG)
 display(spark.sql(f"""
-SELECT id_pedido, id_item_pedido, id_cliente, situacao_rastreio, status_entrega_pt, janela_atraso,
-       data_pedido, data_prevista_entrega, data_entrega_real, local_atual, nome_produto, valor_item_pedido, lucro_total_pedido
+SELECT id_pedido, id_item_pedido, id_cliente, situacao_rastreio, status_prazo_despacho, janela_atraso_despacho,
+       data_pedido, data_despacho_prevista, data_despacho_real, data_entrega_prevista, data_entrega_realizada, situacao_entrega, local_atual, nome_produto, valor_item_pedido, lucro_total_pedido
 FROM {VIEW}
 WHERE id_pedido = (SELECT MIN(id_pedido) FROM {VIEW} WHERE situacao_rastreio = 'Em Trânsito')
 """))
 
 # L2. Fullstack: buscar todos os pedidos de um cliente pelo id_cliente
 display(spark.sql(f"""
-SELECT id_pedido, data_pedido, situacao_rastreio, janela_atraso, COUNT(*) AS itens
+SELECT id_pedido, data_pedido, situacao_rastreio, janela_atraso_despacho, COUNT(*) AS itens
 FROM {VIEW}
 WHERE id_cliente = (SELECT MIN(id_cliente) FROM {VIEW})
 GROUP BY ALL
@@ -179,9 +179,9 @@ ORDER BY data_pedido
 
 # L3. IA / BI: KPI oficial de atraso. Esperado: 57.810 / 101.007 = 57,23%
 display(spark.sql(f"""
-SELECT SUM(flag_atrasado)   AS atrasados,
-       COUNT(flag_atrasado) AS avaliados,
-       ROUND(100.0 * SUM(flag_atrasado) / COUNT(flag_atrasado), 2) AS pct_atraso
+SELECT SUM(flag_atraso_despacho)   AS atrasados,
+       COUNT(flag_atraso_despacho) AS avaliados,
+       ROUND(100.0 * SUM(flag_atraso_despacho) / COUNT(flag_atraso_despacho), 2) AS pct_atraso
 FROM {VIEW}
 """))
 
