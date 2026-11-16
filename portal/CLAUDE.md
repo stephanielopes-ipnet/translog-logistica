@@ -34,12 +34,15 @@ pnpm lint                        # Biome: lint, formatação e ordem dos imports
 pnpm format                      # Biome corrigindo o que for possível
 pnpm typecheck                   # tsc em todos os pacotes
 pnpm --filter @translog/api test # um pacote só (api ou web)
-docker compose up --build        # forma oficial de rodar a API (fixtures)
+AGENT_IT_URL=http://127.0.0.1:8001 pnpm --filter @translog/api test adk-agent  # teste com o agente real (gasta cota do Gemini)
+docker compose up --build        # forma oficial de rodar a API (fixtures, chat simulado)
 docker compose -f docker-compose.yml -f docker-compose.silver.yml up --build  # com a Silver
 docker compose down
 ```
 
 Pacotes: `@translog/api` (`api/`), `@translog/contracts` (`contracts/`) e `@translog/web` (`web/`). Tela em `http://localhost:5173`; documentação da API em `http://localhost:3333/docs`.
+
+Chat: `AGENT=mock` (padrão, simulado na própria API) ou `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001` (agente do Marco) no `portal/.env`, que fica fora do Git. Reinicie o `pnpm dev` depois de mudar o `.env`. No Docker, sempre `mock`.
 
 ## Arquitetura
 
@@ -48,8 +51,9 @@ Documentação técnica completa em `docs/backend.md` (mantenha atualizada ao mu
 - O Node 24 executa o TypeScript direto (sem build): imports relativos com `.ts`, sem `enum`/`namespace` (`erasableSyntaxOnly`).
 - `contracts/` tem os esquemas Zod: validam entrada e saída da API, geram o OpenAPI e os tipos (`z.infer`).
 - `api/src/`: `main.ts` (bootstrap), `server.ts` (Fastify, swagger, rotas), `config.ts` (variáveis validadas no boot), `container.ts` (**único** lugar que escolhe adapters), `http/errors.ts` (**único** lugar que transforma erros em HTTP).
-- Código agrupado por funcionalidade (`orders/`), com porta e adapters. Funções fábrica (`createX(deps)`), sem classes de serviço.
+- Código agrupado por funcionalidade (`orders/`, `chat/`), com porta e adapters. Funções fábrica (`createX(deps)`), sem classes de serviço.
 - A API devolve o view model `Order` pronto. A conversão Silver → `Order` fica só em `orders/silver-mapper.ts`.
+- Chat sem histórico no servidor. A regra do assistente simulado fica só em `api/src/chat/mock-agent.ts` (nunca no frontend). O formato do pedido de contexto enviado ao agente fica só em `withOrderContext` (`chat/adk-agent.ts`). Nenhum reenvio automático, exceto após `404` "Session not found" (uma vez).
 - Datas são texto de calendário (`AAAA-MM-DD`): nunca `new Date(string)` (a Silver vem em UTC e mudaria de dia em UTC-3).
 
 ## Convenções

@@ -1,39 +1,61 @@
 import type { Order } from "@translog/contracts";
 import { ArrowUpRight, CircleAlert, MessageCircleQuestion } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils.ts";
 import type { ChatMessageItem } from "./chat-session.ts";
 import { getChatSuggestions } from "./chat-suggestions.ts";
+import { parseRichText, type RichLine, type RichSegment } from "./rich-text.ts";
 
-/** Renderiza `**negrito**` e quebras de linha em React sem usar `dangerouslySetInnerHTML`. */
-function renderRichText(text: string): ReactNode {
-  const lines = text.split("\n");
-  let lineOffset = 0;
-  return lines.map((line) => {
-    const currentLineOffset = lineOffset;
-    lineOffset += line.length + 1;
-    const segments = line.split(/(\*\*.+?\*\*)/g);
-    let segOffset = 0;
-    return (
-      <span key={`line-${currentLineOffset}`}>
-        {currentLineOffset > 0 && <br />}
-        {segments.map((segment) => {
-          const currentSegOffset = segOffset;
-          segOffset += segment.length;
-          if (segment.startsWith("**") && segment.endsWith("**") && segment.length > 4) {
-            return (
-              <strong
-                key={`seg-${currentLineOffset}-${currentSegOffset}`}
-                className="font-semibold text-slate-900"
-              >
-                {segment.slice(2, -2)}
-              </strong>
-            );
-          }
-          return <span key={`seg-${currentLineOffset}-${currentSegOffset}`}>{segment}</span>;
-        })}
-      </span>
-    );
-  });
+function RichSegments({ segments }: { segments: readonly RichSegment[] }) {
+  return segments.map((segment, index) =>
+    segment.bold ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: os trechos de uma linha nunca mudam de ordem
+      <strong key={index} className="font-semibold text-slate-900">
+        {segment.text}
+      </strong>
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: os trechos de uma linha nunca mudam de ordem
+      <span key={index}>{segment.text}</span>
+    ),
+  );
+}
+
+function RichLineView({ line }: { line: RichLine }) {
+  switch (line.kind) {
+    case "blank":
+      return <div className="h-2" />;
+    case "heading":
+      return (
+        <p className="font-semibold text-slate-900 mt-1 first:mt-0">
+          <RichSegments segments={line.segments} />
+        </p>
+      );
+    case "bullet":
+      return (
+        <div className={cn("flex gap-2", line.level === 1 && "pl-4", line.level === 2 && "pl-8")}>
+          <span aria-hidden="true" className="text-primary">
+            •
+          </span>
+          <span className="min-w-0">
+            <RichSegments segments={line.segments} />
+          </span>
+        </div>
+      );
+    case "text":
+      return (
+        <p>
+          <RichSegments segments={line.segments} />
+        </p>
+      );
+  }
+}
+
+/** Mostra **negrito**, títulos e listas da resposta como elementos React (sem HTML). */
+function RichText({ text }: { text: string }) {
+  return parseRichText(text).map((line, index) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: as linhas de uma mensagem nunca mudam de ordem
+    <RichLineView key={index} line={line} />
+  ));
 }
 
 interface ChatMessagesProps {
@@ -156,7 +178,7 @@ export function ChatMessages({
                 <span className="label-mono !text-primary font-semibold">Assistente TransLog</span>
               </div>
               <div className="border-l-2 border-primary bg-slate-50/90 rounded-r-md px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 break-words border-y border-r border-y-slate-200/80 border-r-slate-200/80">
-                {renderRichText(msg.text)}
+                <RichText text={msg.text} />
               </div>
               <span className="mt-1 block font-mono text-[10.5px] text-slate-400 tabular">
                 {msg.time}

@@ -13,6 +13,9 @@ services:
       # A fonte no Docker é escolhida pelos arquivos de compose, não pelo .env (que vale para o pnpm dev).
       DATA_SOURCE: fixtures
       SAMPLE_ORDER_IDS: ${SAMPLE_ORDER_IDS:-}
+      # Chat sempre simulado no Docker: o agente do Marco ainda não tem imagem na main, e
+      # AGENT_URL=http://127.0.0.1:8001 apontaria para o próprio container, não para a máquina.
+      AGENT: mock
     ports:
       - "${API_PORT:-3333}:${API_PORT:-3333}"
     healthcheck:

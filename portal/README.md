@@ -33,10 +33,10 @@ Além da aplicação real em React (`portal/web/`), os protótipos visuais conti
 
 | Parte | O que faz | Situação em 15/11 |
 |---|---|---|
-| **Tela** (`web/`) | Interface em React que o cliente vê e usa no navegador | **Pronta** — construída com o design da Direção D, consultando os pedidos no servidor do portal e com o assistente funcionando em modo demonstração |
-| **Servidor do portal** (`api/`) | Recebe o número do pedido, busca os dados e devolve a resposta pronta para a tela | **Pronto** para a consulta de pedidos |
-| **Contrato** (`contracts/`) | Lista combinada de cada informação que o servidor entrega à tela: nome, formato e valores possíveis | **Pronto** para pedidos (compartilhado entre servidor e tela) |
-| **Conexão com o Agente de IA** | Leva a pergunta do cliente no servidor do portal até o agente em Python do Marco | Aguardando acordo final com o Marco sobre o formato da conversa (enquanto isso, o chat da tela responde com as regras de referência da demonstração) |
+| **Tela** (`web/`) | Interface em React que o cliente vê e usa no navegador | **Pronta** — design da Direção D; consulta os pedidos e manda as perguntas do chat ao servidor do portal |
+| **Servidor do portal** (`api/`) | Recebe o número do pedido ou a pergunta do chat, busca os dados e devolve a resposta pronta para a tela | **Pronto** para pedidos e chat |
+| **Contrato** (`contracts/`) | Lista combinada de cada informação que o servidor entrega à tela: nome, formato e valores possíveis | **Pronto** para pedidos e chat (compartilhado entre servidor e tela) |
+| **Assistente do chat** | Responde as perguntas do cliente. Dois modos, escolhidos por configuração: **simulado** (respostas prontas do próprio servidor) ou **agente de IA** do Marco | **Funcionando nos dois modos.** Com o agente real, testado em 15/11 pela tela. Alguns detalhes ainda dependem do Marco (ver "Pontos em aberto"); no Docker, só o simulado |
 
 ## Como a tela foi desenhada (Identidade Visual)
 
@@ -46,7 +46,7 @@ A interface segue a **Direção D (Manifesto & Rota Integrada)**, pensada para t
 - **Honestidade sem alarme:** o vermelho aparece **apenas** onde há atraso real (etiqueta `Atrasado`, célula de prazo, fita superior do cartão e etapa em atraso da linha do tempo). Avisos de atenção (como o motivo provável e a liberação pendente) usam âmbar (`#F59E0B`), enquanto a marca usa azul-petróleo (`#0F4C81`).
 - **Tipografia técnica de manifesto:** textos usam a fonte `Inter` para leitura rápida, enquanto números de pedido, códigos de manifesto (`TL-000375-LATAM`), datas, quantidades e valores em dólar usam fonte monoespaçada (`IBM Plex Mono`), facilitando a leitura de números.
 - **Rota + Andamento no mesmo bloco:** em vez de uma barra de progresso genérica, a origem e o destino internacionais ficam nas duas pontas da própria linha do tempo de 4 etapas (`Pedido realizado` → `Pedido liberado` → `Em trânsito` → `Entregue`). Assim, até a tabela de itens (com contagem de itens e unidades) cabe na primeira tela sem precisar rolar.
-- **Assistente como canal oficial:** o painel lateral de 400 px apresenta as respostas como um parecer da própria TransLog (com barra lateral azul-petróleo), adapta as perguntas sugeridas ao pedido aberto na tela e busca automaticamente na base qualquer número de pedido que o cliente citar na conversa.
+- **Assistente como canal oficial:** o painel lateral de 400 px apresenta as respostas como um parecer da própria TransLog (com barra lateral azul-petróleo), adapta as perguntas sugeridas ao pedido aberto na tela, mostra listas e títulos das respostas e abre no rastreio qualquer pedido que o cliente citar na conversa.
 - **Navegação rápida e todos os estados previstos:** busca com atalho de teclado (`/`) e botão de limpar para voltar ao início, tela inicial explicativa, carregamento animado, pedido não encontrado com retorno rápido à busca, falha de conexão com botão "Tentar novamente" e falha no envio de mensagem no chat com reenvio manual.
 
 ### Barra de controle da demonstração
@@ -64,7 +64,7 @@ No topo da tela há uma barra escura (**Direção D**), que pode ser ocultada nu
   Painel de gestão (Marcelo, BI): usa a mesma base, voltado para a gestão da TransLog.
 ```
 
-A tela conversa só com o servidor do portal. É o servidor que busca os dados e, depois, vai falar com o assistente de IA. Assim, nenhuma chave de acesso nem dado interno chega ao navegador do cliente.
+A tela conversa só com o servidor do portal. É o servidor que busca os dados e que fala com o assistente de IA. Assim, nenhuma chave de acesso nem dado interno chega ao navegador do cliente.
 
 ## De onde vêm os dados
 
@@ -147,10 +147,13 @@ São pedidos reais da base, escolhidos para cobrir todas as situações da tela.
 
 ## O que já foi verificado (15/11)
 
-- **130 testes automáticos** passando (105 no servidor + 25 na interface React).
-- **Tela React (`@translog/web`) pronta**, validando todas as respostas do servidor pelo contrato compartilhado e compilando para produção em menos de 1 segundo.
+- **254 testes automáticos** passando (209 no servidor + 45 na tela). Nenhum deles chama a IA de verdade (não gastam cota).
+- **Chat pela tela, nos dois modos**, com o roteiro da banca (abrir o 375, ver o atraso, "Perguntar ao assistente"), uma pergunta citando outro pedido (que abre sozinho no rastreio) e uma "Nova conversa":
+  - simulado: respostas em menos de meio segundo;
+  - agente de IA do Marco: respostas em 11 a 17 segundos.
+- O registro (log) do servidor guarda só dados técnicos da conversa (tamanho da mensagem, tempo, resultado); **nunca o texto** das perguntas ou respostas.
 - Base completa: os 65.752 pedidos foram carregados sem nenhuma linha com problema, em cerca de 11 segundos.
-- Cada consulta é respondida em **menos de 1 milésimo de segundo**.
+- Cada consulta de pedido é respondida em **menos de 1 milésimo de segundo**.
 - Os 65.752 pedidos foram conferidos, um a um, contra o script de referência usado para gerar os exemplos: todos iguais.
 - O servidor roda em **Docker**, tanto com os exemplos quanto com a base completa.
 
@@ -158,9 +161,9 @@ São pedidos reais da base, escolhidos para cobrir todas as situações da tela.
 
 | Assunto | Com quem | Por que importa |
 |---|---|---|
-| Motivo provável do atraso | Mateus e Marcelo | A base ainda não tem essa informação. Hoje os exemplos têm ("Promessa irreal" no 375); com a base completa, nenhum pedido mostra o aviso. Precisa estar resolvido para a demo |
+| Motivo provável do atraso | Mateus e Marcelo | A base ainda não tem essa informação. Hoje os exemplos têm ("Promessa irreal" no 375); com a base completa, nenhum pedido mostra o aviso. E o agente de IA lê a base, então diz que não há motivo registrado enquanto a tela mostra "Promessa irreal". Precisa estar resolvido para a demo |
 | Base usada na demo | Grupo | Pedidos de exemplo (11, com motivo provável no 375) ou base completa (todos os pedidos, sem motivo provável) |
-| Formato da conversa com o assistente | Marco | Necessário para ligar o chat da tela ao agente em Python (enquanto isso, o chat da tela já funciona com as respostas de referência) |
+| Ajustes do agente de IA | Marco | O chat já funciona com o agente, mas falta combinar: como o número do pedido aberto chega a ele, respostas mais curtas e para o cliente (hoje vêm longas e com termos técnicos), formatação, o que acontece quando a resposta demora demais, e o agente no Docker |
 | Versão final da base (Silver ou Gold) | Mateus | Se as colunas mudarem, só uma parte pequena do servidor precisa ser ajustada |
 | Comportamento do chat ao trocar de pedido e rótulo de pagamento não processado | Matheus / Grupo | As opções já estão prontas e podem ser alternadas ao vivo na barra superior da tela para decisão final |
 
@@ -186,7 +189,30 @@ pnpm dev
 
 Esse comando liga o servidor (`http://localhost:3333`) e a tela do portal (`http://localhost:5173`) ao mesmo tempo. Basta abrir [http://localhost:5173](http://localhost:5173) no navegador, clicar no exemplo **#375** e interagir com o rastreio e com o assistente.
 
-### 2. Servidor via Docker (documentação interativa da API)
+### 2. Chat: simulado ou agente de IA
+
+Sem nenhuma configuração, o chat responde no modo **simulado**: respostas prontas, criadas pelo próprio servidor do portal, que funcionam sem internet e sem a IA.
+
+Para o chat usar o **agente de IA do Marco**:
+
+1. Suba o agente (ele precisa estar respondendo em `http://127.0.0.1:8001`).
+2. Na pasta `portal/`, crie o arquivo `.env` a partir do exemplo e mude duas linhas:
+
+   ```bash
+   cp .env.example .env
+   # no .env:
+   #   AGENT=adk
+   #   AGENT_URL=http://127.0.0.1:8001
+   ```
+
+3. Reinicie o `pnpm dev`.
+4. Confira em [http://localhost:3333/api/health](http://localhost:3333/api/health): deve aparecer `"agent":"adk"`.
+
+Para voltar ao simulado, troque `AGENT=adk` por `AGENT=mock` e reinicie. O `.env` fica só no seu computador (não vai para o GitHub), e a chave da IA fica no agente, nunca no portal.
+
+Cada pergunta ao agente usa a IA do Google (gasta cota) e pode levar de alguns segundos até um minuto e meio; nesse tempo a tela mostra "digitando…". Se passar disso, a mensagem aparece como "O assistente demorou demais · Tentar novamente".
+
+### 3. Servidor via Docker (documentação interativa da API)
 
 ```bash
 cd portal
@@ -194,6 +220,8 @@ docker compose up --build
 ```
 
 Depois, abra [http://localhost:3333/docs](http://localhost:3333/docs) no navegador para ver e testar os endereços da API diretamente. Para usar a base completa ou ver mais comandos, consulte [docs/backend.md](docs/backend.md).
+
+No Docker, o chat fica sempre no modo **simulado**. Dois motivos: o agente do Marco ainda não tem uma versão em Docker no repositório, e, dentro do Docker, o endereço `127.0.0.1` aponta para o próprio container do servidor, não para o computador onde o agente está rodando. Quando o agente ganhar a versão em Docker, os dois passam a subir juntos.
 
 ## Glossário
 
@@ -208,6 +236,9 @@ Depois, abra [http://localhost:3333/docs](http://localhost:3333/docs) no navegad
 | Docker | Ferramenta que empacota o servidor para ele funcionar do mesmo jeito em qualquer computador |
 | Documentação da API (`/docs`) | Página gerada automaticamente que descreve a API e permite testá-la pelo navegador |
 | Teste automático | Verificação escrita em código, que roda a cada mudança para garantir que nada quebrou |
+| Assistente simulado (`mock`) | Modo do chat com respostas prontas, criadas pelo próprio servidor do portal. Não usa IA |
+| Agente de IA (`adk`) | O assistente do Marco, feito com o Google ADK e o modelo Gemini. O servidor do portal conversa com ele |
+| Conversa (sessão) | Sequência de perguntas e respostas. Cada "Nova conversa" na tela começa uma conversa nova no agente |
 
 ## Pessoas ligadas ao portal
 
@@ -215,7 +246,7 @@ Depois, abra [http://localhost:3333/docs](http://localhost:3333/docs) no navegad
 |---|---|---|
 | Matheus van Deursen | FullStack | Responsável pelo portal (servidor e tela) |
 | Mateus Maciel | Engenharia de Dados | Fornece a base de pedidos (Silver e, depois, Gold) |
-| Marco Aurélio | Engenharia de IA | Assistente que vai responder no chat |
+| Marco Aurélio | Engenharia de IA | Agente de IA que responde no chat |
 | Marcelo Pimenta | BI | Painel de gestão; motivo provável do atraso, junto com o Mateus |
 | Stephanie Lopes | Gestão de Projetos | Acompanhamento e documentação do projeto |
 

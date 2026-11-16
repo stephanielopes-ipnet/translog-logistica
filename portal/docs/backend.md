@@ -2,7 +2,7 @@
 
 Para quem vai rodar, revisar ou mudar o código do portal. A visão geral, sem detalhes técnicos, está no [README](../README.md).
 
-Estado em 15/11/2026: fases 0, 1 e 3 concluídas (fundação, contrato `@translog/contracts`, API de pedidos `@translog/api` e interface frontend `@translog/web` seguindo a Direção D). A integração HTTP de chat com o agente ADK (Fase 2) aguarda o acordo de contrato com o Marco. Checklist em [tasks.md](../tasks.md).
+Estado em 15/11/2026: fundação, contrato `@translog/contracts`, API de pedidos e de chat `@translog/api` e interface `@translog/web` (Direção D) concluídas. O chat responde pelo assistente simulado (`AGENT=mock`, padrão) ou pelo agente ADK do Marco (`AGENT=adk`), conferido pela tela contra o agente real em 15/11. O que ainda depende do acordo com o Marco fica isolado em `withOrderContext` e na configuração (seção 10.8). Checklist em [tasks.md](../tasks.md).
 
 ## Sumário
 
@@ -15,31 +15,34 @@ Estado em 15/11/2026: fases 0, 1 e 3 concluídas (fundação, contrato `@translo
 7. [Configuração](#7-configuração)
 8. [Fontes de dados](#8-fontes-de-dados)
 9. [Mapeamento Silver → `Order`](#9-mapeamento-silver--order)
-10. [Privacidade em camadas](#10-privacidade-em-camadas)
-11. [Tratamento de erros](#11-tratamento-de-erros)
-12. [Frontend (`@translog/web`)](#12-frontend-translogweb)
-13. [Testes](#13-testes)
-14. [Docker](#14-docker)
-15. [Como fazer mudanças comuns](#15-como-fazer-mudanças-comuns)
-16. [Convenções](#16-convenções)
-17. [Decisões técnicas](#17-decisões-técnicas)
-18. [Limitações e próximos passos](#18-limitações-e-próximos-passos)
+10. [Chat e assistente](#10-chat-e-assistente)
+11. [Privacidade em camadas](#11-privacidade-em-camadas)
+12. [Tratamento de erros](#12-tratamento-de-erros)
+13. [Frontend (`@translog/web`)](#13-frontend-translogweb)
+14. [Testes](#14-testes)
+15. [Docker](#15-docker)
+16. [Como fazer mudanças comuns](#16-como-fazer-mudanças-comuns)
+17. [Convenções](#17-convenções)
+18. [Decisões técnicas](#18-decisões-técnicas)
+19. [Limitações e próximos passos](#19-limitações-e-próximos-passos)
 
 ## 1. Visão geral
 
 O portal é um monorepo pnpm dividido em três pacotes:
 
 - **`@translog/contracts` (`contracts/`)**: esquemas Zod compartilhados que definem o contrato HTTP, geram o OpenAPI em `/docs` e tipam tanto o backend quanto o frontend.
-- **`@translog/api` (`api/`)**: API HTTP em Fastify que entrega à tela o pedido pronto para exibir (view model `Order`), lendo de 11 pedidos de exemplo versionados (`fixtures`) ou da base Silver em CSV (`file`). Tudo é carregado uma vez na inicialização e consultado em memória em $O(1)$.
+- **`@translog/api` (`api/`)**: API HTTP em Fastify que entrega à tela o pedido pronto para exibir (view model `Order`), lendo de 11 pedidos de exemplo versionados (`fixtures`) ou da base Silver em CSV (`file`), e responde o chat (`POST /api/chat`) pelo assistente simulado ou pelo agente ADK do Marco. Os pedidos são carregados uma vez na inicialização e consultados em memória em $O(1)$.
 - **`@translog/web` (`web/`)**: Single-Page Application em React 19 + Vite 8 + Tailwind CSS v4 que implementa o design da **Direção D** (estética de manifesto de carga internacional combinada com rota e linha do tempo de 4 etapas integradas) e consome a API real via `@tanstack/react-query`, validando todas as respostas no cliente com os esquemas de `@translog/contracts`.
 
 ```
 Navegador (@translog/web, :5173)  ──►  API do portal (@translog/api, :3333)  ──►  Silver CSV / fixtures
-        │                                       │
-        └── Assistente local (mock Fase 3)      └──►  Agente ADK do Marco (Fase 2, futura)
+                                                │
+                                                └──►  Assistente do chat (AGENT):
+                                                        mock: regras na própria API
+                                                        adk:  agente ADK do Marco (:8001) ──► Gemini
 ```
 
-A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento), nunca direto com o agente. A chave do Gemini fica restrita ao processo do agente.
+A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento), nunca direto com o agente. A chave do Gemini fica restrita ao processo do agente: nunca no portal, no código, nos testes, nos logs ou no navegador.
 
 ### Stack
 
@@ -60,10 +63,10 @@ A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento
 | @tanstack/react-query | 5.107.1 | `web` | Cache, estado assíncrono, retentativas e sincronização com a API |
 | lucide-react | 1.72.0 | `web` | Ícones consistentes com os protótipos |
 | @fontsource-variable/inter | 5.3.0 | `web` | Fonte `Inter Variable` empacotada localmente |
-| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (130 testes no total) |
+| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (254 testes, mais 1 de integração com o agente real, desligado por padrão) |
 | Biome | 2.6.7 | todos | Lint, formatação, acessibilidade e ordem dos imports |
 
-Tamanho aproximado: ~950 linhas de código na API + ~2.400 linhas no frontend, cobertos por **130 testes automatizados** (105 na API + 25 no frontend).
+Tamanho aproximado: ~1.600 linhas de código na API + ~3.100 no frontend (das quais ~400 são os pedidos de exemplo dos testes), cobertos por **254 testes automatizados** (209 na API + 45 no frontend). O chat não trouxe dependência nova: o adapter do agente usa o `fetch` nativo do Node.
 
 ## 2. Estrutura de pastas
 
@@ -91,6 +94,7 @@ portal/
 │   └── src/
 │       ├── index.ts         # reexporta tudo
 │       ├── orders.ts        # Order, enums, params e resposta de samples
+│       ├── chat.ts          # corpo e resposta de POST /api/chat, AgentMode
 │       ├── health.ts        # resposta do health, DataSource
 │       └── errors.ts        # formato padrão de erro
 ├── api/                     # @translog/api
@@ -100,10 +104,18 @@ portal/
 │       ├── main.ts          # bootstrap: .env → config → servidor → listen
 │       ├── server.ts        # Fastify, swagger, error handler, container, rotas (health inline)
 │       ├── config.ts        # variáveis de ambiente validadas
-│       ├── container.ts     # único lugar que escolhe o adapter de dados
+│       ├── container.ts     # único lugar que escolhe os adapters (dados e assistente)
 │       ├── http/
 │       │   └── errors.ts    # único lugar que transforma erros em resposta HTTP
-│       ├── privacy.test.ts  # varredura de chaves e valores proibidos em todas as respostas
+│       ├── privacy.test.ts  # varredura de chaves e valores proibidos em todas as respostas (pedidos e chat)
+│       ├── chat/
+│       │   ├── routes.ts              # POST /api/chat
+│       │   ├── chat-service.ts        # pedido de contexto, trava por conversa, log sem conteúdo, ChatBusyError
+│       │   ├── cited-orders.ts        # números de pedido citados no texto
+│       │   ├── support-agent.ts       # porta SupportAgent + AgentUnavailableError e AgentTimeoutError
+│       │   ├── mock-agent.ts          # adapter mock: regras e textos do assistente simulado
+│       │   ├── adk-agent.ts           # adapter adk: sessões, POST /run, withOrderContext (provisório)
+│       │   └── adk-events.ts          # extractFinalText (mesma regra do extract_final_text do agente)
 │       └── orders/
 │           ├── routes.ts              # GET /api/orders/samples e /api/orders/:orderId
 │           ├── order-service.ts       # regras de consulta + OrderNotFoundError
@@ -124,9 +136,9 @@ portal/
         ├── app.tsx          # composição geral: URL state, queries, troca de pedido, atalhos e chat
         ├── index.css        # @theme inline, @custom-variant dark, classes .label-mono, .perf-t, .route-line
         ├── api/
-        │   ├── client.ts    # fetch + validação Zod com @translog/contracts + classe ApiError
-        │   ├── fixtures.ts  # espelho dos 11 pedidos de exemplo para simulação offline via ProtoBar
-        │   └── queries.ts   # hooks useHealth, useOrderSamples, useOrderQuery e política shouldRetry
+        │   ├── client.ts    # getJson/postJson + validação Zod com @translog/contracts + classe ApiError
+        │   ├── fixtures.ts  # espelho dos 11 pedidos de exemplo, usado só nos testes da tela
+        │   └── queries.ts   # useHealth, useOrderSamples, useOrderQuery, useSendChatMessage e shouldRetry
         ├── lib/
         │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD), formatManifestCode
         │   ├── url-state.ts # leitura e escrita de ?pedido= e presets de apresentação (?t, ?c, ?s, ?r, ?n, ?bar)
@@ -142,12 +154,15 @@ portal/
             │   ├── order-items-table.tsx  # tabela de itens declarados e rodapé perfurado (.perf-t) com total em USD
             │   └── tracking-panel.tsx     # orquestração da coluna esquerda (60%)
             ├── chat/
-            │   ├── mock-chat-service.ts   # motor determinístico do assistente (quando chega, por que atrasou, resumo)
-            │   ├── chat-messages.tsx      # despachos numerados (#01), divisor de troca, typing e parser seguro de **negrito**
+            │   ├── chat-session.ts        # regras puras: sessionId, troca de pedido, texto de falha, tipo das mensagens
+            │   ├── chat-suggestions.ts    # perguntas sugeridas conforme o pedido aberto
+            │   ├── rich-text.ts           # **negrito**, títulos e listas das respostas, sem HTML
+            │   ├── chat-messages.tsx      # mensagens, divisor de troca, "digitando…" e falha com "Tentar novamente"
             │   ├── chat-input.tsx         # chips de sugestão contextual + textarea com Enter / Shift+Enter
             │   └── chat-panel.tsx         # coluna direita fixa (400 px) com contexto do pedido ativo
             └── dev-bar/
-                └── proto-bar.tsx          # barra inferior recolhível para simular estados, decisões em aberto e tema
+                ├── chat-presets.ts        # conversas de exemplo da barra, com textos fixos sobre o 375
+                └── proto-bar.tsx          # barra recolhível para simular estados e as decisões em aberto
 ```
 
 Testes ficam ao lado do arquivo testado (`*.test.ts`) tanto em `api/src/` quanto em `web/src/`.
@@ -169,7 +184,7 @@ pnpm dev            # sobe API (http://localhost:3333) e Web (http://localhost:5
 
 O comando `pnpm dev` usa `pnpm --parallel --stream -r --filter @translog/api --filter @translog/web dev`:
 - `@translog/api` roda com `node --watch` na porta `3333`;
-- `@translog/web` roda o servidor do Vite na porta `5173`, fazendo proxy automático de qualquer requisição `/api/*` para `http://127.0.0.1:3333` (ou para `VITE_API_TARGET`, se definida).
+- `@translog/web` roda o servidor do Vite na porta `5173`, fazendo proxy automático de qualquer requisição `/api/*` para `http://127.0.0.1:<API_PORT>` (`API_PORT` e `WEB_PORT` vêm do ambiente ou do `portal/.env`; padrões 3333 e 5173).
 
 Sem `.env`, a API sobe com os `fixtures` (11 pedidos). Para usar a Silver real (65.752 pedidos), copie o arquivo para `portal/dados/silver_pedidos_rastreio.csv` e:
 
@@ -182,6 +197,25 @@ pnpm dev
 ```
 
 Com `file`, cada recarga do `--watch` na API relê a Silver (~10 s).
+
+### Chat com o agente ADK (desenvolvimento)
+
+Sem configuração, o chat usa o assistente simulado (`AGENT=mock`). Para usar o agente do Marco, com ele no ar em `127.0.0.1:8001`:
+
+```bash
+cp .env.example .env
+# no .env:
+#   AGENT=adk
+#   AGENT_URL=http://127.0.0.1:8001
+pnpm dev            # reinicie se já estava rodando: o --watch não relê o .env
+curl localhost:3333/api/health   # ..."agent":"adk"
+```
+
+Teste automatizado com o agente real (chama o Gemini e gasta cota; desligado por padrão):
+
+```bash
+AGENT_IT_URL=http://127.0.0.1:8001 pnpm --filter @translog/api test adk-agent
+```
 
 ### Docker
 
@@ -200,7 +234,7 @@ Para não repetir os `-f`, defina `COMPOSE_FILE=docker-compose.yml:docker-compos
 | `pnpm dev` | Sobe API (`:3333`) e frontend Web (`:5173`) em paralelo com hot reload |
 | `pnpm start` | Sobe apenas a API sem watch |
 | `pnpm build` | Gera o bundle de produção do frontend em `web/dist/` |
-| `pnpm test` | Roda o Vitest em todos os pacotes (130 testes: 105 na API + 25 no Web) |
+| `pnpm test` | Roda o Vitest em todos os pacotes (254 testes: 209 na API + 45 no Web) |
 | `pnpm lint` | Biome em todos os pacotes (só verifica) |
 | `pnpm format` | Biome corrigindo formatação e imports |
 | `pnpm typecheck` | `tsc` em todos os pacotes (`contracts`, `api` e `web`) |
@@ -245,18 +279,41 @@ Usuário digita "375" ou clica no atalho #375 em @translog/web
      └─ TrackingPanel renderiza OrderManifestCard + OrderItemsTable e sincroniza contexto do ChatPanel
 ```
 
+### Pergunta no chat (Ponta a Ponta)
+
+```
+Usuário clica "Perguntar ao assistente" no pedido 375 (ou digita no chat)
+ ├─ App cria o sessionId da conversa (crypto.randomUUID) se ainda não houver
+ ├─ useSendChatMessage → POST /api/chat { sessionId, message, orderId: 375 }   sem retry
+ │   ├─ Fastify valida o corpo por chatRequestSchema ─────────── falha → 400 VALIDATION_ERROR
+ │   ├─ chatService.send
+ │   │   ├─ conversa já esperando resposta? ── ChatBusyError ─── http/errors.ts → 409 CHAT_BUSY
+ │   │   ├─ contexto: 1º pedido existente citado no texto; senão o aberto (se existir)
+ │   │   └─ agent.reply({ sessionId, message, order })
+ │   │       ├─ mock: regras de mock-agent.ts                   resposta imediata
+ │   │       └─ adk:  cria a sessão (1ª mensagem) → POST /run → extractFinalText
+ │   │             ├─ tempo esgotado ── AgentTimeoutError ───── 504 AGENT_TIMEOUT
+ │   │             └─ HTTP de erro, JSON inválido, sem resposta final
+ │   │                   └─ AgentUnavailableError ───────────── 502 AGENT_UNAVAILABLE
+ │   ├─ log: sessão, tamanho, tempo e resultado (nunca o texto)
+ │   └─ 200 { sessionId, reply, mentionedOrderId }
+ └─ postJson valida com chatResponseSchema
+     ├─ mentionedOrderId ≠ pedido aberto → abre esse pedido no rastreio (mesma troca do formulário)
+     └─ a resposta entra no chat; em erro, a pergunta fica "Não enviada · Tentar novamente"
+```
+
 ### Camadas do backend (portas e adapters)
 
 | Camada | Arquivo | Depende de |
 |---|---|---|
-| Rotas | `orders/routes.ts` | `OrderService` (interface) e esquemas do contrato |
-| Serviço | `orders/order-service.ts` | `OrderRepository` (porta) |
-| Porta | `orders/order-repository.ts` | Tipo `Order` do contrato |
-| Adapters | `fixtures-repository.ts`, `file-repository.ts` | Porta, mapper, Node (fs, stream) |
-| Composição | `container.ts` | Config e adapters: **único** lugar que escolhe a fonte |
+| Rotas | `orders/routes.ts`, `chat/routes.ts` | `OrderService`/`ChatService` (interfaces) e esquemas do contrato |
+| Serviço | `orders/order-service.ts`, `chat/chat-service.ts` | `OrderRepository` (porta); `SupportAgent` (porta) e `OrderService.findOrder` |
+| Porta | `orders/order-repository.ts`, `chat/support-agent.ts` | Tipo `Order` do contrato |
+| Adapters | `fixtures-repository.ts`, `file-repository.ts`; `mock-agent.ts`, `adk-agent.ts` | Porta, mapper, Node (fs, stream, `fetch`) |
+| Composição | `container.ts` | Config e adapters: **único** lugar que escolhe a fonte (`DATA_SOURCE`) e o assistente (`AGENT`) |
 | Erros → HTTP | `http/errors.ts` | Erros de domínio: **único** lugar que decide status e mensagem |
 
-Padrão de código: funções fábrica (`createOrderService(deps)`), sem classes de serviço. Classes só para erros de domínio (`OrderNotFoundError` na API e `ApiError` no cliente HTTP do frontend).
+Padrão de código: funções fábrica (`createOrderService(deps)`), sem classes de serviço. Classes só para erros de domínio (`OrderNotFoundError`, `ChatBusyError`, `AgentUnavailableError` e `AgentTimeoutError` na API; `ApiError` no cliente HTTP do frontend).
 
 ## 5. Contrato (`@translog/contracts`)
 
@@ -274,7 +331,11 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 | `orderIdParamsSchema` | Params da rota: texto de 1 a 10 dígitos, maior que zero |
 | `orderSamplesResponseSchema` | `{ orderIds: number[] }` |
 | `trackingStatusSchema`, `deadlineStatusSchema`, `shippingModeSchema`, `marketSchema` | Enums com os valores da base |
-| `healthResponseSchema`, `dataSourceSchema` | `{ status: "ok", dataSource: "fixtures" \| "file", orders }` |
+| `healthResponseSchema`, `dataSourceSchema` | `{ status: "ok", dataSource: "fixtures" \| "file", orders, agent }` |
+| `agentModeSchema` / `AgentMode` | `"mock" \| "adk"` (`AGENT`); o health só informa o modo, não consulta o agente |
+| `chatRequestSchema` / `ChatRequest` | Corpo de `POST /api/chat` |
+| `chatResponseSchema` / `ChatResponse` | Resposta de `POST /api/chat` |
+| `chatSessionIdSchema`, `CHAT_MESSAGE_MAX_LENGTH` | UUID da conversa; limite de 1000 caracteres da mensagem |
 | `errorResponseSchema` | `{ error: { code, message } }` |
 
 ### `Order`
@@ -299,13 +360,26 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 
 `delayWindow`, `region`, `origin` e `destination` são texto livre de propósito (podem mudar com a Silver nova). O contrato não tem regras entre campos (por exemplo, "`actualDeliveryDate` só se Entregue"): quem garante é o mapper, com testes.
 
+### Chat
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `sessionId` (pedido e resposta) | UUID | Gerado pela tela a cada conversa nova (`crypto.randomUUID()`) |
+| `message` | texto | Aparado nas pontas e depois medido: 1 a 1000 caracteres |
+| `orderId` | número de pedido, `null` ou ausente | Pedido aberto na tela; inexistente é ignorado, sem erro |
+| `reply` | texto, mínimo 1 caractere | Resposta do assistente; pode ter `**negrito**`, quebras de linha, títulos (`#`) e listas (`*`, `-`, `•`) |
+| `mentionedOrderId` | número de pedido ou `null` | Pedido **existente** citado na mensagem do cliente, para a tela abrir |
+
+O OpenAPI de `/docs` traz um exemplo de corpo e as respostas `200`, `400`, `409`, `502` e `504`.
+
 ## 6. API (`@translog/api`)
 
 | Rota | Sucesso | Erros |
 |---|---|---|
-| `GET /api/health` | `200 { status: "ok", dataSource, orders }` | |
+| `GET /api/health` | `200 { status: "ok", dataSource, orders, agent }` | |
 | `GET /api/orders/samples` | `200 { orderIds }`: ids de `SAMPLE_ORDER_IDS` que existem na fonte, na ordem configurada | |
 | `GET /api/orders/:orderId` | `200 Order` | `400 VALIDATION_ERROR`, `404 ORDER_NOT_FOUND` |
+| `POST /api/chat` | `200 { sessionId, reply, mentionedOrderId }` | `400 VALIDATION_ERROR`, `409 CHAT_BUSY`, `502 AGENT_UNAVAILABLE`, `504 AGENT_TIMEOUT` |
 | `GET /docs` | Swagger UI (`/docs/json` = OpenAPI) | |
 
 O `orderId` aceita só dígitos (1 a 10), maior que zero; zeros à esquerda passam (`0015` → 15). `1e3`, `0x1F`, `-1`, `1.5`, espaços e 11 dígitos são recusados.
@@ -347,6 +421,12 @@ curl localhost:3333/api/orders/abc
 # 400 {"error":{"code":"VALIDATION_ERROR","message":"Requisição inválida: orderId: deve ser um número inteiro positivo de até 10 dígitos."}}
 ```
 
+```bash
+curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
+  -d '{"sessionId":"3f2b8c1e-7a4d-4e5f-9b6a-1c2d3e4f5a6b","message":"Por que o pedido #375 atrasou?","orderId":375}'
+# 200 (AGENT=mock) {"sessionId":"3f2b8c1e-...","reply":"O motivo provável do atraso do pedido **#375** é **Promessa irreal**: o prazo de 2 dias da modalidade Second Class provavelmente foi curto para a rota internacional Texas → Saltillo (México).","mentionedOrderId":375}
+```
+
 ## 7. Configuração
 
 | Variável | Padrão | Uso |
@@ -355,8 +435,12 @@ curl localhost:3333/api/orders/abc
 | `DATA_SOURCE` | `fixtures` | `fixtures` ou `file` |
 | `ORDERS_FILE` | vazio | CSV da Silver; obrigatório com `file`. Caminho relativo parte de `portal/` |
 | `SAMPLE_ORDER_IDS` | `15,375,562,1002` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
+| `AGENT` | `mock` | Assistente do chat: `mock` ou `adk` |
+| `AGENT_URL` | vazio | Endereço http(s) do agente; obrigatório com `adk` (dev: `http://127.0.0.1:8001`). Barra final removida |
+| `AGENT_APP_NAME` | `translog_agent` | Nome do app no ADK; só letras, números, `_` e `-` (vai no caminho da URL) |
+| `AGENT_TIMEOUT_MS` | `90000` | Limite por resposta do agente, de 1000 a 600000 ms (o agente já levou 54 s) |
 | `NODE_ENV` | vazio | `production` = log em JSON; ausente = legível (pino-pretty) |
-| `VITE_API_TARGET` | `http://127.0.0.1:3333` | Alvo do proxy `/api` no Vite dev server (opcional, apenas para o frontend em dev) |
+| `WEB_PORT` | `5173` | Porta do Vite dev server (só o frontend em dev); o proxy `/api` usa `API_PORT` |
 
 Regras (`api/src/config.ts`):
 
@@ -370,7 +454,8 @@ Regras (`api/src/config.ts`):
     - ORDERS_FILE é obrigatória com DATA_SOURCE=file: caminho do CSV da Silver (não definida)
   ```
 
-- No Docker, `DATA_SOURCE` e `ORDERS_FILE` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 14).
+- No Docker, `DATA_SOURCE` e `ORDERS_FILE` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 15). `AGENT` fica fixo em `mock` no compose.
+- A chave do Gemini nunca entra no `.env` do portal: fica só no `.env` do agente.
 
 ## 8. Fontes de dados
 
@@ -477,7 +562,109 @@ Os campos do pedido vêm da primeira linha do grupo (na Silver, todos os itens d
 
 **Verificação completa (14/11):** os 65.752 pedidos produzidos pela API foram comparados com a implementação de referência em Python que gerou os mocks. São idênticos, exceto o `probableCause` do 375: o script de referência fixa "Promessa irreal" nele como exemplo da demo.
 
-## 10. Privacidade em camadas
+## 10. Chat e assistente
+
+Tudo em `api/src/chat/`. A tela manda a pergunta para `POST /api/chat`; a API responde pelo assistente escolhido em `AGENT`. **Sem histórico no servidor:** o ADK guarda a conversa, e o simulado responde cada mensagem sozinho. Sem streaming e sem rate limit nesta fase.
+
+| Arquivo | Papel |
+|---|---|
+| `routes.ts` | `POST /api/chat`, com o esquema no `/docs` |
+| `chat-service.ts` | Pedido de contexto, trava por conversa, log; lança `ChatBusyError` |
+| `cited-orders.ts` | `citedOrderIds` e `findCitedOrder`: usados pelo serviço e pelo simulado (uma regra só) |
+| `support-agent.ts` | Porta `SupportAgent.reply({ sessionId, message, order }) → string` e os erros do assistente |
+| `mock-agent.ts` | Adapter `mock` |
+| `adk-agent.ts`, `adk-events.ts` | Adapter `adk` e extração da resposta final |
+
+### 10.1. Pedido de contexto e pedido citado
+
+1. O serviço procura na mensagem sequências de 1 a 10 dígitos maiores que zero (`#375` → 375; `0015` → 15; 11 dígitos ou mais, como telefone, não contam) e consulta cada uma, na ordem, em `OrderService.findOrder`.
+2. O primeiro pedido que existe vira o **contexto** e volta em `mentionedOrderId`, para a tela abrir esse pedido.
+3. Sem pedido citado, o contexto é o `orderId` aberto na tela, se existir na fonte. Pedido aberto inexistente é ignorado, sem erro.
+
+O adapter recebe o pedido já resolvido (`order: Order | null`).
+
+### 10.2. Uma mensagem por vez por conversa
+
+O serviço guarda as conversas ocupadas num `Set`, conferido e marcado **antes de qualquer `await`** (duas chamadas simultâneas não passam juntas). Outra mensagem da mesma conversa antes da resposta → `ChatBusyError` → `409 CHAT_BUSY`. A conversa é liberada no `finally`, inclusive em falha. Conversas diferentes são atendidas em paralelo. Resposta vazia (só espaços) vira `AgentUnavailableError`.
+
+### 10.3. Assistente simulado (`AGENT=mock`)
+
+`mock-agent.ts` tem as regras e os textos que ficavam na tela, consultando a fonte configurada (funciona com a Silver):
+
+| Pergunta | Resposta |
+|---|---|
+| Cita pedido inexistente (com a palavra "pedido" ou só o número) | "Não encontrei o pedido **#N**. Confira o número e tente novamente." |
+| "modalidade", "tipos de envio", "formas de envio", "classe" | As quatro modalidades e seus prazos |
+| "atras", "por que", "motivo", "demor", "causa" | `buildWhyReply`: motivo provável, ou situação sem atraso, cancelado, aguardando liberação |
+| "quando", "chega", "prazo", "previs", "entreg", "situac", "status", "onde", ou só o pedido | `buildWhenReply`: situação, datas e dias de atraso |
+| Sem pedido de contexto | Pede o número do pedido |
+| Fora do escopo | Diz o que sabe fazer |
+
+Regras fixas: rótulo sempre "Motivo provável", nenhum texto apresenta a causa como comprovada, nada sobre pagamento (só "Aguardando Liberação"). O detalhe de "Promessa irreal" é montado a partir do pedido (modalidade, prazo, estado de origem → cidade e país de destino; "rota internacional" só se os países forem diferentes). Outros motivos aparecem sem detalhe.
+
+### 10.4. Adapter do agente ADK (`AGENT=adk`)
+
+Pela API nativa do ADK (`agent/docs/api-chat.md`); não existe `/chat` no agente. Só `fetch` nativo.
+
+| Etapa | Comportamento |
+|---|---|
+| Identidade | `userId = portal-<sessionId>`, gerado no servidor, nunca vindo do navegador |
+| Criar a sessão | `POST /apps/{AGENT_APP_NAME}/users/{userId}/sessions/{sessionId}` com `{}` na **primeira** mensagem de cada `sessionId`. `409` "already exists" conta como sucesso |
+| Memória de sessões | `Map` em ordem de uso: esquece as com mais de 2 h sem uso e, acima de 1.000, as usadas há mais tempo. Se a conversa voltar, a criação devolve `409` e segue normal |
+| Mensagem | `POST /run` com `{ appName, userId, sessionId, newMessage: { role: "user", parts: [{ text }] } }` |
+| Sessão perdida | `404` com `detail` "Session not found" (o agente reiniciou; as sessões ficam em memória): recria a sessão e reenvia **uma vez**. Seguro porque a mensagem comprovadamente não foi processada. Outro `404` vira `502` sem reenvio |
+| Limite de tempo | Um `AbortSignal.timeout(AGENT_TIMEOUT_MS)` por resposta, cobrindo criação da sessão, `/run` e o eventual reenvio → `AgentTimeoutError` (`504`) |
+| Falhas | HTTP não-2xx (sem chave, cota, "high demand" do Gemini: o `/run` responde `500`), JSON inválido, conexão recusada ou sem resposta final → `AgentUnavailableError` (`502`) |
+| Reenvio | Nenhum outro reenvio automático, nem na API nem na tela |
+
+**`extractFinalText(events)`** (`adk-events.ts`) reproduz `extract_final_text` (`agent/src/translog/client.py`) e todos os casos de teste dele: recusa evento com `errorCode`/`error_code`; o último evento com conteúdo precisa ser do `model`, sem `partial`/`interrupted` e sem chamada ou retorno de ferramenta; junta as partes de texto que não são `thought`; nunca recupera um texto intermediário anterior. "Verdadeiro" segue o Python (`null`, `0`, `""`, `[]`, `{}` são falsos). Única diferença: também recusa `function_response` (snake_case), o que só deixa a regra mais estrita.
+
+**`withOrderContext(message, order)`** coloca o pedido de contexto dentro do texto, porque o agente não recebe o número em campo separado: `[Pedido aberto no portal: 375] Quando chega?`. **Formato provisório**, a combinar com o Marco; é o único ponto do portal que o conhece.
+
+Motivos técnicos (campo `reason` do log): `HTTP <status> em POST /run`, `HTTP <status> ao criar sessão`, `sem resposta do agente em <ms> ms (...)`, `falha de conexão com o agente (..., ECONNREFUSED)`, `JSON inválido na resposta do agente (...)` e os da extração (com o `errorCode`, nunca o `errorMessage`). Nunca o corpo HTTP: o `422` do FastAPI ecoa a entrada.
+
+### 10.5. Log sem conteúdo
+
+Uma linha por mensagem, sem o texto do cliente nem a resposta:
+
+```
+INFO: Mensagem do chat respondida
+    agent: "adk"
+    sessionId: "8cf6b792-104c-4df5-928e-9a1feea95461"
+    messageLength: 30
+    outcome: "ok"
+    durationMs: 16998
+```
+
+`outcome`: `ok` (info), `busy` (info), `unavailable`, `timeout` ou `error` (warn, com `reason` técnico). O reenvio após sessão perdida registra `Sessão perdida no agente (reiniciou?); recriando e reenviando`, só com a sessão. O log padrão de requisição do Fastify registra método e URL, nunca o corpo.
+
+### 10.6. Na tela
+
+O pedido aberto vai em `orderId`; `mentionedOrderId` abre o pedido citado; "digitando…" enquanto espera, sem tempo artificial; falha vira "Não enviada · Tentar novamente" (no `504`, "O assistente demorou demais"), com reenvio só manual. Detalhes na seção 13.6.
+
+### 10.7. Verificação com o agente real (15/11)
+
+Pela tela, contra o agente local do Marco (Docker, lendo a mesma Silver do portal; modelo `gemini-3.5-flash`), com a API em `fixtures`:
+
+| Passo | Simulado | Agente ADK |
+|---|---|---|
+| 375 → "Perguntar ao assistente" | 0,2 s | 17,3 s |
+| "E o pedido 15, já chegou?" (abre o 15 no rastreio) | 0,2 s | 11,5 s |
+| "Nova conversa" → "Quando chega?" (sessão nova, contexto do 15 pelo prefixo) | 0,3 s | 13,7 s |
+
+O agente não repetiu o prefixo ao cliente. As respostas dele vieram longas, item a item, com termos técnicos (`actual_days`, "Item ID"), sem motivo provável (a Silver não tem a coluna, enquanto a tela em `fixtures` mostra "Promessa irreal" no 375) e com alguns símbolos que a tela não formata (`---`, `*Nota:*`, crases). O log da API trouxe só os metadados acima.
+
+### 10.8. O que depende do Marco
+
+Isolado em `withOrderContext` e na configuração `AGENT*`; o resto do chat não muda:
+
+- formato do pedido de contexto no texto (e instruir o agente a não repeti-lo);
+- tamanho, tom e formatação das respostas; motivo provável; modelo e velocidade;
+- se o ADK continua processando depois de um `504` (o "Tentar novamente" pode sobrepor duas mensagens na mesma sessão);
+- Dockerfile do agente na `main` para entrar no compose;
+- base de pedidos do agente igual à do portal (depende também da Gold).
+
+## 11. Privacidade em camadas
 
 Regra do projeto: nenhuma resposta traz dados do cliente, de pagamento ou financeiros internos.
 
@@ -488,29 +675,35 @@ Regra do projeto: nenhuma resposta traz dados do cliente, de pagamento ou financ
    - varre todas as chaves, em qualquer nível, de todas as respostas (sucesso, erros, `/docs/json`), nas duas fontes;
    - confere que nenhuma resposta contém os valores fictícios das colunas proibidas (`FICTICIO-*`) e sem uso (`SEM-USO`) da amostra;
    - usa um repositório que devolve `id_cliente`, `lucro_item` etc. para provar a camada 3.
-5. **Logs sem conteúdo.** Linhas e pedidos inválidos são logados só com número do registro, número do pedido e o nome dos campos.
-6. **Silver fora do Git e da imagem.** `portal/dados/` está no `.gitignore` da raiz; o `.dockerignore` tira `dados/` e qualquer `*.csv`. No Docker, a Silver entra por volume somente leitura.
+5. **Logs sem conteúdo.** Linhas e pedidos inválidos são logados só com número do registro, número do pedido e o nome dos campos. O chat registra só sessão, tamanho, modo, tempo e resultado (seção 10.5). Erros 4xx registram só `statusCode` e `code`: a mensagem de JSON malformado do Node traz um trecho do corpo enviado.
+6. **Chat.** A resposta passa por `chatResponseSchema` (só `sessionId`, `reply`, `mentionedOrderId`). O simulado monta o texto só com campos do `Order`. `privacy.test.ts` pergunta ao simulado sobre todos os pedidos, nas duas fontes e com um repositório que devolve campos proibidos, e confere chaves, valores fictícios e palavras proibidas no texto (cliente, pagamento, lucro, margem, desconto, latitude...). **Limite:** com `AGENT=adk`, o texto é produzido pelo agente a partir da base que ele lê; o portal não filtra esse texto. A privacidade depende do agente ler só colunas permitidas (pendência com o Marco).
+7. **Silver fora do Git e da imagem.** `portal/dados/` está no `.gitignore` da raiz; o `.dockerignore` tira `dados/` e qualquer `*.csv`. No Docker, a Silver entra por volume somente leitura.
 
-## 11. Tratamento de erros
+## 12. Tratamento de erros
 
 Tudo em `http/errors.ts`. Rotas e serviços não têm `try/catch` para montar resposta.
 
 | Origem | Status | `code` | `message` |
 |---|---|---|---|
 | `OrderNotFoundError` (serviço) | 404 | `ORDER_NOT_FOUND` | Pedido não encontrado. Confira o número e tente novamente. |
+| `ChatBusyError` (chat) | 409 | `CHAT_BUSY` | Aguarde a resposta anterior antes de enviar outra mensagem. |
+| `AgentUnavailableError` (assistente) | 502 | `AGENT_UNAVAILABLE` | O assistente está indisponível no momento. Tente novamente em instantes. |
+| `AgentTimeoutError` (assistente) | 504 | `AGENT_TIMEOUT` | O assistente demorou demais para responder. Tente novamente. |
 | Validação Zod (params, corpo) | 400 | `VALIDATION_ERROR` | `Requisição inválida: <campo>: <motivo>.` |
 | JSON malformado | 400 | `VALIDATION_ERROR` | Requisição inválida. |
 | Outros 4xx do Fastify | mesmo status | `BAD_REQUEST` | Mensagem genérica por status (ex.: 415 "Tipo de conteúdo não suportado.") |
 | Rota inexistente | 404 | `NOT_FOUND` | Recurso não encontrado. |
 | Qualquer outro erro | 500 | `INTERNAL_ERROR` | Ocorreu um erro inesperado. Tente novamente. (detalhe só no log) |
 
+O motivo técnico dos erros do assistente vai só para o log (seção 10.5), nunca para a resposta. Nos demais 4xx, o log registra só `statusCode` e `code`.
+
 As mensagens de validação do Zod saem em pt-BR (`z.config(z.locales.ptBR())` no `server.ts`); um esquema pode trazer mensagem própria, como a do `orderId`.
 
-## 12. Frontend (`@translog/web`)
+## 13. Frontend (`@translog/web`)
 
 A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implementando fielmente o protótipo **Direção D** (`portal/prototipos/translog-prototipo-direcao-d.html`).
 
-### 12.1. Identidade visual e Design System (`src/index.css`)
+### 13.1. Identidade visual e Design System (`src/index.css`)
 
 - **Tipografia técnica dupla:**
   - `Inter Variable` (`--font-sans`, via `@fontsource-variable/inter`) para leitura fluida de títulos, rótulos principais e mensagens do assistente;
@@ -528,7 +721,7 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
   - `.route-line`: conector horizontal tracejado ligando origem e destino no cabeçalho da rota;
   - Fita superior semântica de `3px` no `OrderManifestCard` e botão copiável no código de guia (`TL-000375-LATAM`).
 
-### 12.2. Layout, estrutura de tela e ergonomia (`src/app.tsx`)
+### 13.2. Layout, estrutura de tela e ergonomia (`src/app.tsx`)
 
 - **Desktop-first (`min-w-[1280px]`):**
   - **Cabeçalho (`AppHeader`, `h-16`):** marca TransLog (`International Logistics · Rastreamento de pedidos`), fita institucional e indicador de conexão que reflete `GET /api/health` (`Conectado` ou `Sem conexão`).
@@ -539,26 +732,27 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
     - `OrderItemsTable`: exibe itens, categorias, quantidades e soma distinta de itens e unidades totais no cabeçalho.
   - **Coluna direita (`ChatPanel`, `w-[400px]` fixa na altura da viewport):** assistente TransLog com indicador de conexão no avatar, faixa de contexto do pedido ativo (`Falando sobre o pedido #375` ou `Nenhum pedido selecionado`), botão *"Nova conversa"* desabilitado quando o chat está vazio, sugestões contextuais e caixa de envio (`Enter` envia, `Shift+Enter` quebra linha).
 
-### 12.3. Cliente HTTP, validação Zod e cache (`src/api/`)
+### 13.3. Cliente HTTP, validação Zod e cache (`src/api/`)
 
 - **`client.ts`:**
-  - Toda chamada HTTP passa por `getJson(path, schema)`.
+  - Toda chamada HTTP passa por `getJson(path, schema)` ou `postJson(path, body, schema)`, que usam a mesma função (`requestJson`).
   - Se o `fetch` falhar na rede (`TypeError`), lança `ApiError` com `status: 0` e `code: "NETWORK_ERROR"`, ativando automaticamente o card de **Sem conexão com o servidor** na tela.
   - Se a resposta não for `2xx`, tenta decodificar o envelope `errorResponseSchema` (`@translog/contracts`) para preservar `code` (`ORDER_NOT_FOUND`, `VALIDATION_ERROR`, etc.) e `message` vindos do Fastify.
-  - Se for `200 OK`, valida o corpo com `schema.safeParse(body)` usando o próprio esquema Zod de `@translog/contracts` (`orderSchema`, `orderSamplesResponseSchema`, `healthResponseSchema`). Respostas fora do contrato lançam `INVALID_RESPONSE`.
+  - Se for `200 OK`, valida o corpo com `schema.safeParse(body)` usando o próprio esquema Zod de `@translog/contracts` (`orderSchema`, `orderSamplesResponseSchema`, `healthResponseSchema`, `chatResponseSchema`). Respostas fora do contrato lançam `INVALID_RESPONSE`.
 - **`queries.ts` (`@tanstack/react-query`):**
   - `useHealth()`: consulta `/api/health` com `staleTime: 30_000`.
   - `useOrderSamples()`: consulta `/api/orders/samples` e usa fallback `[15, 375, 562, 1002]` caso a API ainda não tenha respondido.
   - `useOrderQuery(orderId)`: consulta `/api/orders/:orderId` apenas quando `orderId !== null`.
+  - `useSendChatMessage()`: `useMutation` de `POST /api/chat` com `retry: false` (o agente pode já ter processado a mensagem; reenvio só manual).
   - `shouldRetry(failureCount, error)`: política testada unitariamente que **nunca repete erros 4xx** (`404 ORDER_NOT_FOUND` ou `400 VALIDATION_ERROR` falham na hora) e faz **1 retentativa rápida** em erros de rede (`status: 0`) ou `5xx`.
 
-### 12.4. Formatação segura de datas e valores (`src/lib/format.ts`)
+### 13.4. Formatação segura de datas e valores (`src/lib/format.ts`)
 
 - **`formatDate(isoDate)`:** converte `"2015-01-08"` em `"08/01/2015"` operando exclusivamente por regex e corte de string (`/^(\d{4})-(\d{2})-(\d{2})/`), **sem jamais instanciar `new Date()`**. Isso garante que o frontend preserve a mesma regra de calendário do backend em qualquer fuso horário do navegador.
 - **`formatCurrency(value)`:** usa `Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" })` para produzir `US$ 91,34`.
 - **`formatManifestCode(order)`:** gera o código de etiqueta internacional no formato `TL-<ORDER_ID_6_DIGITOS>-<MARKET>` (ex.: `TL-000375-LATAM`, `TL-020322-PACIFICASIA`).
 
-### 12.5. Máquina de estados da linha do tempo (`src/features/tracking/timeline.ts`)
+### 13.5. Máquina de estados da linha do tempo (`src/features/tracking/timeline.ts`)
 
 `buildTimelineSteps(order, releaseLabel)` recebe um `Order` e a variante de rótulo (`"waiting"` ou `"payment"`) e devolve os dados das etapas sem efeitos colaterais, mantendo a apresentação visual (conectores e destaque vermelho em atraso) no `OrderManifestCard`:
 
@@ -570,64 +764,69 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
 | **Entregue** | Pedido realizado (`done`, `orderDate`) | Pedido liberado (`done`) | Em trânsito (`done`) | Entregue (`done`, `actualDeliveryDate` + `(+Nd)` em vermelho se atrasado) |
 | **Cancelado** | Pedido realizado (`done`, `orderDate`) | — | — | Banner neutro *"Este pedido foi cancelado."* |
 
-### 12.6. Assistente de IA e integração entre as duas colunas (`src/features/chat/`)
+### 13.6. Chat ligado à API (`src/features/chat/`)
 
-Enquanto o endpoint `POST /api/chat` (Fase 2) aguarda definição do contrato com o agente ADK, o frontend inclui o serviço determinístico `mock-chat-service.ts` com todas as regras de negócio e voz da TransLog:
+A tela não tem mais regra de respostas: tudo vem de `POST /api/chat` (a regra do simulado vive só em `api/src/chat/mock-agent.ts`).
 
-- **Detecção automática de pedido e busca na API real:** se o cliente digitar `"Onde está o pedido 375?"` (ou qualquer número existente na Silver, mesmo fora dos 11 `fixtures`), `app.tsx` pré-busca `GET /api/orders/:id` via `queryClient.fetchQuery` e `buildAssistantReply` devolve `detectedOrderId`, abrindo automaticamente o pedido na coluna esquerda antes de responder.
-- **Sugestões contextuais (`getChatSuggestions`):** quando o chat está vazio, os 3 botões de pergunta rápida se adaptam ao pedido aberto no momento (ou sugerem consultar o pedido `#375` quando nenhum pedido está aberto).
-- **Respostas contextuais (`buildAssistantReply`, `buildWhenReply`, `buildWhyReply`):**
-  - Perguntas sobre **prazo** (`"quando chega"`, `"prazo"`, `"data"`): informa data prevista, data real (se entregue) e dias de atraso/adiantamento.
-  - Perguntas sobre **causa de atraso** (`"por que atrasou"`, `"motivo"`, `"causa"`): explica o `probableCause` sempre como **motivo provável** (por exemplo, em `Promessa irreal`, detalha que o prazo estimado na modalidade `Second Class` foi curto para a rota internacional `San Benito → Saltillo`). Nunca afirma causa comprovada nem sugere rastreio em tempo real.
-  - Botão **"Perguntar ao assistente"** dentro do alerta âmbar de Motivo Provável no `OrderManifestCard`: envia imediatamente a pergunta `"Por que o pedido #375 atrasou?"` para a coluna direita.
-- **Renderização segura de formatação (`chat-messages.tsx`):** as respostas usam `**negrito**` apenas no dado principal; o componente `renderRichText` converte os segmentos em nós React `<strong>` sem usar `dangerouslySetInnerHTML`.
-- **Três modos de histórico ao trocar de pedido (`chatOnSwitch`):**
-  - `keep` (padrão atual): mantém todas as mensagens sem divisor;
-  - `divider`: mantém o histórico e insere um divisor visual (`Alternado para o pedido #375`);
-  - `clear`: limpa a conversa ao trocar para outro pedido.
+- **Envio (`app.tsx`):** a pergunta entra na conversa, o "digitando…" aparece (sem tempo artificial) e `useSendChatMessage` envia `{ sessionId, message, orderId }`, com o `orderId` do pedido exibido (o mesmo do chip "Falando sobre o pedido"). Enquanto espera, a caixa de texto fica bloqueada.
+- **`sessionId` por conversa (`chat-session.ts`):** criado na primeira mensagem (`createSessionId`, UUID v4). Volta a vazio (conversa nova) em "Nova conversa", na troca de pedido com "Zerar" (`startsNewConversation`) e ao aplicar uma conversa de exemplo da barra. A resposta que chega depois de a conversa mudar é descartada.
+- **Pedido citado:** `mentionedOrderId` diferente do pedido aberto abre esse pedido pela mesma função do formulário (`handleSelectOrder`), aplicando a regra de troca do chat.
+- **Falha:** a pergunta fica "Não enviada · Tentar novamente"; no `504`, "O assistente demorou demais · Tentar novamente" (`chatFailureLabel`). Reenvio só manual. Com a rede simulada desligada na barra (`n=off`), a mensagem falha na hora, sem chamar a API.
+- **Formatação (`rich-text.ts`):** `parseRichText` transforma o texto em linhas (texto, título `#`/`##`/`###`, item de lista `*`/`-`/`•` com até 2 níveis, linha em branco) com trechos em `**negrito**`; `chat-messages.tsx` monta os elementos React, sem `dangerouslySetInnerHTML`. Tabelas, links, `---`, `*itálico*` e crases aparecem como texto.
+- **Sugestões (`chat-suggestions.ts`):** com a conversa vazia, 3 perguntas adaptadas ao pedido aberto; sempre citam o número do pedido.
+- **Limite:** a caixa de texto aceita até `CHAT_MESSAGE_MAX_LENGTH` (1000) caracteres. `Enter` envia, `Shift+Enter` quebra linha.
+- **Três modos ao trocar de pedido (`chatOnSwitch`, decisão em aberto):** `keep` (padrão) mantém a conversa; `divider` insere `Alternado para o pedido #N`; `clear` limpa a conversa e começa outra no backend.
 
-### 12.7. Estado na URL e Barra de Apresentação (`src/lib/url-state.ts` e `ProtoBar`)
+### 13.7. Estado na URL e Barra de Apresentação (`src/lib/url-state.ts` e `ProtoBar`)
 
 - **URL limpa por padrão:** ao abrir `http://localhost:5173`, a URL permanece limpa (`/`) e a tela abre no estado inicial vazio. Ao buscar um pedido, apenas `?pedido=<id>` é gravado via `window.history.replaceState` (se for o pedido padrão ou se limpar a busca, o parâmetro é removido).
 - **Presets de demonstração por query string:** para testes ou apresentações guiadas, a URL também lê opcionalmente:
   - `?pedido=375` (ou `?order=375`): abre direto o pedido informado;
   - `?t=empty|loading|notfound|neterr|375`: força um estado de rastreamento;
-  - `?c=normal|typing|err|empty`: força um estado do assistente;
+  - `?c=conversation|typing|error|empty`: conversa de exemplo com textos fixos sobre o 375 (abre o 375 se nenhum pedido for informado);
   - `?s=keep|divider|clear`: escolhe o comportamento do chat ao trocar de pedido;
   - `?r=waiting|payment`: alterna o rótulo de `"Aguardando liberação"` vs `"Pagamento pendente"`;
-  - `?n=on|off`: alterna tema claro/escuro;
+  - `?n=on|off`: simula a rede ligada ou desligada;
   - `?bar=off`: oculta completamente a barra inferior.
-- **Barra de demonstração (`ProtoBar`):** barra fixa no rodapé que permite testar ao vivo todos os estados de tela, alternar as 2 decisões de produto em aberto com o time e recolher a barra durante a apresentação para a banca.
+- **Barra de demonstração (`ProtoBar`):** barra recolhível que permite testar ao vivo todos os estados de tela, alternar as 2 decisões de produto em aberto com o time e recolher a barra durante a apresentação para a banca. As conversas de exemplo (`Conversa`, `Digitando`, `Erro`) usam textos fixos de `dev-bar/chat-presets.ts`, abrem o 375 e começam uma conversa nova; o "Digitando" de exemplo não envia nada à API.
 
-## 13. Testes
+## 14. Testes
 
 ```bash
-pnpm test                         # todos os 130 testes (~15 s com a Silver presente)
-pnpm --filter @translog/api test  # só a API (105 testes)
-pnpm --filter @translog/web test  # só o frontend (25 testes, ~1 s)
+pnpm test                         # todos os 254 testes (~15 s com a Silver presente)
+pnpm --filter @translog/api test  # só a API (209 testes + 1 de integração desligado)
+pnpm --filter @translog/web test  # só o frontend (45 testes, ~1 s)
 ```
 
-### Testes do Backend (`@translog/api` — 105 testes)
+### Testes do Backend (`@translog/api` — 209 testes)
 
 | Arquivo | Cobre |
 |---|---|
-| `config.test.ts` | Padrões, vazios, cada variável inválida, `ORDERS_FILE` relativo, lista de erros completa |
-| `server.test.ts` | Health (fixtures, file, arquivo ausente), formato de todos os erros, OpenAPI e Swagger UI |
+| `config.test.ts` | Padrões, vazios, cada variável inválida (inclusive `AGENT*`), `ORDERS_FILE` relativo, barra final de `AGENT_URL`, lista de erros completa |
+| `server.test.ts` | Health (fixtures, file, arquivo ausente, modo do agente), formato de todos os erros, OpenAPI e Swagger UI |
+| `chat/chat-service.test.ts` | Pedido citado existente e inexistente, primeiro número existente, pedido aberto inexistente ignorado, trava (mesma conversa → `ChatBusyError`; liberada depois de resposta e de falha; conversas diferentes em paralelo), resposta vazia, log sem conteúdo |
+| `chat/mock-agent.test.ts` | 375 "por que atrasou" e "quando chega", modalidades, sem pedido, fora do escopo, pedido inexistente, cada situação, "Promessa irreal" em rota nacional e Same Day, nenhuma causa comprovada nem pagamento |
+| `chat/routes.test.ts` | `200`, `400` (sem `sessionId`, UUID inválido, mensagem vazia, só espaços, 1001 caracteres, `orderId` inválido), mensagem aparada, `409`, `502`, `504` sem vazar detalhe, OpenAPI com exemplo |
+| `chat/adk-events.test.ts` | Todos os casos de teste de `extract_final_text` + formatos inesperados, `error_code`, `function_call`/`function_response` |
+| `chat/adk-agent.test.ts` | Contra um servidor HTTP falso: sessão criada só na 1ª mensagem com `userId` do servidor, `409` na criação = ok, `404` → recria e reenvia uma vez (e só uma), `500` → `502`, timeout → `504`, sem resposta final, `errorCode`, JSON inválido, conexão recusada, contexto do pedido no texto, expiração e limite do `Map`, rota com `AGENT=adk`. Integração com o agente real só com `AGENT_IT_URL` |
 | `orders/routes.test.ts` | 200 (os 11 fixtures sem alteração), 404, 400 (8 formatos), zeros à esquerda, samples, parâmetro no OpenAPI |
 | `orders/fixtures-repository.test.ts` | Carga, quatro situações da demo, arquivo inválido, campos extras descartados |
 | `orders/silver-mapper.test.ts` | Pedido 375 completo, fuso, entrega por situação, `delayDays`, prefixo da janela, centavos, rota, 11 casos inválidos, colunas proibidas fora da lista lida |
 | `orders/file-repository.test.ts` | Amostra igual aos mocks, log, descarte de colunas, linhas inválidas sem conteúdo no log, limite de avisos, itens fora de sequência, BOM, erros fatais; **integração com a Silver real** |
-| `privacy.test.ts` | Seção 10 |
+| `privacy.test.ts` | Seção 11 (pedidos e chat) |
 
-### Testes do Frontend (`@translog/web` — 25 testes)
+### Testes do Frontend (`@translog/web` — 45 testes)
 
 | Arquivo | Cobre |
 |---|---|
 | `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-000375-LATAM`) e pluralização de dias |
 | `lib/url-state.test.ts` | Leitura de `?pedido=375`, rejeição de IDs inválidos (`0`, `abc`), presets da `ProtoBar` e atualização limpa da query string |
-| `api/client.test.ts` | `shouldRetry` (não repete 4xx, repete 1 vez em erro de rede ou 500) e tratamento de `ApiError` |
+| `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo enviado, `409`/`502`/`504`, resposta fora do contrato) |
 | `features/tracking/timeline.test.ts` | Máquina de estados das 4 etapas em todas as situações (`Entregue`, `Em Trânsito`, `Aguardando Liberação` com variantes `waiting`/`payment`, e `Cancelado`) |
-| `features/chat/mock-chat-service.test.ts` | Extração de número de pedido no texto, explicação de motivo provável sem certeza absoluta, resposta de prazo, modalidades e sugestões contextuais |
+| `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, conversa nova só com "Zerar", efeito da troca de pedido nas mensagens, texto de falha por status |
+| `features/chat/chat-suggestions.test.ts` | Sugestões por situação do pedido, sempre citando o número |
+| `features/chat/rich-text.test.ts` | Negrito, listas (`*`, `-`, `•`, subníveis), títulos, linha em branco, asteriscos soltos |
+| `features/dev-bar/chat-presets.test.ts` | Conversas de exemplo da barra |
 
 **Fixtures de teste da API**
 
@@ -636,9 +835,9 @@ pnpm --filter @translog/web test  # só o frontend (25 testes, ~1 s)
 
 **Integração com a Silver real:** roda só se `portal/dados/silver_pedidos_rastreio.csv` existir (`describe.skipIf`). Confere 65.752 pedidos, 0 linhas inválidas e os 11 pedidos dos mocks. Com uma Silver nova, o número esperado precisa ser atualizado.
 
-**Configuração do Vitest:** `isolate: false` (os testes não compartilham estado global) e `TZ=America/Sao_Paulo`. Rotas são testadas com `app.inject` (sem abrir porta). `buildServer(config, { logger: false, overrides })` aceita `overrides.orderRepository` para injetar um repositório nos testes.
+**Configuração do Vitest:** `isolate: false` (os testes não compartilham estado global) e `TZ=America/Sao_Paulo`. Rotas são testadas com `app.inject` (sem abrir porta). `buildServer(config, { logger: false, overrides })` aceita `overrides.orderRepository` e `overrides.supportAgent` para injetar um repositório ou um assistente (que demora ou falha) nos testes. **Nenhum teste automatizado chama o Gemini.**
 
-## 14. Docker
+## 15. Docker
 
 ### Imagem (`api/Dockerfile`, contexto `portal/`)
 
@@ -654,12 +853,14 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 
 | Arquivo | Conteúdo |
 |---|---|
-| `docker-compose.yml` | Serviço `api` com `DATA_SOURCE=fixtures`, porta `${API_PORT:-3333}`, healthcheck em `/api/health` (`start_period: 60s`, `start_interval: 1s`) |
+| `docker-compose.yml` | Serviço `api` com `DATA_SOURCE=fixtures`, `AGENT=mock`, porta `${API_PORT:-3333}`, healthcheck em `/api/health` (`start_period: 60s`, `start_interval: 1s`) |
 | `docker-compose.silver.yml` | Sobreposição: `DATA_SOURCE=file`, `ORDERS_FILE=/data/silver_pedidos_rastreio.csv`, volume `./dados:/data:ro` |
+
+**Chat no Docker sempre simulado:** o agente do Marco ainda não tem imagem na `main`, e, dentro do container da API, `AGENT_URL=http://127.0.0.1:8001` apontaria para o próprio container, não para a máquina. Quando o Dockerfile do agente estiver na `main`, ele entra como serviço no compose e a API usa `AGENT_URL=http://agent:8001`. Para testar com o agente, use `pnpm dev`.
 
 **Por que dois arquivos:** com o volume no `docker-compose.yml`, o Docker cria `portal/dados/` **como root** no host quando a pasta não existe (testado em 14/11). Em um clone novo no Linux, copiar a Silver para lá passaria a exigir `sudo`. A sobreposição só monta o volume quando a Silver é usada.
 
-## 15. Como fazer mudanças comuns
+## 16. Como fazer mudanças comuns
 
 **A Silver mudou (coluna renomeada, nova ou removida)**
 1. `orders/silver-mapper.ts`: ajustar `SILVER_COLUMNS` e `mapSilverOrder`.
@@ -671,25 +872,29 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 2. `silver-mapper.ts`: preencher o campo.
 3. `orders/fixtures/orders.json` e `web/src/api/fixtures.ts`: incluir o campo nos 11 pedidos.
 4. Testes: `routes.test.ts` compara o pedido 15 campo a campo; ajustar.
-5. Conferir se o campo não é sensível (seção 10).
+5. Conferir se o campo não é sensível (seção 11).
 
-**Conectar o chat do frontend ao endpoint real `POST /api/chat` (quando a Fase 2 estiver pronta)**
-1. Definir `chatRequestSchema` e `chatResponseSchema` em `contracts/src/chat.ts` e reexportar em `contracts/src/index.ts`.
-2. Adicionar `postJson("/api/chat", body, chatResponseSchema)` em `web/src/api/client.ts` e uma `useMutation` em `web/src/api/queries.ts`.
-3. Em `web/src/app.tsx` (`sendQuestion`), substituir o timer local de `buildAssistantReply` pela mutação HTTP, mantendo `mock-chat-service.ts` apenas para os modos de simulação da `ProtoBar`.
+**Mudar como o pedido aberto chega ao agente** (acordo com o Marco)
+1. `api/src/chat/adk-agent.ts`: só `withOrderContext`.
+2. Ajustar o teste "o texto enviado ao /run leva o contexto do pedido" em `adk-agent.test.ts`.
+
+**Assistente novo** (ex.: outro agente)
+1. Adapter em `api/src/chat/` que implementa `SupportAgent` e lança `AgentUnavailableError`/`AgentTimeoutError`.
+2. Valor novo em `agentModeSchema` (`contracts/src/chat.ts`), variáveis em `config.ts` e `.env.example`.
+3. Novo `case` em `createSupportAgent` (`container.ts`). Serviço, rota e tela não mudam.
 
 **Fonte de dados nova** (ex.: Gold em Parquet)
 1. Novo adapter em `orders/` que devolve um `OrderRepository`.
 2. Novo valor em `dataSourceSchema` (`contracts/src/health.ts`) e variáveis em `config.ts` e `.env.example`.
 3. Novo `case` em `createOrderRepository` (`container.ts`). Serviço e rotas não mudam.
 
-**Rota ou módulo novo na API** (ex.: chat)
+**Rota ou módulo novo na API** (o chat foi feito assim)
 1. Pasta própria em `api/src/` (`chat/`), com `routes.ts`, serviço e porta.
 2. Esquemas em `contracts/src/` e reexportação no `index.ts`.
 3. Registro no `server.ts` e composição no `container.ts`.
 4. Erros de domínio novos: classe no módulo e mapeamento em `http/errors.ts`.
 
-## 16. Convenções
+## 17. Convenções
 
 - Código, identificadores, arquivos e rotas em inglês. Mensagens da API, interface da tela, documentação e commits em pt-BR.
 - Valores de dados como vêm da base, sem tradução (`Em Trânsito`, `Standard Class`, `LATAM`).
@@ -699,7 +904,7 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 - Antes de commitar: `pnpm lint`, `pnpm typecheck`, `pnpm test`.
 - Nada de abstração especulativa: só o que a fase atual usa.
 
-## 17. Decisões técnicas
+## 18. Decisões técnicas
 
 | Decisão | Motivo |
 |---|---|
@@ -716,12 +921,22 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | `Object.fromEntries`, grupos liberados e pool de textos | Memória da carga de 230 para 47 MB de heap (seção 8) |
 | Docker em dois arquivos de compose | Evita a pasta `dados/` criada como root em clones novos |
 | `probableCause` sempre `null` vindo da Silver | A coluna não existe; nada de regra inventada no backend |
+| Chat sem histórico no servidor; porta `SupportAgent` recebe o pedido já resolvido | O ADK guarda a conversa; o simulado responde cada mensagem sozinho |
+| Pedido citado detectado pelo portal, não pelo agente | Funciona nos dois modos e não depende do formato da resposta do agente |
+| Trava por conversa marcada antes de qualquer `await` | O ADK exige uma mensagem por vez por sessão; `409 CHAT_BUSY` em vez de fila |
+| Um limite de tempo por resposta (`AGENT_TIMEOUT_MS`, 90 s) | É o tempo que o cliente espera; cobre criação da sessão, `/run` e o reenvio após `404` |
+| Reenvio automático só após `404` "Session not found" | Única situação em que a mensagem comprovadamente não foi processada |
+| `withOrderContext` como único ponto que conhece o formato do contexto | O formato ainda depende do Marco |
+| Regra do simulado só no backend | Uma cópia só; funciona com a Silver, não só com os 11 de exemplo |
+| Log do chat sem conteúdo | Só metadados; o motivo técnico é montado pelo adapter, sem corpo HTTP |
+| Chat no Docker sempre `mock` | O agente ainda não tem imagem na `main`; `127.0.0.1` no container é o próprio container |
 | URL limpa por padrão no frontend (`/` sem query string inicial) | Evita poluir a barra de endereços ao abrir o portal; grava `?pedido=` apenas quando o cliente consulta um pedido |
 
-## 18. Limitações e próximos passos
+## 19. Limitações e próximos passos
 
 - **Motivo provável na Silver:** com `DATA_SOURCE=file`, nenhum pedido tem `probableCause` (só os `fixtures` têm os motivos preenchidos, como `"Promessa irreal"` no pedido 375). Depende do Mateus e do Marcelo; quando a coluna existir, a mudança é apenas em `silver-mapper.ts`.
-- **Chat no Backend (Fase 2):** contrato de `POST /api/chat` depende do acordo com o Marco (sessões do ADK, como o `orderId` chega ao agente, se o agente devolve o pedido citado). Quando fechado, o `ChatService` da API e a mutação HTTP em `@translog/web` substituirão o `mock-chat-service.ts`.
+- **Agente ADK (pendências com o Marco, seção 10.8):** formato do pedido no texto, respostas longas e técnicas, formatação, sobreposição de mensagens depois de um `504`, Dockerfile na `main`. A tela e a API já funcionam com o agente; só `withOrderContext` e a configuração dependem dele.
+- **Tela x chat no motivo provável:** com `AGENT=adk`, o agente lê a Silver (sem motivo provável), enquanto a tela em `fixtures` mostra "Promessa irreal" no 375. Some quando o motivo provável existir na base (Mateus e Marcelo) e o agente e o portal lerem a mesma fonte.
 - **Duas decisões de produto em aberto (simuláveis na `ProtoBar`):**
   1. Comportamento do chat ao trocar de pedido (`divider` vs `keep` vs `clear`);
   2. Rótulo de pedidos com pagamento pendente (`Aguardando liberação` vs `Pagamento pendente`).
