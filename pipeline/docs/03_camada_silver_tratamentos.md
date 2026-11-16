@@ -414,6 +414,8 @@ O cenário ideal é o BI consumir **só a Gold** (dados agregados). Por decisão
 
 ## 13. Silver v2: indicadores da PMO, malha de hubs e rastreio simulado
 
+> **Substituída em parte pela Silver v3 (seção 14).** A premissa de datas (13.2), os nomes `data_prevista_entrega`/`data_entrega_real`, a situação "Entregue" e o rastreio sorteado no 02d (13.6) **não valem mais**. Os indicadores da PMO (13.3), os achados (13.4) e a malha de hubs (13.5) continuam válidos, agora lidos como **despacho**.
+
 ### 13.1 Por que
 A TransLog precisa saber **onde cada pedido está** (portal e agente de IA) e **quanto, onde e por que atrasa** (BI e PMO). O DataCo só tem datas macro (pedido, entrega, dias programados e reais), sem a posição da carga. A v2 acrescenta:
 - os **indicadores pedidos pela PMO**, calculados na tabela (02a);
@@ -559,3 +561,38 @@ Não existe marítimo: prazos de 0 a 6 dias são incompatíveis com transporte p
   - matriz situação × datas × posição (seção 13.6);
   - sem `data_envio`, `status_movimento` e `etapa_gargalo`;
   - contém as 10 colunas novas principais.
+
+## 14. Silver v3: premissa de despacho e entrega simulada
+
+### 14.1 O que mudou e por quê
+O DataCo não tem documentação oficial, e a nomenclatura do setor e os dados indicam que `Shipping date` / `Days for shipping (real)` medem o **despacho**. A decisão, validada com o instrutor, está em `04_decisao_premissa_despacho.md`. A v3 aplica essa leitura em todo o pipeline:
+- **Despacho = dado real.** O atraso oficial (`flag_atrasado`, `dias_atraso`, `causa_provavel`, `receita_em_risco`) passa a ser lido como **atraso no despacho**. Os valores não mudam: são 57.811 itens atrasados de 101.009 avaliados.
+- **Entrega = simulada.** O resultado do transporte segue o padrão combinado com o instrutor (60% no prazo, 20% com atraso, 20% com extravio) e é sempre identificado com `dado_simulado`.
+- **Uma única fonte de posição.** A posição do pedido é o **último evento** do 02g, consolidado no 02i. O 02d não sorteia mais etapa.
+- **Uma única hipótese.** O cenário `entrega` foi removido. As views leem só a fatia publicada (`silver.simulacao_publicada`).
+
+### 14.2 Nomes antigos → novos
+| Antes | Agora | Observação |
+|---|---|---|
+| `flag_atrasado` | `flag_atraso_despacho` | Valores iguais (atraso no despacho) |
+| `dias_atraso` | `dias_atraso_despacho` | |
+| `no_prazo` | `despacho_no_prazo` | |
+| `faixa_atraso` | `faixa_atraso_despacho` | |
+| `janela_atraso` | `janela_atraso_despacho` | |
+| `causa_provavel` | `causa_atraso_despacho` | |
+| `data_prevista_entrega` (pedido + prazo programado) | `data_despacho_prevista` (DATE) | `data_entrega_prevista` passou a ser a promessa de **entrega** |
+| `data_entrega_real` (= Shipping date) | `data_despacho_real` (DATE) | A entrega é `data_entrega_realizada` |
+| `status_entrega_pt` | `status_prazo_despacho` | |
+| `situacao_rastreio = 'Entregue'` | `situacao_rastreio = 'Despachado'` | A entrega fica em `situacao_entrega` |
+| `receita_em_risco` (itens com despacho atrasado) | só na Gold v3 | Agora é a venda dos pedidos com **entrega atrasada ou extraviada** |
+| posição sorteada no 02d | posição = último evento (02g → 02i) | |
+| — | `tipo_rota` na tabela (02a) | Derivado do país de destino |
+
+**Regra da entrega (v3):** 60% no prazo, 20% com atraso e 20% extraviados nos concluídos. Toda entrega atrasada vem de despacho atrasado; parte dos despachos atrasados é recuperada no transporte (calibrada na base inteira). Detalhes em `05_arquitetura_dados_silver.md`, seção 4.
+
+**Views sem marca de simulação:** `dado_simulado`, fonte, versão e escopo ficam só nas tabelas. O texto da IA usa linguagem de operação.
+
+### 14.3 Ordem de execução
+01 → 01b → 02a → 02d (hubs) → 02g (eventos; chama o 02f) → 02i (rastreio) → 02e (view) → 02b (testes Silver) → 02h (testes da simulação) → 03b (Gold v3).
+
+A arquitetura completa, o dicionário de colunas e o uso por consumidor estão em `05_arquitetura_dados_silver.md`.
