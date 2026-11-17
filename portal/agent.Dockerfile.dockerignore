@@ -1,0 +1,21 @@
+# Contexto de build do agent.Dockerfile = pasta agent/ (do Marco, que não é alterada).
+# Este arquivo fica ao lado do Dockerfile (o BuildKit procura <Dockerfile>.dockerignore) e
+# tira do contexto tudo o que é local ou segredo. O Dockerfile já copia só o necessário;
+# isto é a segunda camada.
+.env
+.env.*
+!.env.example
+.venv
+.state
+.cache
+.adk
+.pytest_cache
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+build
+dist
+data
+tests
+scripts
+docs

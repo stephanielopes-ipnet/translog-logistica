@@ -1,0 +1,59 @@
+# Sobreposição que liga o assistente de IA (agente ADK do Marco, pasta agent/) ao portal:
+#   docker compose -f docker-compose.yml -f docker-compose.dados.yml -f docker-compose.agente.yml up --build
+# (ou com docker-compose.databricks.yml no lugar do dados). Só o agente, para usar com o pnpm dev:
+#   pnpm agent:up      (e AGENT=adk, AGENT_URL=http://127.0.0.1:8001 no portal/.env)
+#   pnpm agent:down
+#
+# Exige:
+#   - agent/.env com GOOGLE_API_KEY preenchida (copie de agent/.env.example). Sem o arquivo, o
+#     compose recusa subir; com a chave vazia, o agente encerra com "ERRO: falta GOOGLE_API_KEY"
+#     e a API não sobe (depende do agente saudável). A chave entra só como variável de ambiente
+#     do container, nunca na imagem nem neste arquivo.
+#   - portal/dados/consumo_pedidos.csv (pnpm export:dados): o agente lê essa tabela, mesmo
+#     quando a API lê do Databricks. Atualize o CSV para os dois contarem a mesma história.
+#
+# Sem esta sobreposição, o chat continua simulado (AGENT=mock), que é o plano B.
+services:
+  agent:
+    build:
+      context: ../agent
+      dockerfile: ../portal/agent.Dockerfile
+    env_file:
+      - path: ../agent/.env
+        required: true
+    environment:
+      # Têm prioridade sobre o agent/.env (o agente usa load_dotenv sem override).
+      # O mapa liga os 8 campos do agente às colunas de consumo_pedidos (nunca status_pedido).
+      TRANSLOG_ORDER_BACKEND: csv
+      TRANSLOG_ORDERS_CSV: /data/consumo_pedidos.csv
+      TRANSLOG_DATA_ORIGIN: silver
+      TRANSLOG_CSV_ENCODING: utf-8-sig
+      TRANSLOG_CSV_DELIMITER: ","
+      TRANSLOG_COLUMN_MAP: /config/agente-mapa-colunas.json
+      TRANSLOG_ALLOW_DEMO_KNOWLEDGE: "false"
+    volumes:
+      - ./dados:/data:ro
+      - ./config/agente-mapa-colunas.json:/config/agente-mapa-colunas.json:ro
+    ports:
+      # Só na própria máquina: para o pnpm dev e a tela de testes do ADK (/docs).
+      - "127.0.0.1:8001:8001"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/list-apps', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
+
+  api:
+    environment:
+      AGENT: adk
+      AGENT_URL: http://agent:8001
+      AGENT_TIMEOUT_MS: ${AGENT_TIMEOUT_MS:-}
+    depends_on:
+      agent:
+        condition: service_healthy

@@ -1,0 +1,16 @@
+# Sobreposição para rodar a API com os CSVs das tabelas consumo_* (DATA_SOURCE=file):
+#   docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build
+# ou, para não repetir, no .env: COMPOSE_FILE=docker-compose.yml:docker-compose.dados.yml
+#
+# Exige portal/dados/consumo_pedidos.csv, consumo_itens_pedido.csv e consumo_eventos_logisticos.csv
+# (fora do Git; baixe com "pnpm export:dados"). Os arquivos entram por volume somente leitura e
+# nunca vão para a imagem. Fica separado do docker-compose.yml porque o Docker cria a pasta
+# dados/ como root no host quando ela não existe: com o volume sempre montado, quem acabou de
+# clonar ficaria com uma pasta que só abre com sudo.
+services:
+  api:
+    environment:
+      DATA_SOURCE: file
+      DATA_DIR: /data
+    volumes:
+      - ./dados:/data:ro

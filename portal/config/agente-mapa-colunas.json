@@ -1,0 +1,10 @@
+{
+  "order_id": "id_pedido",
+  "order_item_id": "id_pedido",
+  "order_status": "situacao_pedido",
+  "delivery_status": "status_prazo_despacho",
+  "scheduled_days": "prazo_despacho_dias",
+  "actual_days": "dias_ate_despacho",
+  "shipping_mode": "modo_envio",
+  "destination_region": "destino_regiao"
+}

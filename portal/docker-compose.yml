@@ -1,0 +1,30 @@
+# Forma oficial de rodar a API: docker compose up --build
+# Este arquivo sobe com os pedidos de exemplo (fixtures), sem nenhum arquivo externo.
+# Com os CSVs: docker-compose.dados.yml; direto do Databricks: docker-compose.databricks.yml
+# (ver README). Variáveis em .env.example.
+name: translog-portal
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      API_PORT: ${API_PORT:-3333}
+      # A fonte no Docker é escolhida pelos arquivos de compose, não pelo .env (que vale para o pnpm dev).
+      DATA_SOURCE: fixtures
+      SAMPLE_ORDER_IDS: ${SAMPLE_ORDER_IDS:-}
+      # Chat sempre simulado no Docker: o agente do Marco ainda não tem imagem na main, e
+      # AGENT_URL=http://127.0.0.1:8001 apontaria para o próprio container, não para a máquina.
+      AGENT: mock
+    ports:
+      - "${API_PORT:-3333}:${API_PORT:-3333}"
+    healthcheck:
+      # 127.0.0.1 e não localhost: no Alpine, localhost pode resolver para ::1 (IPv6).
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${API_PORT:-3333}/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      # Com os CSVs ou o Databricks, a API só abre a porta depois de carregar os pedidos.
+      start_period: 60s
+      start_interval: 1s
