@@ -1,5 +1,11 @@
 # Retomada do acompanhamento de Marco
 
+## Publicação concluída — 17/11
+
+Marco pediu atualizar o GitHub. [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32) publicado como rascunho em `feat/agente-silver-v2-rag`, sem merge; PR #30 já estava integrado. Código `01e8eb6`, preservando contexto do portal e padrão Gemini 3.5 Flash Lite da main. Repositório local do grupo está nessa branch, com 49 testes aprovados no destino. Nada de credenciais ou CSV privado foi publicado. Não repetir a publicação nem criar outro PR para o mesmo trabalho.
+
+Próximo passo de Marco: teste conjunto com Matheus FullStack, na máquina da apresentação, com portal e agente usando a mesma v2. Conferir 1001 (quatro itens, entregue no prazo no cenário), pergunta mista com citação da FAQ, fonte histórica/simulada e comportamento de erro. Citação reforçada ainda precisa de reavaliação. Revisão final da FAQ com Stephanie e contingência 503 continuam pendentes; SQL/banco não foram escolhidos por esta publicação.
+
 ## Continuidade mais recente — Gemini autorizado e avaliado em 17/11
 
 Marco respondeu “sim autorizo” ao envio mínimo de dados ao Google para as duas conversas descritas. Ambas executadas, sem 503; primeira correspondeu ao pedido 1001 da v2; segunda chamou consulta + Chroma, distinguiu despacho/entrega e não prometeu alteração de endereço, mas omitiu a citação. Instrução reforçada com formato de título/fonte/versão, sem nova inferência depois disso. [Avaliação e respostas](avaliacao-gemini-v2-2026-11-17.md). A autorização dessas duas chamadas foi atendida; não solicitá-la novamente. A omissão de citação continua pendente de reavaliação. Registros abaixo de avaliação bloqueada são históricos, anteriores à autorização.

@@ -2,6 +2,10 @@
 
 Atualização documental: 17/11/2026. Os registros datados abaixo preservam o histórico de cada etapa.
 
+## Atualização publicada no GitHub — 17/11
+
+Publicada por solicitação explícita de Marco na branch `feat/agente-silver-v2-rag`, código no commit `01e8eb68ef0fe92cdd5e7ec7729fe355ddb53b1b`, [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32) aberto como rascunho, sem merge. O PR #30 anterior já estava integrado à main; a nova branch parte da main atual e preserva contexto de pedido do portal e modelo padrão. 49 testes passaram também no destino `agent/`, com 10 avisos, em 9,26 s, reutilizando o ambiente existente. Publicação restrita a `agent/`, sem credenciais, dados privados completos ou derivados. Conector GitHub confirmou o PR e o arquivo publicados após escritas via Git local e navegador (escritas do conector retornaram 403). Próximo aceite: Matheus FullStack executar portal → backend → ADK na máquina da demo com a mesma v2, conferir citações, vários itens e tratamento de falha do provedor. Políticas finais, SQL e contingência 503 continuam pendentes.
+
 ## Duas conversas Gemini autorizadas e executadas — 17/11
 
 Marco autorizou explicitamente a transmissão dos dados mínimos dos pedidos 1001 e 12 ao Gemini/Google para as duas conversas preparadas. Ambas responderam sem erro 503 nesta execução. A primeira consultou o pedido 1001 e informou corretamente entrega histórica/simulada em San Lorenzo em 22/01/2015. A segunda chamou consulta e busca de conhecimento, separou despacho de entrega e reconheceu os limites para alterar endereço. **Resultado parcial da segunda:** faltou citar título/fonte/versão do trecho. Instrução reforçada depois da observação; efeito desse reforço ainda não reavaliado com Gemini. Ver [respostas e limites](avaliacao-gemini-v2-2026-11-17.md). Não repetir pedido de autorização para essas duas chamadas já executadas nem tratá-las como avaliação integral aprovada.
