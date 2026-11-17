@@ -28,6 +28,8 @@
 
 :root {
   color-scheme: light;
+  /* Altura do cabeçalho (64 px + fita de 3 px + borda): o rastreio ocupa o resto da tela. */
+  --header-h: 68px;
 }
 
 html,
@@ -47,7 +49,8 @@ body {
   }
 
   button:focus-visible,
-  a:focus-visible {
+  a:focus-visible,
+  [tabindex]:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
     outline-offset: 2px;
   }

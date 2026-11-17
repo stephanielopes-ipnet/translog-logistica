@@ -1,0 +1,157 @@
+// Rotas da tela (History API, URLs limpas). Lógica pura: o hook que lê e muda a URL fica em
+// `use-location.ts`. Roteador feito à mão porque são cinco rotas fixas, sem rotas aninhadas nem
+// carregamento de dados por rota: uma dependência (react-router) traria mais do que usamos.
+
+export type Route =
+  | { name: "home" }
+  /** `orderParam` é o texto de `?pedido=` como veio (pode ser inválido: a tela mostra "não encontrado"). */
+  | { name: "tracking"; orderParam: string | null }
+  /** `returnTo` é a página da Área do colaborador pedida antes do login (já validada). */
+  | { name: "staffLogin"; returnTo: string | null }
+  | { name: "staffTower" }
+  | { name: "staffOrder"; orderParam: string }
+  | { name: "notFound" };
+
+export type AreaTab = "tracking" | "staff" | null;
+
+export const STAFF_LOGIN_PATH = "/colaborador/entrar";
+export const STAFF_HOME_PATH = "/colaborador";
+
+/** Interpreta o endereço atual. `/?pedido=N` (endereço antigo) abre o rastreio. */
+export function matchRoute(pathname: string, search: string): Route {
+  const path = normalizePath(pathname);
+  const params = new URLSearchParams(search);
+
+  if (path === "/") {
+    const legacyOrder = params.get("pedido");
+    return legacyOrder === null ? { name: "home" } : { name: "tracking", orderParam: legacyOrder };
+  }
+  if (path === "/rastreio") {
+    return { name: "tracking", orderParam: params.get("pedido") };
+  }
+  if (path === STAFF_LOGIN_PATH) {
+    return { name: "staffLogin", returnTo: safeReturnPath(params.get("voltar")) };
+  }
+  if (path === STAFF_HOME_PATH) {
+    return { name: "staffTower" };
+  }
+  const staffOrder = /^\/colaborador\/pedidos\/([^/]+)$/.exec(path);
+  if (staffOrder?.[1]) {
+    return { name: "staffOrder", orderParam: safeDecode(staffOrder[1]) };
+  }
+  return { name: "notFound" };
+}
+
+/** Endereço do rastreio do cliente (`/rastreio?pedido=N`, ou `/rastreio` sem pedido). */
+export function trackingHref(orderParam?: string | number | null): string {
+  if (orderParam === undefined || orderParam === null || orderParam === "") {
+    return "/rastreio";
+  }
+  return `/rastreio?${new URLSearchParams({ pedido: String(orderParam) }).toString()}`;
+}
+
+/** Endereço da visão do colaborador de um pedido. */
+export function staffOrderHref(orderId: number): string {
+  return `/colaborador/pedidos/${orderId}`;
+}
+
+/** Login do colaborador, lembrando a página pedida (só se for da Área do colaborador). */
+export function staffLoginHref(returnTo?: string | null): string {
+  const safe = safeReturnPath(returnTo);
+  if (safe === null || safe === STAFF_HOME_PATH) {
+    return STAFF_LOGIN_PATH;
+  }
+  return `${STAFF_LOGIN_PATH}?${new URLSearchParams({ voltar: safe }).toString()}`;
+}
+
+/**
+ * Página para onde voltar depois do login. Só aceita caminhos internos da Área do colaborador
+ * (nada de `//outro-site`, `https://…` ou `/colaborador/entrar`), para o `?voltar=` não virar
+ * um redirecionamento aberto.
+ */
+export function safeReturnPath(value: string | null | undefined): string | null {
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return null;
+  }
+  const pathOnly = normalizePath(value.split(/[?#]/)[0] ?? "");
+  if (pathOnly === STAFF_LOGIN_PATH) {
+    return null;
+  }
+  if (pathOnly === STAFF_HOME_PATH || pathOnly.startsWith(`${STAFF_HOME_PATH}/`)) {
+    return value;
+  }
+  return null;
+}
+
+export function isStaffRoute(route: Route): boolean {
+  return route.name === "staffTower" || route.name === "staffOrder";
+}
+
+/** Aba do cabeçalho marcada como ativa. O Início não tem aba (a marca leva a ele). */
+export function activeTab(route: Route): AreaTab {
+  if (route.name === "tracking") {
+    return "tracking";
+  }
+  if (route.name === "staffLogin" || isStaffRoute(route)) {
+    return "staff";
+  }
+  return null;
+}
+
+/** Estado da sessão do colaborador visto pela guarda de rota. */
+export type SessionState = "loading" | "authenticated" | "anonymous";
+
+/**
+ * Guarda da Área do colaborador. Devolve o endereço para onde redirecionar, ou `null` para
+ * mostrar a página. Sem sessão → login (lembrando a página pedida); já com sessão no login →
+ * a página pedida ou a Torre. Enquanto a sessão carrega, não decide (`null`).
+ */
+export function guardRedirect(
+  route: Route,
+  currentHref: string,
+  session: SessionState,
+): string | null {
+  if (session === "loading") {
+    return null;
+  }
+  if (isStaffRoute(route) && session === "anonymous") {
+    return staffLoginHref(currentHref);
+  }
+  if (route.name === "staffLogin" && session === "authenticated") {
+    return route.returnTo ?? STAFF_HOME_PATH;
+  }
+  return null;
+}
+
+/** Título da aba do navegador em cada página. */
+export function pageTitle(route: Route): string {
+  switch (route.name) {
+    case "home":
+      return "TransLog · Sua carga pelo mundo";
+    case "tracking":
+      return route.orderParam
+        ? `Pedido #${route.orderParam} · TransLog`
+        : "Rastreamento · TransLog";
+    case "staffLogin":
+      return "Entrar · Área do colaborador · TransLog";
+    case "staffTower":
+      return "Torre de controle · TransLog";
+    case "staffOrder":
+      return `Pedido #${route.orderParam} · Visão do colaborador · TransLog`;
+    case "notFound":
+      return "Página não encontrada · TransLog";
+  }
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizePath(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed === "" ? "/" : trimmed;
+}

@@ -1,284 +1,168 @@
-import type { Order } from "@translog/contracts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError } from "@/api/client.ts";
-import { useHealth, useOrderQuery, useOrderSamples, useSendChatMessage } from "@/api/queries.ts";
+import { type ReactNode, useCallback, useEffect, useMemo } from "react";
+import { useHealth, useOrderQuery } from "@/api/queries.ts";
+import { useLogout, useSession } from "@/api/session.ts";
+import { AppFooter } from "@/components/app-footer.tsx";
 import { AppHeader } from "@/components/app-header.tsx";
-import { ChatPanel } from "@/features/chat/chat-panel.tsx";
 import {
-  type ChatMessageItem,
-  chatFailureLabel,
-  chatTimeLabel,
-  createSessionId,
-  messagesAfterOrderSwitch,
-} from "@/features/chat/chat-session.ts";
-import { type TrackerViewMode, TrackingPanel } from "@/features/tracking/tracking-panel.tsx";
-import { parseOrderId, readOrderIdFromUrl, withOrderQueryParam } from "@/lib/url-state.ts";
+  CheckingSessionPage,
+  NotFoundPage,
+  PrimaryLink,
+  SimplePage,
+} from "@/components/simple-page.tsx";
+import { ChatPanel } from "@/features/chat/chat-panel.tsx";
+import { useChatConversation } from "@/features/chat/use-chat-conversation.ts";
+import { TrackingPage } from "@/features/tracking/tracking-page.tsx";
+import {
+  activeTab,
+  guardRedirect,
+  isStaffRoute,
+  matchRoute,
+  pageTitle,
+  type Route,
+  type SessionState,
+  STAFF_LOGIN_PATH,
+  trackingHref,
+} from "@/lib/router.ts";
+import { parseOrderId } from "@/lib/url-state.ts";
+import { navigate, useLocationHref } from "@/lib/use-location.tsx";
 
 export function App() {
-  const initialOrderId = useMemo(
-    () => readOrderIdFromUrl(typeof window !== "undefined" ? window.location.search : ""),
-    [],
-  );
+  const href = useLocationHref();
+  const route = useMemo(() => {
+    const url = new URL(href, "http://local");
+    return matchRoute(url.pathname, url.search);
+  }, [href]);
 
-  const msgSeqRef = useRef(1);
-  const nextMsgId = useCallback(() => {
-    const id = msgSeqRef.current;
-    msgSeqRef.current += 1;
-    return id;
-  }, []);
-
-  // Estado de busca e pedido selecionado (abre vazio por padrão quando sem parâmetros)
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(initialOrderId);
-  // Pedido selecionado no momento, para quem lê depois de esperar (resposta do chat).
-  const selectedOrderIdRef = useRef(selectedOrderId);
+  // Endereço antigo (`/?pedido=N`): abre o rastreio e passa a mostrar `/rastreio?pedido=N`.
   useEffect(() => {
-    selectedOrderIdRef.current = selectedOrderId;
-  }, [selectedOrderId]);
-  const [queryValue, setQueryValue] = useState<string>(
-    initialOrderId ? String(initialOrderId) : "",
-  );
-  const [submittedQuery, setSubmittedQuery] = useState<string>(queryValue);
+    if (route.name === "tracking" && !href.startsWith("/rastreio")) {
+      navigate(trackingHref(route.orderParam), { replace: true });
+    }
+  }, [href, route]);
 
-  // Número digitado fora do formato: mostra "não encontrado" sem consultar a API.
-  const [invalidQuery, setInvalidQuery] = useState(false);
+  useEffect(() => {
+    document.title = pageTitle(route);
+  }, [route]);
 
-  // Estado do Chat
-  const [messages, setMessages] = useState<ChatMessageItem[]>([]);
-  const [typing, setTyping] = useState(false);
-  // Conversa atual no backend. null = a próxima mensagem começa uma conversa nova.
-  const sessionIdRef = useRef<string | null>(null);
-  const { mutateAsync: sendChatMessage } = useSendChatMessage();
+  // Sessão do colaborador: guarda da Área do colaborador e e-mail no cabeçalho.
+  const sessionQuery = useSession();
+  const session: SessionState = sessionQuery.isPending
+    ? "loading"
+    : sessionQuery.data?.authenticated
+      ? "authenticated"
+      : "anonymous";
+  const redirect = guardRedirect(route, href, session);
+  useEffect(() => {
+    if (redirect !== null) {
+      navigate(redirect, { replace: true });
+    }
+  }, [redirect]);
 
-  // Consultas à API real (@translog/api)
+  const logout = useLogout();
+  const handleLogout = useCallback(() => {
+    logout.mutate(undefined, { onSettled: () => navigate(STAFF_LOGIN_PATH) });
+  }, [logout]);
+
   const healthQuery = useHealth();
-  const samplesQuery = useOrderSamples();
-  const orderQuery = useOrderQuery(selectedOrderId);
-
   const isConnected = !healthQuery.isError;
 
-  // Pedido ativo resolvido pela API real
-  const activeOrder: Order | null = useMemo(() => {
-    if (invalidQuery || selectedOrderId === null) {
-      return null;
-    }
-    return orderQuery.data ?? null;
-  }, [invalidQuery, selectedOrderId, orderQuery.data]);
+  // Pedido do rastreio do cliente: fica aqui para o chat saber de qual pedido se fala.
+  const trackingOrderId = route.name === "tracking" ? parseOrderId(route.orderParam) : null;
+  const orderQuery = useOrderQuery(trackingOrderId);
+  const activeOrder = trackingOrderId !== null ? (orderQuery.data ?? null) : null;
 
-  // View mode calculado da coluna de rastreio
-  const trackerView: TrackerViewMode = useMemo(() => {
-    if (invalidQuery) {
-      return "notfound";
-    }
-    if (selectedOrderId === null) {
-      return "empty";
-    }
-    if (orderQuery.isPending) {
-      return "loading";
-    }
-    if (orderQuery.isError) {
-      const err = orderQuery.error;
-      if (err instanceof ApiError && err.status === 404) {
-        return "notfound";
-      }
-      return "error";
-    }
-    if (orderQuery.data) {
-      return "result";
-    }
-    return "empty";
-  }, [
-    invalidQuery,
-    selectedOrderId,
-    orderQuery.isPending,
-    orderQuery.isError,
-    orderQuery.error,
-    orderQuery.data,
-  ]);
-
-  // Sincroniza URL (?pedido=N) ao selecionar um pedido
-  const syncUrlOrder = useCallback((orderId: number | null) => {
-    if (typeof window === "undefined") return;
-    const nextSearch = withOrderQueryParam(window.location.search, orderId);
-    const nextUrl = `${window.location.pathname}${nextSearch}`;
-    window.history.replaceState(null, "", nextUrl);
-  }, []);
-
-  /**
-   * Começa uma conversa nova: a próxima mensagem vai com outro `sessionId`, e a resposta ainda
-   * pendente da conversa anterior é descartada quando chegar.
-   */
-  const startNewConversation = useCallback(() => {
-    sessionIdRef.current = null;
-    setTyping(false);
-  }, []);
-
-  // Troca de pedido: a conversa continua, com um divisor marcando o pedido novo.
-  const applyOrderSwitchToChat = useCallback(
-    (nextOrderId: number | null) => {
-      const previousOrderId = selectedOrderIdRef.current;
-      setMessages((prev) =>
-        messagesAfterOrderSwitch(prev, previousOrderId, nextOrderId, nextMsgId),
-      );
+  // O LogBot citou outro pedido: abre o rastreio dele (a mesma conversa continua lá).
+  const routeName = route.name;
+  const handleMentionedOrder = useCallback(
+    (orderId: number) => {
+      navigate(trackingHref(orderId), { replace: routeName === "tracking" });
     },
-    [nextMsgId],
+    [routeName],
   );
 
-  // Busca um pedido pelo formulário, pelos chips ou pelo pedido citado no chat
-  const handleSelectOrder = useCallback(
-    (rawOrderId: string) => {
-      const parsed = parseOrderId(rawOrderId);
-      setSubmittedQuery(rawOrderId);
-      setQueryValue(rawOrderId);
-      setInvalidQuery(parsed === null);
+  const chat = useChatConversation({
+    activeOrder,
+    focusedOrderId: trackingOrderId,
+    onMentionedOrder: handleMentionedOrder,
+  });
 
-      if (parsed === null) {
-        setSelectedOrderId(null);
-        syncUrlOrder(null);
-        return;
-      }
-
-      applyOrderSwitchToChat(parsed);
-      setSelectedOrderId(parsed);
-      syncUrlOrder(parsed);
-    },
-    [applyOrderSwitchToChat, syncUrlOrder],
-  );
-
-  const handleClearOrder = useCallback(() => {
-    setInvalidQuery(false);
-    setSelectedOrderId(null);
-    setQueryValue("");
-    setSubmittedQuery("");
-    syncUrlOrder(null);
-  }, [syncUrlOrder]);
-
-  const handleRetryTracking = useCallback(() => {
-    setInvalidQuery(false);
-    if (selectedOrderId !== null) {
-      void orderQuery.refetch();
-    } else {
-      const fallback = parseOrderId(submittedQuery || queryValue || "375");
-      if (fallback) {
-        setSelectedOrderId(fallback);
-        syncUrlOrder(fallback);
-      }
-    }
-  }, [orderQuery, queryValue, selectedOrderId, submittedQuery, syncUrlOrder]);
-
-  const markMessageFailed = useCallback((messageId: number, failureLabel: string) => {
-    setMessages((prev) =>
-      prev.map((item) =>
-        item.id === messageId && item.role === "user"
-          ? { ...item, status: "failed", failureLabel }
-          : item,
-      ),
-    );
-  }, []);
-
-  // Envia a pergunta à API (POST /api/chat) e mostra a resposta. Sem reenvio automático.
-  const deliverChatReply = useCallback(
-    async (question: string, userMessageId: number) => {
-      sessionIdRef.current ??= createSessionId();
-      const sessionId = sessionIdRef.current;
-      setTyping(true);
-      try {
-        const response = await sendChatMessage({
-          sessionId,
-          message: question,
-          orderId: activeOrder?.orderId ?? null,
-        });
-        if (sessionIdRef.current !== sessionId) {
-          return; // O cliente começou uma "Nova conversa" enquanto esperava.
-        }
-        setTyping(false);
-        // Pedido citado na mensagem: abre no rastreio (mesma troca de pedido do formulário).
-        if (
-          response.mentionedOrderId !== null &&
-          response.mentionedOrderId !== selectedOrderIdRef.current
-        ) {
-          handleSelectOrder(String(response.mentionedOrderId));
-        }
-        setMessages((prev) => [
-          ...prev,
-          { id: nextMsgId(), role: "assistant", text: response.reply, time: chatTimeLabel() },
-        ]);
-      } catch (error) {
-        if (sessionIdRef.current !== sessionId) {
-          return;
-        }
-        setTyping(false);
-        markMessageFailed(userMessageId, chatFailureLabel(error));
-      }
-    },
-    [activeOrder, handleSelectOrder, markMessageFailed, nextMsgId, sendChatMessage],
-  );
-
-  const handleSendMessage = useCallback(
-    (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || typing) return;
-      const id = nextMsgId();
-      setMessages((prev) => [
-        ...prev,
-        { id, role: "user", text: trimmed, time: chatTimeLabel(), status: "sent" },
-      ]);
-      void deliverChatReply(trimmed, id);
-    },
-    [deliverChatReply, nextMsgId, typing],
-  );
-
-  // Reenvio manual ("Tentar novamente"): a mensagem que falhou volta para o fim da conversa.
-  const handleRetryMessage = useCallback(
-    (messageId: number) => {
-      if (typing) return;
-      const target = messages.find((m) => m.id === messageId && m.role === "user");
-      if (target?.role !== "user") return;
-
-      const id = nextMsgId();
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== messageId),
-        { id, role: "user", text: target.text, time: chatTimeLabel(), status: "sent" },
-      ]);
-      void deliverChatReply(target.text, id);
-    },
-    [deliverChatReply, messages, nextMsgId, typing],
-  );
-
-  const handleNewChat = useCallback(() => {
-    startNewConversation();
-    setMessages([]);
-  }, [startNewConversation]);
+  const staffEmail = sessionQuery.data?.authenticated ? sessionQuery.data.email : null;
+  const showStaffUser = isStaffRoute(route) && session === "authenticated";
 
   return (
-    <div className="flex flex-col h-full min-w-[1280px] bg-slate-100/80 text-slate-900 antialiased overflow-hidden">
-      <AppHeader connected={isConnected} />
+    <div className="min-h-full min-w-[1280px] flex flex-col bg-slate-100/80 text-slate-900 antialiased">
+      <AppHeader
+        tab={activeTab(route)}
+        connected={isConnected}
+        staff={
+          showStaffUser
+            ? {
+                email: staffEmail ?? "Colaborador",
+                onLogout: handleLogout,
+                loggingOut: logout.isPending,
+              }
+            : null
+        }
+      />
 
-      <main className="flex-1 min-h-0">
-        <div className="mx-auto max-w-[1440px] h-full px-6 py-5 grid grid-cols-[minmax(0,1fr)_400px] grid-rows-[minmax(0,1fr)] gap-6">
-          <TrackingPanel
-            view={trackerView}
-            queryValue={queryValue}
-            submittedQuery={submittedQuery}
-            onQueryChange={setQueryValue}
-            onSubmitOrder={handleSelectOrder}
-            onClearOrder={handleClearOrder}
-            onRetry={handleRetryTracking}
-            sampleOrderIds={samplesQuery.orderIds}
-            activeOrder={activeOrder}
-            onAskAssistant={handleSendMessage}
+      <main className="flex-1">
+        {redirect !== null || (isStaffRoute(route) && session === "loading") ? (
+          <CheckingSessionPage />
+        ) : (
+          <Page
+            route={route}
+            tracking={
+              route.name === "tracking" ? (
+                <TrackingPage
+                  orderParam={route.orderParam}
+                  orderQuery={orderQuery}
+                  onAskAssistant={chat.sendMessage}
+                  chat={
+                    <ChatPanel
+                      activeOrder={activeOrder}
+                      connected={isConnected}
+                      messages={chat.messages}
+                      typing={chat.typing}
+                      onSendMessage={chat.sendMessage}
+                      onRetryMessage={chat.retryMessage}
+                      onNewChat={chat.newConversation}
+                    />
+                  }
+                />
+              ) : null
+            }
           />
-
-          <ChatPanel
-            activeOrder={activeOrder}
-            connected={isConnected}
-            messages={messages}
-            typing={typing}
-            onSendMessage={handleSendMessage}
-            onRetryMessage={handleRetryMessage}
-            onNewChat={handleNewChat}
-          />
-        </div>
+        )}
       </main>
+
+      <AppFooter />
     </div>
   );
+}
+
+/** Página de cada rota. Início e Área do colaborador ganham o conteúdo nas tarefas 2 e 4. */
+function Page({ route, tracking }: { route: Route; tracking: ReactNode }) {
+  switch (route.name) {
+    case "home":
+      return (
+        <SimplePage label="TransLog · Início" title="Sua carga pelo mundo. Cada etapa visível.">
+          <p>Acompanhe despacho, voo, alfândega e entrega do seu pedido.</p>
+          <PrimaryLink href="/rastreio">Rastrear um pedido</PrimaryLink>
+        </SimplePage>
+      );
+    case "tracking":
+      return tracking;
+    case "staffLogin":
+      return (
+        <SimplePage label="Área do colaborador" title="Acesso restrito à equipe TransLog.">
+          <p>O formulário de entrada chega na próxima etapa.</p>
+        </SimplePage>
+      );
+    case "staffTower":
+      return <SimplePage label="Área do colaborador" title="Torre de controle" />;
+    case "staffOrder":
+      return <SimplePage label="Visão do colaborador" title={`Pedido #${route.orderParam}`} />;
+    case "notFound":
+      return <NotFoundPage />;
+  }
 }

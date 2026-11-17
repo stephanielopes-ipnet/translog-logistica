@@ -36,6 +36,18 @@ export function postJson<Schema extends z.ZodType>(
 }
 
 /**
+ * POST em `/api{path}` com corpo JSON, para rotas que respondem sem corpo (`204`, ex.: login e
+ * logout). Erros viram `ApiError` como nas demais chamadas.
+ */
+export async function postNoContent(path: string, body: unknown): Promise<void> {
+  await send(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
  * Chama a API e valida a resposta com o esquema do contrato. Toda falha vira `ApiError`:
  * rede (`status: 0`, `NETWORK_ERROR`), erro da API (código e mensagem do envelope padrão)
  * ou resposta fora do contrato (`INVALID_RESPONSE`).
@@ -45,10 +57,31 @@ async function requestJson<Schema extends z.ZodType>(
   init: RequestInit,
   schema: Schema,
 ): Promise<z.output<Schema>> {
+  const { response, body } = await send(path, init);
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    throw new ApiError(
+      response.status,
+      "INVALID_RESPONSE",
+      "O servidor respondeu em um formato inesperado.",
+    );
+  }
+  return parsed.data;
+}
+
+/**
+ * Faz a chamada e lê o corpo (quando houver). O cookie de sessão do colaborador (`HttpOnly`)
+ * vai junto por ser a mesma origem: a tela nunca lê nem guarda o token.
+ */
+async function send(
+  path: string,
+  init: RequestInit,
+): Promise<{ response: Response; body: unknown }> {
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
       ...init,
+      credentials: "same-origin",
       headers: { Accept: "application/json", ...init.headers },
     });
   } catch {
@@ -57,7 +90,7 @@ async function requestJson<Schema extends z.ZodType>(
 
   let body: unknown;
   try {
-    body = await response.json();
+    body = response.status === 204 ? undefined : await response.json();
   } catch {
     body = undefined;
   }
@@ -77,16 +110,7 @@ async function requestJson<Schema extends z.ZodType>(
       "Ocorreu um erro inesperado. Tente novamente.",
     );
   }
-
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new ApiError(
-      response.status,
-      "INVALID_RESPONSE",
-      "O servidor respondeu em um formato inesperado.",
-    );
-  }
-  return parsed.data;
+  return { response, body };
 }
 
 /**

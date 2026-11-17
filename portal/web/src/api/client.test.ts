@@ -1,6 +1,6 @@
 import { chatResponseSchema, healthResponseSchema, orderSchema } from "@translog/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getJson, postJson, shouldRetry } from "./client.ts";
+import { ApiError, getJson, postJson, postNoContent, shouldRetry } from "./client.ts";
 
 describe("api client", () => {
   afterEach(() => {
@@ -80,6 +80,7 @@ describe("api client", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/chat", {
       method: "POST",
+      credentials: "same-origin",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -121,6 +122,36 @@ describe("api client", () => {
 
     await expect(postJson("/chat", {}, chatResponseSchema)).rejects.toMatchObject({
       code: "INVALID_RESPONSE",
+    });
+  });
+
+  it("postNoContent accepts a 204 without body and sends the session cookie", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(postNoContent("/auth/logout", {})).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
+    );
+  });
+
+  it("postNoContent maps a 429 to ApiError with the API message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ error: { code: "TOO_MANY_ATTEMPTS", message: "Muitas tentativas." } }),
+            { status: 429, headers: { "Content-Type": "application/json" } },
+          ),
+        ),
+    );
+
+    await expect(postNoContent("/auth/login", {})).rejects.toMatchObject({
+      status: 429,
+      message: "Muitas tentativas.",
     });
   });
 });

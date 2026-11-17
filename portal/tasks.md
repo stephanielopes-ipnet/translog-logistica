@@ -50,6 +50,16 @@ Plano em `portal/_contexto/escopo-novo.md` (seções 4, 5, 9, 10 e 11). Duas vis
 - [ ] **4. Rotas do colaborador e Torre de controle**
 - [ ] **5. Docs e verificação**
 
+## Fase 6: escopo novo, frontend (17/11)
+
+Plano em `portal/_contexto/escopo-novo.md` (seções 1, 2, 4, 9, 10 e 11) e protótipos em `portal/_contexto/prototipos/` (estilo da 04). Code freeze em 19/11.
+
+- [x] **1. Estrutura: rotas, cabeçalho e rodapé**: roteador feito à mão com History API (`web/src/lib/router.ts`, lógica pura com testes; `use-location.tsx` com `navigate` e `Link`), rotas `/`, `/rastreio?pedido=N`, `/colaborador/entrar`, `/colaborador`, `/colaborador/pedidos/:id` e 404; `/?pedido=N` (endereço antigo) abre o rastreio e vira `/rastreio?pedido=N`; guarda da Área do colaborador (`guardRedirect`: sem sessão → login com `?voltar=`, só para páginas da área, sem redirecionamento aberto; já logado no login → página pedida ou Torre) lendo `GET /api/auth/session` (`api/session.ts`; `404` = sem sessão) com `credentials: "same-origin"`; cabeçalho com marca (Início), abas com a ativa marcada, indicadores discretos (ponto + texto: "Atendimento 24h" e conexão) e, na área do colaborador, e-mail + "Sair" (`POST /api/auth/logout`); rodapé novo com logo IPNET (`web/public/ipnet.svg`); conversa do LogBot extraída para `use-chat-conversation.ts` (acima das páginas, para seguir do Início ao Rastreamento); rastreio em `tracking-page.tsx` com o pedido vindo da URL, mesmo comportamento; título da aba por página. Início, login, Torre e visão do colaborador como páginas provisórias (tarefas 2 e 4).
+- [ ] **2. Página inicial do cliente**
+- [ ] **3. Rastreio do cliente (ajustes)**
+- [ ] **4. Área do colaborador**
+- [ ] **5. Docs e verificação final**
+
 ## Próximas fases (fora desta etapa)
 
 - [ ] **Agente no Docker Compose**: depende do Dockerfile do agente na `main` (Marco).
