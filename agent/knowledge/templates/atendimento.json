@@ -1,0 +1,12 @@
+[
+  {
+    "id": "preencher-identificador",
+    "kind": "policy",
+    "title": "Título da política",
+    "text": "Texto a ser escrito e revisado pelo grupo.",
+    "source": "Informar documento ou responsável pela regra",
+    "version": "1",
+    "status": "draft",
+    "approved_by": ""
+  }
+]
