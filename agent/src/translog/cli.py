@@ -35,7 +35,7 @@ def main(argv=None):
                       "model": settings.model, "api_key_configured": bool(os.getenv("GOOGLE_API_KEY", "").strip()),
                       "knowledge_mode": "demo" if settings.allow_demo else "approved",
                       "knowledge_index_exists": store._pointer(settings.allow_demo).is_file(),
-                      "sql_status": "Pendente de decisão do grupo; CSV não é integração SQL."}
+                      "sql_status": "Fonte alinhada: Databricks, tabelas consumo_*, CSV como alternativa local. Este agente ainda não tem conexão SQL direta."}
         elif args.command == "order":
             result = consultar_pedido(args.order_id)
         elif args.command == "validate-orders":

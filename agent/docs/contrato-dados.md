@@ -1,5 +1,7 @@
 # Contrato de consulta — v0.1 proposto
 
+Correção posterior de 17/11: fonte do projeto já alinhada em 16/11 — tabelas `consumo_*` no Databricks, com CSVs exportados como alternativa local e sem banco próprio. O agente de testes usa `csv_v2`. Conexão SQL direta do agente não implementada é uma limitação técnica; as notas anteriores de decisão de banco pendente não refletem o alinhamento atual. FAQ fechada e conciliada em `faq-v2-conciliada.md`; teste em http://127.0.0.1:8003 .
+
 ## Contrato ativo local v0.2 — consumo Silver v2, 17/11
 
 Os três CSVs enviados por Mateus foram recebidos e integrados no backend explícito `csv_v2`. O [contrato e relatório v2](integracao-silver-v2-2026-11-17.md) definem pedidos, itens e eventos, retorno com `order`/`items`/`events`, preservação de diferenças negativas e nulos, separação entre despacho e entrega e identificação de histórico/simulação. Marco confirmou que 4/2/1 dias são prazos de despacho. Não há mudança do nome ou argumento da ferramenta nem das rotas HTTP. Banco/SQL continuam pendentes. As seções v0.1 abaixo documentam o adaptador anterior, ainda disponível como `csv`, e as pendências históricas; não descrevem a fonte local ativa após esta atualização.

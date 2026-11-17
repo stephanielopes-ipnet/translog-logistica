@@ -1,5 +1,29 @@
 # Retomada do acompanhamento de Marco
 
+## Ponto de entrada consolidado e autorização permanente — 17/11
+
+Para uma conversa nova, começar por **[inicio-nova-conversa.md](inicio-nova-conversa.md)** e ler `AGENTS.md`/`Agentes.md`. Os arquivos de instruções foram consolidados para remover decisões antigas que contradiziam o estado atual. O histórico abaixo permanece datado e não deve reabrir FAQ, escolha da fonte ou instruções de redação revogadas.
+
+Marco autorizou expressamente manter ambos os arquivos de orientação atualizados e publicar no GitHub as mudanças necessárias ao projeto sem confirmação repetida para commits/push/PR dentro desse escopo. Repositório e conta permanecem os mesmos; não inclui segredos, dados privados, alterações alheias ou merge/deploy por inferência. O pacote desta atualização sincroniza FAQ fechada de 18 trechos, atendimento natural, ausência de rodapés, evidência de localização, 51 testes e guia de casos no PR #32. Conferir estado remoto antes de novas publicações.
+## Mais recente — guia de casos salvo para o grupo e apresentação
+
+Marco pediu salvar as perguntas sugeridas e a continuidade na mesma conversa para testar, mostrar ao grupo em 18/11 e usar como referência na apresentação. Guia completo: [casos-teste-e-apresentacao-agente.md](casos-teste-e-apresentacao-agente.md), com oito perguntas principais, cinco sequências, 15 adicionais, resultados esperados, seleção de demonstração e ficha para registrar evidências. README e roteiro técnico apontam para ele. Feedback positivo de Marco registrado sem marcar todos os casos como aprovados. Somente documentação; nenhum teste com modelo, reinício ou novo push nesta etapa.
+## Mais recente — fonte/versão apenas nos registros técnicos
+
+Marco não quer referência de FAQ/versão entre parênteses na mensagem do cliente. Prompt local atualizado: resposta normal não imprime fonte, versão, ID ou rodapé; Chroma e eventos preservam os metadados. Citar título/versão somente se o cliente perguntar a origem. Isso substitui instruções anteriores de referência visível/discreta obrigatória. Instância de testes segue porta 8003; após reinício, atualizar página e usar New Session. Reavaliação manual necessária; sem nova chamada automática ao Gemini ou push nesta etapa.
+## Direção mais recente — atendimento do cenário da banca
+
+Marco quer respostas ao cliente, não explicações técnicas do dataset em toda consulta. Instruções agora usam status/local comprovado do cenário de apresentação, sem repetir “amostra fictícia/base histórica/simulado”; origem segue registrada e deve ser explicada se perguntada. Preservar datas originais, sem inventar calendário atual/GPS. Essa é uma direção explícita do usuário e substitui a regra anterior de repetir simulação sempre. FAQ já fechada, fonte Databricks já alinhada; não reabrir decisões.
+
+Pedido 16: Não pago (expirado), destino Brasília, apenas registro administrativo; `tracking.location=null`. Não dizer que está ou foi criado em Brasília. Ferramenta e prompt corrigidos, dois testes novos, suíte de 51 passou na etapa de localização. Relatório `ajuste-atendimento-apresentacao.md`. Reiniciar somente a instância dedicada 8003 para carregar as instruções, preservando 8001; Marco deve atualizar página e usar New Session após o reinício. Nenhuma chamada generativa adicional foi feita; resposta nova ainda precisa ser observada.
+## Mais recente — FAQ fechada e teste local na porta 8003
+
+Marco corrigiu em 17/11: FAQ já fechada e fonte SQL já alinhada. Não reabrir essas decisões. Confirmada no portal a escolha de 16/11: consumo_* no Databricks, CSV como alternativa local, sem banco próprio. Agente local é `csv_v2`; conexão SQL direta ainda não implementada é questão técnica distinta.
+
+FAQ conciliada completa de 18 trechos indexada, versão `2-conciliada-2026-11-17`. Original preservado e oito orientações técnicas anteriores arquivadas. Corrigidos despacho/entrega, status pagamento/expiração, causas e limites de encaminhamento; horários da central e regra de atraso de entrega >=3/extravio agora ativos conforme o fechamento. Não dizer que a política está aguardando aprovação.
+
+Instância dedicada de testes na pasta `translogbrasil`: http://127.0.0.1:8003 , agente `translog_agent`, com Silver v2 e FAQ atualizada. Processo registrado em `.state/adk-v2-8003.pid`; servidor da porta 8001 preservado. HTTP 200 e descoberta do agente conferidos. Marco quer testar bastante e retornar a Mateus de Dados; orientar pelo [roteiro com resultados esperados](roteiro-testes-silver-v2-faq.md), uma conversa nova por cenário. 49 testes e seis buscas Chroma passaram; novas conversas manuais ainda não avaliadas. Estas correções posteriores continuam locais, sem novo push ao PR #32.
+
 ## Publicação concluída — 17/11
 
 Marco pediu atualizar o GitHub. [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32) publicado como rascunho em `feat/agente-silver-v2-rag`, sem merge; PR #30 já estava integrado. Código `01e8eb6`, preservando contexto do portal e padrão Gemini 3.5 Flash Lite da main. Repositório local do grupo está nessa branch, com 49 testes aprovados no destino. Nada de credenciais ou CSV privado foi publicado. Não repetir a publicação nem criar outro PR para o mesmo trabalho.

@@ -1,27 +1,35 @@
 # Assistente TransLog
 
-Agente Google ADK com consulta estruturada de pedidos e recuperação vetorial de FAQ/orientações pelo Chroma. Projeto acadêmico, sem GPS ao vivo.
+Agente Google ADK para consultar pedidos e oferecer atendimento em linguagem natural, com FAQ/políticas recuperadas pelo Chroma. Projeto acadêmico do grupo 3, cliente fictício.
 
-## Atualização de 17/11/2026
+## Começar ou retomar
 
-- Backend `csv_v2` para os três CSVs recebidos de Mateus: pedidos, itens e eventos. Despacho e entrega separados; nulos e diferenças negativas preservados.
-- Histórico com complemento simulado, referência 06/02/2018. A nova base não é a amostra anterior: o pedido 1001 tem quatro linhas de itens e está entregue no prazo no cenário.
-- Comunicação amigável e contexto de pedido aberto no portal preservados.
-- Oito orientações técnicas revisadas localmente no Chroma. FAQ original de Stephanie é rascunho; regras comerciais pendentes continuam fora do índice ativo.
-- 49 testes técnicos passaram. Duas conversas Gemini executadas sem 503; a pergunta mista omitiu citação. Instrução reforçada, ainda sem reavaliação desse reforço.
-- Banco/SQL, políticas finais, contingência de 503 e demonstração completa portal → agente continuam pendentes.
+- [Instruções de trabalho](AGENTS.md) e [referência canônica atual](Agentes.md).
+- **[Retomar em uma nova conversa](docs/inicio-nova-conversa.md)**: estado, acordos, pastas, permissões e mensagem pronta.
+- **[Casos de teste e apresentação](docs/casos-teste-e-apresentacao-agente.md)**: oito perguntas principais, cinco sequências de continuidade, perguntas adicionais e ficha de resultados.
+- [Estado verificável](docs/status-implementacao.md) e [decisões](docs/decisoes.md).
 
-## Preparação no Windows
+## Estado em 17/11/2026
 
-Requisito: Python 3.12. Execute os comandos dentro de `agent`:
+- Backend `csv_v2`: três tabelas de consumo recebidas de Mateus de Dados, com 65.752 pedidos, 180.519 itens e 350.416 eventos. Despacho e entrega separados; negativos e nulos preservados.
+- Fonte do projeto já alinhada: `consumo_*` no Databricks; CSVs exportados como alternativa local, sem banco próprio. O agente local ainda não tem conexão SQL direta.
+- FAQ fechada pelo grupo e conciliada: **18 trechos** em `knowledge/approved/faq-politicas-v2.json`. [Versão legível](docs/faq-v2-conciliada.md).
+- Atendimento natural ao cliente no cenário da apresentação, sem repetir avisos técnicos ou rodapés de fonte/versão. Proveniência preservada nos metadados e explicada se perguntada. Datas originais não foram deslocadas; não há GPS ao vivo.
+- `order.tracking` distingue registro administrativo de localização em evento logístico. Para o 16, Brasília é destino, sem localização física disponível.
+- **51 testes técnicos passaram** na última suíte da implementação. Feedback manual positivo de Marco; não equivale à aprovação individual de todos os casos.
+- PR de trabalho: [#32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32), branch `feat/agente-silver-v2-rag`; conferir estado remoto. Publicação da branch não significa merge na main.
+
+## Ambiente e configuração
+
+Python 3.12. Execute dentro da raiz desta base (pasta `agent` no repositório do grupo):
 
 ```powershell
 .\scripts\setup.ps1
 ```
 
-Configure sua chave privadamente na `.env` criada pelo script. Preserve a chave existente; nunca publique esse arquivo. O modelo padrão é `gemini-3.5-flash-lite`.
+Configure a chave privadamente na `.env` ou preserve a existente. Modelo padrão: `gemini-3.5-flash-lite`. Não publicar `.env` ou copiar credenciais para o frontend.
 
-Para usar a Silver v2, obtenha os três CSVs com Mateus e coloque em `agent/data/silver/v2-2026-11-17/`. Os dados completos não fazem parte deste PR. Configure na `.env`:
+Obtenha privadamente os três CSVs com Mateus de Dados e coloque em `data/silver/v2-2026-11-17/`. Para usar essa fonte, configure na `.env`:
 
 ```dotenv
 TRANSLOG_ORDER_BACKEND=csv_v2
@@ -30,33 +38,37 @@ TRANSLOG_CONSUMPTION_DIR=data/silver/v2-2026-11-17
 TRANSLOG_ALLOW_DEMO_KNOWLEDGE=false
 ```
 
-A `.env.example` mantém a amostra como padrão para instalação independente. Não há troca silenciosa de fonte.
+A `.env.example` mantém a amostra como padrão para instalação independente. O pedido 1001 da v2 é diferente do 1001 da amostra antiga: quatro linhas de itens, 14 unidades, entregue no prazo no cenário.
 
-## Verificação e Chroma
+## Verificar e testar
 
 ```powershell
 .\.venv\Scripts\python.exe -m translog.cli doctor
 .\.venv\Scripts\python.exe -m translog.cli validate-orders
 .\.venv\Scripts\python.exe -m translog.cli order 1001
 .\.venv\Scripts\python.exe -m translog.cli index --input knowledge/approved
-.\.venv\Scripts\python.exe -m translog.cli search 'O prazo de despacho é o prazo de entrega?'
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-O índice é recriado localmente. O primeiro uso de embeddings pode baixar o modelo. Testes automatizados e consulta direta não chamam Gemini; `scripts/evaluate_agent_v2.py` faz chamadas reais, sujeitas à autorização de transmissão dos dados mínimos ao Google.
+O índice Chroma é recriado localmente; o primeiro uso pode baixar embeddings. Esses testes/consultas não chamam Gemini. O script `evaluate_agent_v2.py` faz chamadas reais e não deve ser executado automaticamente só para verificar documentação.
 
-## Portal e desenvolvimento
+Instância de testes conhecida na máquina de Marco: **http://127.0.0.1:8003**, `translog_agent`. Verifique disponibilidade antes de iniciar outro processo na mesma porta. Após reiniciar o ADK, atualize a página e clique em **New Session**. Os servidores usam sessões em memória.
+
+Para iniciar a interface se estiver parada:
 
 ```powershell
-.\.venv\Scripts\adk.exe api_server agents --host 127.0.0.1 --port 8002 --no_use_local_storage
+.\.venv\Scripts\adk.exe web agents --port 8003 --no_use_local_storage
 ```
 
-Para a interface de desenvolvimento, use `adk web agents --port 8001 --no_use_local_storage`. Mantenha o terminal aberto. Reiniciar descarta sessões em memória; abra nova conversa ao trocar a fonte. O backend do portal usa sessões ADK e `POST /run`; a chave fica apenas no processo do agente.
+## Integração com o portal
 
-- [Contrato e casos da Silver v2](docs/integracao-silver-v2-2026-11-17.md)
-- [Guia de integração para Matheus FullStack](docs/guia-matheus-fullstack.md)
-- [Contrato HTTP ADK](docs/api-chat.md)
-- [Avaliação real com Gemini e limites](docs/avaliacao-gemini-v2-2026-11-17.md)
-- [Estado de implementação](docs/status-implementacao.md)
+- [Guia de Matheus FullStack](docs/guia-matheus-fullstack.md).
+- [Contrato HTTP ADK](docs/api-chat.md): sessões e `POST /run`; não existe `/chat` adicional no agente.
+- [Contrato e casos da fonte v2](docs/integracao-silver-v2-2026-11-17.md).
+- [Ajustes de atendimento](docs/ajuste-atendimento-apresentacao.md).
 
-Próximo aceite: portal e agente usando a mesma fonte v2 na máquina da demonstração, com status, endereço/FAQ e erro de provedor conferidos. O PR publica código/documentação e não comprova esse teste ponta a ponta.
+O backend do portal pode enviar `[Pedido aberto no portal: CÓDIGO]` como contexto; o agente confirma fatos com a ferramenta. `localhost` aponta para a máquina que faz a chamada. Não usar uma única sessão para clientes independentes.
+
+Próximo aceite: portal → backend → ADK com a mesma v2/FAQ na máquina da demonstração, incluindo continuidade e erro do provedor. Contingência 503 e conexão SQL direta do agente ainda não foram implementadas. Não há garantia de disponibilidade por duas conversas sem 503.
+
+Credenciais, CSVs privados completos, `.venv`, índices, caches e logs privados ficam fora do Git. A autorização de Marco para manter instruções e GitHub atualizados está registrada em `AGENTS.md` e `Agentes.md`.

@@ -1,9 +1,7 @@
-# Conteúdo revisado
+# FAQ e políticas fechadas
 
-Este diretório contém oito orientações técnicas locais do projeto acadêmico em `orientacoes-tecnicas-v2.json`, revisadas pelo assistente no escopo solicitado por Marco em 17/11/2026. Não são políticas comerciais finais aprovadas por Stephanie. Título, fonte, versão e `approved_by` explicitam essa distinção. O rascunho original de Stephanie foi preservado em `../drafts/`, fora do índice ativo.
+O corpus ativo é `faq-politicas-v2.json`: 18 trechos da FAQ fechada pelo grupo, conforme confirmação de Marco em 17/11/2026, conciliados com Silver v2 e limites das ferramentas. Versão `2-conciliada-2026-11-17`.
 
-Marco confirmou que 4/2/1 dias são prazos de despacho. Regras pendentes de horário, encaminhamento, limiar de atraso e calendário foram excluídas da versão técnica. A revisão final de políticas pelo grupo continua pendente. Ver `docs/integracao-silver-v2-2026-11-17.md`.
+O original recebido fica em `../drafts/` apenas como registro da versão de origem; isso não significa que a aprovação do grupo continue pendente. A revisão técnica anterior de oito trechos fica em `../archive/`, fora do índice ativo.
 
-Para conteúdo futuro, copie o modelo de `../templates/atendimento.json`, preencha fonte e versão e registre quem revisou o escopo específico. O indexador só aceita `status: approved` com `approved_by` preenchido.
-
-Não marque conteúdo como aprovado apenas para fazer o programa funcionar. Para aprender, use os exemplos separados de `../demo/` e a opção `--demo`.
+Leia a versão em linguagem natural em `docs/faq-v2-conciliada.md` e o roteiro em `docs/roteiro-testes-silver-v2-faq.md`. Para recriar: `python -m translog.cli index --input knowledge/approved`.

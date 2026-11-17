@@ -76,6 +76,30 @@ def test_non_evaluated_delays_remain_null(exports):
     assert result["order"]["delivery"]["delay_days"] is None
 
 
+def test_system_registration_does_not_place_package_at_destination(exports):
+    orders, _, events, save, _ = exports
+    orders[1]["destino_cidade"] = "Brasília"
+    orders[1]["destino_estado"] = "Distrito Federal"
+    orders[1]["situacao_pedido"] = "Não pago (expirado)"
+    events[2]["codigo_evento"] = "PEDIDO_CRIADO"
+    events[2]["local_evento"] = "Pedido registrado no sistema"
+    save()
+    result = consultar_pedido("8")
+    assert result["status"] == "found"
+    assert result["order"]["destination_city"] == "Brasília"
+    assert result["order"]["tracking"]["location"] is None
+    assert result["order"]["tracking"]["event_kind"] == "system_registration"
+    assert result["events"][-1]["location"] == "Pedido registrado no sistema"
+
+
+def test_tracking_location_comes_from_logistics_event(exports):
+    exports[0][0]["destino_cidade"] = "Cidade de destino"
+    exports[3]()
+    result = consultar_pedido("0007")
+    assert result["order"]["tracking"]["event_kind"] == "logistics_event"
+    assert result["order"]["tracking"]["location"] == "CD de destino"
+
+
 def test_early_delivery_preserves_the_negative_difference(exports):
     exports[0][0]["dias_atraso_entrega"] = "-1"
     exports[3]()

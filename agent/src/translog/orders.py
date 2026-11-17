@@ -96,7 +96,7 @@ class CsvOrderRepository:
 
 class PendingSqlRepository:
     def read_items(self):
-        raise SourceError("Banco definitivo pendente: configurar conector após decisão do grupo.")
+        raise SourceError("Conector SQL direto do agente não implementado; a fonte do projeto já está alinhada no Databricks.")
 
     def source(self):
         return {"backend": "sql_pending"}

@@ -152,6 +152,19 @@ class ConsumptionCsvRepository:
             raise SourceError("Último evento não é único ou não é o final da sequência.")
         if events[-1]["occurred_at"] != order["last_event_at"] or events[-1]["description"] != order["last_event"]:
             raise SourceError("Último evento diverge do pedido.")
+        last = events[-1]
+        logistics_event = last["code"] in {
+            "PEDIDO_DESPACHADO", "COLETA_GATEWAY", "PARTIDA_VOO", "CHEGADA_ALFANDEGA",
+            "LIBERACAO_ALFANDEGA", "CHEGADA_CD", "SAIU_PARA_ENTREGA", "ENTREGUE",
+            "CHEGADA_ARMAZEM", "EXTRAVIO_CONFIRMADO",
+        }
+        order["tracking"] = {
+            "event_kind": "logistics_event" if logistics_event else (
+                "system_registration" if last["code"] == "PEDIDO_CRIADO" else "no_location_evidence"),
+            "location": last["location"] if logistics_event else None,
+            "note": "Local do último evento logístico no cenário histórico/simulado; não é GPS atual." if logistics_event else
+                    "Não há localização física comprovada pelo último evento. Registro no sistema não situa o pacote; destino é apenas o destino.",
+        }
         return {"order": order, "items": sorted(items, key=lambda item: item["order_item_id"]), "events": events}
 
     def source(self):
@@ -159,5 +172,5 @@ class ConsumptionCsvRepository:
                 "is_simulated": True, "is_historical": True,
                 "snapshot_generated_at": datetime.fromtimestamp(max(path.stat().st_mtime for path in self.paths), timezone.utc).isoformat(),
                 "note": "Base acadêmica histórica DataCo com complemento simulado de entrega, eventos, locais, modal e ocorrências. "
-                        "Não são fatos operacionais atuais nem GPS. Datas/causas de entrega e eventos devem ser identificados como simulação; "
-                        "a origem individual dos campos ainda não veio em dicionário versionado. A data do arquivo não é a do evento."}
+                        "Proveniência registrada para auditoria; atendimento da apresentação usa as situações deste cenário. "
+                        "Não é GPS nem operação real ao vivo. As datas originais são preservadas. A data do arquivo não é a do evento."}

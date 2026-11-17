@@ -1,5 +1,7 @@
 # TransLog Brasil — plano de implementação e colaboração
 
+Atualização posterior de 17/11: Marco confirmou FAQ fechada, já conciliada e indexada em 18 trechos. A fonte do projeto foi alinhada em 16/11: tabelas `consumo_*` no Databricks, com CSVs como alternativa local e sem banco próprio, conforme `portal/docs/backend.md`. As notas de banco/FAQ pendentes abaixo pertencem ao planejamento anterior. O agente de teste usa a exportação CSV v2; conexão SQL direta do agente é uma implementação separada, não uma nova decisão a pedir ao grupo. Interface de teste atual: http://127.0.0.1:8003 ; roteiro em `roteiro-testes-silver-v2-faq.md`.
+
 Versão de trabalho atualizada em 14/11/2026. Documento revisável conforme aprendizado. Requisitos: [briefing](https://docs.google.com/document/d/1Q1steYXw1lVysO0sfpmwrVNIChxj1vO6D70Ja72bSJ8/edit). Acordos: [daily](https://docs.google.com/document/d/1pLD--SbRM6r8bZcbSlqcJqf_n77xVVThexhrwjW1YZI/edit?tab=t.okgggspbm3x0), reunião de 13/11 e atualizações explícitas de Marco.
 
 ## Objetivo
