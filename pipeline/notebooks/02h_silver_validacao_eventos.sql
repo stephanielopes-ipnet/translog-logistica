@@ -56,7 +56,7 @@ distribuicao AS (
            100.0 * AVG(CASE WHEN situacao_entrega = 'Entregue no prazo' THEN 1 ELSE 0 END)   AS pct_no_prazo,
            100.0 * AVG(CASE WHEN situacao_entrega = 'Entregue com atraso' THEN 1 ELSE 0 END) AS pct_atraso,
            100.0 * AVG(CASE WHEN situacao_entrega = 'Extraviado' THEN 1 ELSE 0 END)          AS pct_extravio
-    FROM ent WHERE grupo_status = 'concluido'
+    FROM ent WHERE situacao_entrega IN ('Entregue no prazo', 'Entregue com atraso', 'Extraviado')
 ),
 testes AS (
     SELECT 'fatia_publicada_unica' AS teste,
@@ -115,12 +115,12 @@ testes AS (
     UNION ALL
     -- Matriz de status (base real) x resultado simulado
     SELECT 'aguardando_e_cancelado_so_pedido_criado', CONCAT(COUNT(*), ' pedidos fora'), COUNT(*) = 0
-    FROM pe WHERE grupo_status IN ('aguardando', 'cancelado')
+    FROM pe WHERE grupo_status IN ('aguardando', 'nao_pago', 'cancelado')
               AND (eventos <> 1 OR resultado_transporte IS NOT NULL)
 
     UNION ALL
     SELECT 'despachado_tem_um_evento_de_despacho', CONCAT(COUNT(*), ' pedidos fora'), COUNT(*) = 0
-    FROM pe WHERE grupo_status IN ('concluido', 'em_transito') AND despachos <> 1
+    FROM pe WHERE grupo_status = 'despachado' AND despachos <> 1
 
     UNION ALL
     SELECT 'entregue_termina_em_entregue_na_data_simulada', CONCAT(COUNT(*), ' pedidos fora'), COUNT(*) = 0
@@ -153,8 +153,21 @@ testes AS (
     UNION ALL
     -- (antigo T3) em trânsito: nunca entregue, extraviado ou com ocorrência
     SELECT 'em_transito_sem_desfecho', CONCAT(COUNT(*), ' pedidos fora'), COUNT(*) = 0
-    FROM pe WHERE grupo_status = 'em_transito'
+    FROM pe WHERE situacao_entrega = 'Em trânsito'
               AND (entregues > 0 OR extravios > 0 OR resultado_transporte <> 'Em trânsito')
+
+    UNION ALL
+    -- Foto em D: nenhum evento depois da data de referência da base
+    SELECT 'nenhum_evento_depois_da_data_de_referencia', CONCAT(COUNT(*), ' eventos fora'), COUNT(*) = 0
+    FROM ev JOIN (SELECT MAX(data_referencia_base) AS d FROM silver.pedidos_rastreio) r
+    WHERE ev.ts_evento > r.d
+
+    UNION ALL
+    -- Em trânsito só existe perto de D (despacho até ~14 dias antes: maior trânsito + extravio)
+    SELECT 'em_transito_so_perto_da_data_de_referencia',
+           CONCAT(COUNT(*), ' pedidos fora'), COUNT(*) = 0
+    FROM ent JOIN (SELECT CAST(MAX(data_referencia_base) AS DATE) AS d FROM silver.pedidos_rastreio) r
+    WHERE ent.situacao_entrega = 'Em trânsito' AND ent.data_despacho_real < DATE_SUB(r.d, 14)
 
     UNION ALL
     SELECT 'entrega_simulada_depois_do_despacho', CONCAT(COUNT(*), ' pedidos fora'), COUNT(*) = 0
@@ -202,16 +215,17 @@ testes AS (
     JOIN (SELECT DISTINCT id_pedido FROM ev) e USING (id_pedido)
 
     UNION ALL
-    SELECT 'view_eventos_mesmas_linhas_da_fatia',
-           CONCAT((SELECT COUNT(*) FROM silver.vw_eventos_logisticos), ' na view x ', COUNT(*), ' na fatia'),
-           (SELECT COUNT(*) FROM silver.vw_eventos_logisticos) = COUNT(*)
+    -- A tabela de consumo é uma foto: se o 02g rodou e o 02i não, as contagens divergem
+    SELECT 'consumo_eventos_mesmas_linhas_da_fatia',
+           CONCAT((SELECT COUNT(*) FROM silver.consumo_eventos_logisticos), ' no consumo x ', COUNT(*), ' na fatia'),
+           (SELECT COUNT(*) FROM silver.consumo_eventos_logisticos) = COUNT(*)
     FROM ev
 
     UNION ALL
-    SELECT 'view_rastreio_um_registro_por_pedido',
+    SELECT 'consumo_pedidos_um_registro_por_pedido',
            CONCAT(COUNT(*), ' linhas x ', COUNT(DISTINCT id_pedido), ' pedidos'),
            COUNT(*) = COUNT(DISTINCT id_pedido)
-    FROM silver.vw_rastreio_eventos
+    FROM silver.consumo_pedidos
 
     UNION ALL
     -- Padrão do instrutor: 60/20/20 entre os pedidos concluídos (±2 pp no escopo completo)
@@ -247,7 +261,7 @@ ORDER BY ALL;
 -- 3. Exemplos legíveis: um pedido por resultado do transporte
 SELECT e.id_pedido, r.resultado_transporte, e.sequencia, e.codigo_evento, e.etapa_desc, e.ts_evento,
        e.local_evento, e.descricao_evento
-FROM silver.vw_eventos_logisticos e
+FROM silver.consumo_eventos_logisticos e
 JOIN (SELECT resultado_transporte, MIN(id_pedido) AS id_pedido
       FROM silver.rastreio_pedidos WHERE resultado_transporte IS NOT NULL GROUP BY 1) r USING (id_pedido)
 ORDER BY r.resultado_transporte, e.sequencia;

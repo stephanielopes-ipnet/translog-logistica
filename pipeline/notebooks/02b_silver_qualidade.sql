@@ -89,12 +89,12 @@ testes AS (
     WHERE nome_cliente IS NOT NULL AND INSTR(resumo_rastreio_rag, nome_cliente) > 0
 
     UNION ALL
-    -- View de consumo: sem PII, sem linhagem técnica, sem colunas de atraso originais
-    SELECT 'view_sem_colunas_proibidas',
+    -- Tabelas de consumo: sem PII, sem linhagem técnica, sem colunas de atraso originais
+    SELECT 'consumo_sem_colunas_proibidas',
            COALESCE(CONCAT_WS(', ', COLLECT_LIST(column_name)), ''),
            COUNT(*) = 0
     FROM information_schema.columns
-    WHERE table_schema = 'silver' AND table_name = 'vw_pedidos_rastreio'
+    WHERE table_schema = 'silver' AND table_name IN ('consumo_pedidos', 'consumo_itens_pedido', 'consumo_eventos_logisticos')
       AND column_name IN ('nome_cliente', 'status_entrega_original', 'risco_atraso_flag',
                           'dt_ingestao_bronze', 'dt_processamento_silver', 'arquivo_origem',
                           'avaliado_prazo', 'pedido_cancelado',
@@ -105,10 +105,17 @@ testes AS (
                           'data_prevista_despacho', 'data_entrega_simulada')
 
     UNION ALL
-    SELECT 'view_mesmas_linhas_da_tabela',
-           CONCAT(v.n, ' na view / ', s.n, ' na tabela'),
-           v.n = s.n
-    FROM (SELECT COUNT(*) AS n FROM silver.vw_pedidos_rastreio) v, silver s
+    -- Contrato: 3 TABELAS de consumo e nenhuma view antiga sobrando
+    SELECT 'contrato_3_tabelas_de_consumo_sem_views',
+           COALESCE(CONCAT_WS(', ', COLLECT_LIST(CONCAT(table_name, ' (', table_type, ')'))), ''),
+           COUNT_IF(table_name IN ('consumo_pedidos', 'consumo_itens_pedido', 'consumo_eventos_logisticos')
+                    AND table_type <> 'VIEW') = 3
+             AND COUNT_IF(table_type = 'VIEW') = 0
+    FROM information_schema.tables
+    WHERE table_schema = 'silver'
+      AND table_name IN ('consumo_pedidos', 'consumo_itens_pedido', 'consumo_eventos_logisticos',
+                         'vw_pedidos', 'vw_itens_pedido', 'vw_eventos_logisticos',
+                         'vw_pedidos_rastreio', 'vw_rastreio_eventos')
 
     UNION ALL
     -- Quarentena pequena: se passar de 1%, alguma regra provavelmente está errada
@@ -259,10 +266,12 @@ testes AS (
                 OR r.motivo_ocorrencia IS NULL OR r.situacao_entrega IS NULL OR r.data_entrega_prevista IS NULL))
        OR (s.avaliado_prazo AND NOT r.dado_simulado
            AND (r.etapa_atual IS NOT NULL OR r.local_atual IS NOT NULL OR r.motivo_ocorrencia IS NULL))
-       OR (r.dado_simulado AND s.status_pedido IN ('COMPLETE', 'CLOSED')
-           AND r.situacao_entrega NOT IN ('Entregue no prazo', 'Entregue com atraso', 'Extraviado'))
-       OR (r.dado_simulado AND s.status_pedido = 'PROCESSING'
-           AND (r.situacao_entrega <> 'Em trânsito' OR r.ultimo_codigo_evento = 'ENTREGUE'))
+       OR (r.dado_simulado
+           AND r.situacao_entrega NOT IN ('Entregue no prazo', 'Entregue com atraso', 'Extraviado', 'Em trânsito'))
+       OR (r.situacao_entrega = 'Em trânsito' AND r.ultimo_codigo_evento IN ('ENTREGUE', 'EXTRAVIO_CONFIRMADO'))
+       OR (NOT (r.situacao_pedido <=> CASE WHEN s.situacao_rastreio = 'Despachado'
+                                           THEN COALESCE(r.situacao_entrega, 'Despachado')
+                                           ELSE s.situacao_rastreio END))
 
     UNION ALL
     -- Rotas: doméstica nunca passa pela alfândega; rodoviário nunca voa nem é internacional;
@@ -309,56 +318,119 @@ testes AS (
            OR (e.flag_atraso_entrega = 1 AND s.dias_atraso_despacho <= 0))
 
     UNION ALL
-    -- Fonte única de posição: o local da view é o local do último evento publicado
-    SELECT 'posicao_da_view_igual_ultimo_evento',
+    -- Fonte única de posição: o local da consumo_pedidos é o local do último evento publicado
+    SELECT 'posicao_do_consumo_igual_ultimo_evento',
            CONCAT(COUNT(*), ' pedidos divergentes'),
            COUNT(*) = 0
-    FROM (SELECT DISTINCT v.id_pedido, v.local_atual
-          FROM silver.vw_pedidos_rastreio v JOIN silver.rastreio_pedidos r USING (id_pedido)
+    FROM (SELECT v.id_pedido, v.local_atual
+          FROM silver.consumo_pedidos v JOIN silver.rastreio_pedidos r USING (id_pedido)
           WHERE r.dado_simulado) v
     JOIN silver.eventos_logisticos e ON e.id_pedido = v.id_pedido AND e.ultimo_evento
     JOIN silver.simulacao_publicada p ON p.cenario = e.cenario AND p.versao = e.versao AND p.escopo = e.escopo
     WHERE NOT (v.local_atual <=> e.local_evento)
 
     UNION ALL
-    -- Views de consumo (IA / portal) sem nenhuma marca de simulação nem termo "simulad" no texto
-    SELECT 'views_de_consumo_sem_marca_de_simulacao',
+    -- Tabelas de consumo (IA / portal) sem nenhuma marca de simulação nem termo "simulad" no texto
+    SELECT 'tabelas_de_consumo_sem_marca_de_simulacao',
            COALESCE(CONCAT_WS(', ', COLLECT_LIST(CONCAT(table_name, '.', column_name))), ''),
            COUNT(*) = 0
     FROM information_schema.columns
     WHERE table_schema = 'silver'
-      AND table_name IN ('vw_pedidos_rastreio', 'vw_eventos_logisticos', 'vw_rastreio_eventos')
+      AND table_name IN ('consumo_pedidos', 'consumo_itens_pedido', 'consumo_eventos_logisticos')
       AND column_name IN ('dado_simulado', 'fonte_evento', 'origem_evento', 'precisao_temporal',
                           'versao_simulacao', 'escopo_simulacao', 'cenario', 'versao', 'escopo',
                           'campo_origem', 'receita_em_risco')
 
     UNION ALL
     SELECT 'textos_de_consumo_sem_termo_simulado',
-           CONCAT(COUNT(*), ' textos'),
+           CONCAT(COUNT(*), ' pedidos'),
            COUNT(*) = 0
-    FROM silver.vw_pedidos_rastreio
-    WHERE LOWER(resumo_rastreio_rag) LIKE '%simulad%' OR LOWER(motivo_ocorrencia) LIKE '%simulad%'
-       OR LOWER(resumo_rastreio_rag) LIKE '%dataco%' OR LOWER(resumo_rastreio_rag) LIKE '%a base %'
+    FROM silver.consumo_pedidos
+    WHERE LOWER(CONCAT_WS(' ', resumo_pedido, motivo_ocorrencia, linha_do_tempo)) RLIKE 'simulad|dataco|a base '
 
     UNION ALL
-    -- Matriz na VIEW (o que o portal e a IA leem):
-    --   Aguardando Liberação / Cancelado -> sem datas de despacho, dias reais, atraso, local, motivo
-    --                                       e sem datas de entrega
-    --   Em Trânsito / Despachado -> despacho previsto e real, atraso no despacho (0/1)
-    --   Em Trânsito -> nunca tem data de entrega simulada
-    SELECT 'view_matriz_situacao_x_datas_e_posicao',
-           CONCAT(COUNT(*), ' itens fora da matriz'),
+    -- Matriz na consumo_pedidos (o que portal e IA leem):
+    --   aguardando / não pago / cancelado -> sem datas de despacho e entrega, atraso, local e motivo
+    --   despachado (em trânsito, entregue, extraviado) -> despacho previsto e real, atraso no despacho
+    --   em trânsito / extraviado -> sem data de entrega realizada; entregue -> com data
+    SELECT 'consumo_matriz_situacao_x_datas_e_posicao',
+           CONCAT(COUNT(*), ' pedidos fora da matriz'),
            COUNT(*) = 0
-    FROM silver.vw_pedidos_rastreio
-    WHERE (situacao_rastreio IN ('Aguardando Liberação', 'Cancelado')
+    FROM silver.consumo_pedidos
+    WHERE (situacao_pedido IN ('Aguardando pagamento', 'Não pago (expirado)', 'Cancelado')
            AND (data_despacho_prevista IS NOT NULL OR data_despacho_real IS NOT NULL
-                OR dias_envio_real IS NOT NULL OR flag_atraso_despacho IS NOT NULL
-                OR local_atual IS NOT NULL OR etapa_atual IS NOT NULL OR motivo_ocorrencia IS NOT NULL
+                OR dias_ate_despacho IS NOT NULL OR flag_atraso_despacho IS NOT NULL
+                OR local_atual IS NOT NULL OR motivo_ocorrencia IS NOT NULL
                 OR data_entrega_prevista IS NOT NULL OR data_entrega_realizada IS NOT NULL))
-       OR (situacao_rastreio IN ('Em Trânsito', 'Despachado')
+       OR (situacao_pedido IN ('Em trânsito', 'Entregue no prazo', 'Entregue com atraso', 'Extraviado', 'Despachado')
            AND (data_despacho_prevista IS NULL OR data_despacho_real IS NULL OR flag_atraso_despacho IS NULL))
-       OR (situacao_rastreio = 'Em Trânsito' AND data_entrega_realizada IS NOT NULL)
-       OR situacao_rastreio NOT IN ('Aguardando Liberação', 'Cancelado', 'Em Trânsito', 'Despachado')
+       OR (situacao_pedido IN ('Em trânsito', 'Extraviado') AND data_entrega_realizada IS NOT NULL)
+       OR (situacao_pedido LIKE 'Entregue%' AND data_entrega_realizada IS NULL)
+
+    UNION ALL
+    -- Data de referência (D) = última transação (maior data entre pedido e despacho), única
+    SELECT 'data_referencia_unica_e_igual_ultima_transacao',
+           CONCAT(MIN(data_referencia_base), ' / ', GREATEST(MAX(data_pedido), MAX(data_envio))),
+           COUNT(DISTINCT data_referencia_base) = 1
+             AND MIN(data_referencia_base) = GREATEST(MAX(data_pedido), MAX(data_envio))
+    FROM silver.pedidos_rastreio
+
+    UNION ALL
+    -- Status de espera: só os últimos 7 dias antes de D ficam "Aguardando pagamento";
+    -- os demais viram "Não pago (expirado)"; nenhum outro status vira aguardando/não pago
+    SELECT 'espera_recente_aguardando_e_antiga_expirada',
+           CONCAT(COUNT(*), ' itens fora'),
+           COUNT(*) = 0
+    FROM silver.pedidos_rastreio
+    WHERE (situacao_rastreio IN ('Aguardando pagamento', 'Não pago (expirado)')
+           AND status_pedido NOT IN ('PENDING', 'PENDING_PAYMENT', 'PAYMENT_REVIEW', 'ON_HOLD'))
+       OR (situacao_rastreio = 'Aguardando pagamento' AND data_pedido < data_referencia_base - INTERVAL 7 DAYS)
+       OR (situacao_rastreio = 'Não pago (expirado)' AND data_pedido >= data_referencia_base - INTERVAL 7 DAYS)
+
+    UNION ALL
+    -- consumo_pedidos: 1 linha por pedido, todos os pedidos, itens somados corretamente
+    SELECT 'consumo_pedidos_um_por_pedido_e_itens_batem',
+           CONCAT(v.n, ' linhas / ', v.d, ' distintos / ', t.n, ' pedidos; itens ', v.q, ' x ', t.q),
+           v.n = v.d AND v.n = t.n AND v.q = t.q
+    FROM (SELECT COUNT(*) n, COUNT(DISTINCT id_pedido) d, SUM(qtd_itens) q FROM silver.consumo_pedidos) v,
+         (SELECT COUNT(DISTINCT id_pedido) n, SUM(quantidade_item) q FROM silver.pedidos_rastreio) t
+
+    UNION ALL
+    SELECT 'consumo_itens_pedido_mesmas_linhas_da_origem',
+           CONCAT(v.n, ' no consumo / ', t.n, ' na tabela'),
+           v.n = t.n
+    FROM (SELECT COUNT(*) n FROM silver.consumo_itens_pedido) v, (SELECT COUNT(*) n FROM silver.pedidos_rastreio) t
+
+    UNION ALL
+    -- Situação única do pedido só com valores do contrato
+    SELECT 'consumo_pedidos_situacao_valida',
+           COALESCE(CONCAT_WS(', ', COLLECT_SET(situacao_pedido)), ''),
+           COUNT(*) = 0
+    FROM silver.consumo_pedidos
+    WHERE situacao_pedido IS NULL OR situacao_pedido NOT IN
+          ('Cancelado', 'Aguardando pagamento', 'Não pago (expirado)', 'Em trânsito',
+           'Entregue no prazo', 'Entregue com atraso', 'Extraviado', 'Despachado')
+
+    UNION ALL
+    -- Tabelas de consumo sem dados internos: PII, lucro/margem e status original (incoerente no tempo)
+    SELECT 'tabelas_de_consumo_sem_dados_internos',
+           COALESCE(CONCAT_WS(', ', COLLECT_LIST(CONCAT(table_name, '.', column_name))), ''),
+           COUNT(*) = 0
+    FROM information_schema.columns
+    WHERE table_schema = 'silver'
+      AND table_name IN ('consumo_pedidos', 'consumo_itens_pedido', 'consumo_eventos_logisticos')
+      AND column_name IN ('nome_cliente', 'lucro_item', 'margem_lucro_item', 'lucro_total_pedido',
+                          'status_pedido', 'status_entrega_original', 'risco_atraso_flag')
+
+    UNION ALL
+    -- Linha do tempo e pedidos filtráveis por cliente (portal mostra só os pedidos do cliente)
+    SELECT 'tabelas_de_consumo_tem_id_cliente',
+           CONCAT(COUNT(*), ' de 3 tabelas com id_cliente'),
+           COUNT(*) = 3
+    FROM information_schema.columns
+    WHERE table_schema = 'silver'
+      AND table_name IN ('consumo_pedidos', 'consumo_itens_pedido', 'consumo_eventos_logisticos')
+      AND column_name = 'id_cliente'
 
     UNION ALL
     -- Toda cidade de destino da Silver tem par no de-para (chave: país original + cidade)
@@ -371,16 +443,16 @@ testes AS (
       ON d.coluna = 'destino_cidade' AND d.contexto = c.destino_pais AND d.valor_original = c.destino_cidade
 
     UNION ALL
-    SELECT 'view_tem_colunas_v3',
+    SELECT 'consumo_pedidos_tem_colunas_do_contrato',
            CONCAT(COUNT(*), ' de 16 colunas encontradas'),
            COUNT(*) = 16
     FROM information_schema.columns
-    WHERE table_schema = 'silver' AND table_name = 'vw_pedidos_rastreio'
-      AND column_name IN ('despacho_no_prazo', 'faixa_atraso_despacho', 'causa_atraso_despacho',
-                          'flag_atraso_despacho', 'dias_atraso_despacho', 'rota_servico',
-                          'data_despacho_prevista', 'data_despacho_real', 'status_prazo_despacho',
-                          'etapa_atual', 'local_atual', 'motivo_ocorrencia', 'situacao_entrega',
-                          'data_entrega_prevista', 'data_entrega_realizada', 'flag_atraso_entrega')
+    WHERE table_schema = 'silver' AND table_name = 'consumo_pedidos'
+      AND column_name IN ('id_pedido', 'id_cliente', 'situacao_pedido', 'data_despacho_prevista',
+                          'data_despacho_real', 'flag_atraso_despacho', 'dias_atraso_despacho',
+                          'causa_atraso_despacho', 'data_entrega_prevista', 'data_entrega_realizada',
+                          'flag_atraso_entrega', 'dias_atraso_entrega', 'local_atual', 'lista_itens',
+                          'linha_do_tempo', 'resumo_pedido')
 )
 SELECT teste, detalhe, CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END AS status
 FROM testes
@@ -445,12 +517,12 @@ HAVING COUNT(*) > 1;
 
 -- 3d. Nenhum "?" de codificação sobrando nos nomes da view (esperado: 0)
 SELECT COUNT(*) AS nomes_com_interrogacao
-FROM silver.vw_pedidos_rastreio
+FROM silver.consumo_pedidos
 WHERE destino_estado LIKE '%?%' OR destino_pais LIKE '%?%' OR origem_cliente_cidade LIKE '%?%';
 
 -- COMMAND ----------
 
--- 3e. Leitura humana: um texto RAG por situação do pedido x entrega simulada, já em pt-BR
-SELECT situacao_rastreio, situacao_entrega, rota_logistica, resumo_rastreio_rag
-FROM silver.vw_pedidos_rastreio
-QUALIFY ROW_NUMBER() OVER (PARTITION BY situacao_rastreio, situacao_entrega ORDER BY id_item_pedido) = 1;
+-- 3e. Leitura humana: um resumo por situação do pedido (o que a IA e o portal recebem)
+SELECT situacao_pedido, qtd_itens, resumo_pedido
+FROM silver.consumo_pedidos
+QUALIFY ROW_NUMBER() OVER (PARTITION BY situacao_pedido ORDER BY id_pedido) = 1;

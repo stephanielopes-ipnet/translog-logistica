@@ -3,9 +3,15 @@
 *.env
 secrets/
 *token*
+CLAUDE.md
+AGENT_RULES.md
+ARCHITECTURE_REVIEW.md
+dashboards/
 
 # Dados (CSV completo do Kaggle não vai para o Git)
 data/raw/
+# Exportação das tabelas de consumo baixada do Databricks (02j)
+data/exportacao/
 # Dados locais da Engenharia de Dados (brutos, de-para, dicionário): nenhum vai para o Git
 
 pipeline/data/

@@ -97,7 +97,7 @@ SELECT
     SUM(risco_atraso_flag)                                                     AS atrasos_via_risco_atraso_flag,
     SUM(CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END) AS atrasos_via_status_original,
     SUM(flag_atraso_despacho)                                                         AS atrasos_via_regra_negocio,
-    SUM(CASE WHEN situacao_rastreio = 'Em Trânsito' AND status_prazo_despacho = 'Atrasado' THEN 1 ELSE 0 END)
+    SUM(CASE WHEN status_pedido = 'PROCESSING' AND status_prazo_despacho = 'Atrasado' THEN 1 ELSE 0 END)
                                                                                AS em_transito_ja_marcados_atrasados
 FROM {TABELA}
 """))
@@ -129,21 +129,6 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY situacao_rastreio ORDER BY id_item_pedid
 """))
 
 # COMMAND ----------
-# I. GEOLOCALIZAÇÃO: pontos de loja válidos para mapa?
-#    Lojas ficam nos EUA/Porto Rico: lat ~17..50, lon ~-160..-64. Fora disso = suspeito.
-display(spark.sql(f"""
-SELECT
-    COUNT(DISTINCT latitude_origem, longitude_origem)                                     AS pontos_de_loja,
-    SUM(CASE WHEN latitude_origem IS NULL OR longitude_origem IS NULL THEN 1 ELSE 0 END)  AS coordenada_nula,
-    SUM(CASE WHEN latitude_origem = 0 AND longitude_origem = 0 THEN 1 ELSE 0 END)         AS coordenada_zero,
-    SUM(CASE WHEN latitude_origem NOT BETWEEN 17 AND 50
-               OR longitude_origem NOT BETWEEN -160 AND -64 THEN 1 ELSE 0 END)            AS fora_eua_porto_rico,
-    MIN(latitude_origem) AS lat_min, MAX(latitude_origem) AS lat_max,
-    MIN(longitude_origem) AS lon_min, MAX(longitude_origem) AS lon_max
-FROM {TABELA}
-"""))
-
-# COMMAND ----------
 # J. INITCAP NAS CIDADES: quantos nomes a padronização alterou (e como)?
 #    Ex.: "McAllen" -> "Mcallen", "Ciudad de México" -> "Ciudad De México".
 display(spark.sql("""
@@ -156,37 +141,40 @@ LIMIT 30
 """))
 
 # COMMAND ----------
-# L. TESTE DE ACEITAÇÃO NA VIEW (o que Fullstack e IA vão fazer de verdade)
-VIEW = "silver.vw_pedidos_rastreio"
+# L. TESTE DE ACEITAÇÃO NAS TABELAS DE CONSUMO (o que Fullstack e IA vão fazer de verdade)
+#    Contrato: silver.consumo_pedidos (IA + portal), silver.consumo_eventos_logisticos e silver.consumo_itens_pedido (portal)
 
-# L1. Fullstack: buscar um pedido em trânsito pelo id (deve trazer os itens com
-#     situação, janela, data prevista e texto RAG)
-display(spark.sql(f"""
-SELECT id_pedido, id_item_pedido, id_cliente, situacao_rastreio, status_prazo_despacho, janela_atraso_despacho,
-       data_pedido, data_despacho_prevista, data_despacho_real, data_entrega_prevista, data_entrega_realizada, situacao_entrega, local_atual, nome_produto, valor_item_pedido, lucro_total_pedido
-FROM {VIEW}
-WHERE id_pedido = (SELECT MIN(id_pedido) FROM {VIEW} WHERE situacao_rastreio = 'Em Trânsito')
+# L1. IA / portal: um pedido em trânsito pelo id (situação, prazo, atraso, itens, linha do tempo, texto)
+display(spark.sql("""
+SELECT id_pedido, id_cliente, situacao_pedido, data_entrega_prevista, flag_atraso_entrega, dias_atraso_entrega,
+       local_atual, lista_itens, linha_do_tempo, resumo_pedido
+FROM silver.consumo_pedidos
+WHERE id_pedido = (SELECT MIN(id_pedido) FROM silver.consumo_pedidos WHERE situacao_pedido = 'Em trânsito')
 """))
 
-# L2. Fullstack: buscar todos os pedidos de um cliente pelo id_cliente
-display(spark.sql(f"""
-SELECT id_pedido, data_pedido, situacao_rastreio, janela_atraso_despacho, COUNT(*) AS itens
-FROM {VIEW}
-WHERE id_cliente = (SELECT MIN(id_cliente) FROM {VIEW})
-GROUP BY ALL
-ORDER BY data_pedido
+# L2. Portal: todos os pedidos de um cliente + itens + linha do tempo (joins por id_pedido)
+display(spark.sql("""
+SELECT p.id_pedido, p.data_pedido, p.situacao_pedido, i.nome_produto, i.quantidade_item
+FROM silver.consumo_pedidos p JOIN silver.consumo_itens_pedido i USING (id_pedido)
+WHERE p.id_cliente = (SELECT MIN(id_cliente) FROM silver.consumo_pedidos)
+ORDER BY p.data_pedido
+"""))
+display(spark.sql("""
+SELECT * FROM silver.consumo_eventos_logisticos
+WHERE id_pedido = (SELECT MIN(id_pedido) FROM silver.consumo_pedidos WHERE situacao_pedido = 'Em trânsito')
+ORDER BY sequencia
 """))
 
-# L3. IA / BI: KPI oficial de atraso. Esperado: 57.810 / 101.007 = 57,23%
-display(spark.sql(f"""
-SELECT SUM(flag_atraso_despacho)   AS atrasados,
-       COUNT(flag_atraso_despacho) AS avaliados,
+# L3. IA / BI: KPI oficial de atraso no despacho (por pedido). Esperado: 21.127 / 36.866 = 57,3%
+display(spark.sql("""
+SELECT SUM(flag_atraso_despacho) AS atrasados, COUNT(flag_atraso_despacho) AS avaliados,
        ROUND(100.0 * SUM(flag_atraso_despacho) / COUNT(flag_atraso_despacho), 2) AS pct_atraso
-FROM {VIEW}
+FROM silver.consumo_pedidos
 """))
 
-# L4. Governança: colunas expostas na view (conferir que não há PII nem linhagem)
-display(spark.sql(f"DESCRIBE {VIEW}"))
+# L4. Governança: colunas expostas (conferir que não há PII, lucro nem marca de simulação)
+for v in ["silver.consumo_pedidos", "silver.consumo_itens_pedido", "silver.consumo_eventos_logisticos"]:
+    display(spark.sql(f"DESCRIBE {v}"))
 
 # COMMAND ----------
 # K. DEDUP DETERMINÍSTICA: há empates (mesmo item, mesmo dt_ingestao_bronze)?

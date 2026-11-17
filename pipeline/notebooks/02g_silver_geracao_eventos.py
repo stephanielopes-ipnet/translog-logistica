@@ -20,7 +20,11 @@
 #   - Extraviado (20%, sorteio independente)  -> jornada para numa etapa + EXTRAVIO_CONFIRMADO
 #   => toda entrega atrasada vem de um despacho atrasado: o despacho é a etapa crítica.
 #   A fração recuperada é CALIBRADA na base inteira para que o atraso feche em 20%.
-#   PROCESSING (em trânsito): jornada parcial até uma etapa sorteada; sem desfecho.
+#   FOTO EM D (data_referencia_base, 02a = última transação da base): a jornada de TODO pedido
+#   despachado (COMPLETE, CLOSED, PROCESSING) é gerada inteira e todo evento depois de D é
+#   cortado. Se o desfecho (entrega ou confirmação de extravio) cai depois de D, o pedido
+#   aparece "Em trânsito" em D, na posição do último evento até D (posição pelo tempo, sem
+#   sorteio). Nenhuma data simulada passa de D.
 #
 # Saídas (gravação idempotente por fatia versão + escopo):
 #   silver.eventos_logisticos             1 linha por evento do pedido
@@ -131,12 +135,12 @@ recuperavel = atrasado & ((c("transito_padrao_dias") - c("dias_atraso_despacho")
 irrecuperavel = atrasado & ~recuperavel
 
 df_calibracao = (
-    df_pedidos_base.where("grupo_status = 'concluido'")
+    df_pedidos_base.where("grupo_status = 'despachado'")
     .withColumn("transito_padrao_dias", transito_padrao())
     .agg(F.avg(irrecuperavel.cast("double")).alias("share_irrecuperavel"),
          F.avg(recuperavel.cast("double")).alias("share_recuperavel"),
          F.avg(atrasado.cast("double")).alias("share_despacho_atrasado"),
-         F.count("*").alias("concluidos_na_base"))
+         F.count("*").alias("despachados_na_base"))
     .withColumn("p_nao_recuperado",
                 F.greatest(F.lit(0.0), F.least(F.lit(1.0),
                     (F.lit(PCT_ATRASO / (100.0 - PCT_EXTRAVIO)) - c("share_irrecuperavel")) / c("share_recuperavel"))))
@@ -149,47 +153,42 @@ display(df_calibracao)
 # 3. Resultado da entrega por pedido (determinístico)
 # -----------------------------------------------------------------------------
 u_recup = sorteio("RECUPERACAO", 10000) / 10000.0
-resultado = (
-    F.when(c("grupo_status") == "em_transito", "Em trânsito")
-    .when(c("grupo_status") != "concluido", F.lit(None))
+resultado_planejado = (
+    F.when(c("grupo_status") != "despachado", F.lit(None))
     .when(sorteio("EXTRAVIO") < PCT_EXTRAVIO, "Extraviado")
     .when(~atrasado, "No prazo")
     .when(irrecuperavel | (u_recup < c("p_nao_recuperado")), "Não recuperou o atraso do despacho")
     .otherwise("Recuperou o atraso do despacho")
 )
+ENTREGUES = ["No prazo", "Recuperou o atraso do despacho", "Não recuperou o atraso do despacho"]
+plan_entregue = c("resultado_planejado").isin(*ENTREGUES)
 
-# Em trânsito: posição = etapa sorteada (uniforme) entre os eventos da rota, exceto ENTREGUE
-rota_eventos = F.filter(F.array(
-    F.lit("COLETA_GATEWAY"),
-    F.when(c("aereo"), F.lit("PARTIDA_VOO")),
-    F.when(c("internacional"), F.lit("CHEGADA_ALFANDEGA")),
-    F.when(c("internacional"), F.lit("LIBERACAO_ALFANDEGA")),
-    F.lit("CHEGADA_CD"),
-    F.when(c("tem_armazem"), F.lit("CHEGADA_ARMAZEM")),
-    F.lit("SAIU_PARA_ENTREGA"),
-), lambda x: x.isNotNull())
-posicao_em_transito = F.element_at(rota_eventos, (F.pmod(F.xxhash64(c("id_pedido"), F.lit("POSICAO")),
-                                                         F.size(rota_eventos)) + 1).cast("int"))
-
-entregue = c("resultado_transporte").isin("No prazo", "Recuperou o atraso do despacho",
-                                          "Não recuperou o atraso do despacho")
 df_ped = (
     df_pedidos_entrada.crossJoin(df_calibracao.select("p_nao_recuperado"))
     .withColumn("cenario", F.lit(CENARIO))
     .withColumn("transito_padrao_dias", transito_padrao())
-    .withColumn("resultado_transporte", resultado)
-    .withColumn("transito_real_dias",
-                F.when(c("resultado_transporte") == "Recuperou o atraso do despacho",
+    .withColumn("resultado_planejado", resultado_planejado)
+    .withColumn("transito_plan_dias",
+                F.when(c("resultado_planejado") == "Recuperou o atraso do despacho",
                        c("transito_padrao_dias") - c("dias_atraso_despacho"))
-                .when(entregue, c("transito_padrao_dias")).cast("int"))
-    .withColumn("codigo_etapa_extravio", F.when(c("resultado_transporte") == "Extraviado", etapa_extravio()))
-    # Última ordem de evento mantida na jornada
+                .when(plan_entregue, c("transito_padrao_dias")).cast("int"))
+    .withColumn("codigo_etapa_extravio", F.when(c("resultado_planejado") == "Extraviado", etapa_extravio()))
+    # Desfecho planejado (entrega ou confirmação do extravio) e a foto em D
+    .withColumn("ts_desfecho_planejado",
+                F.when(plan_entregue, F.unix_timestamp("data_envio") + c("transito_plan_dias") * DIA)
+                .when(c("resultado_planejado") == "Extraviado",
+                      F.unix_timestamp("data_envio") + (c("transito_padrao_dias") + DIAS_PARA_CONFIRMAR_EXTRAVIO) * DIA))
+    .withColumn("em_transito_em_d", c("despachado") & (c("ts_desfecho_planejado") > F.unix_timestamp("data_referencia_base")))
+    .withColumn("resultado_transporte",
+                F.when(c("em_transito_em_d"), F.lit("Em trânsito")).otherwise(c("resultado_planejado")))
+    # Última ordem de evento da jornada planejada (o corte em D vem depois, pelo horário)
     .withColumn("corte_ordem",
-                F.when(entregue, F.lit(100))
-                .when(c("resultado_transporte") == "Extraviado", ORDEM[c("codigo_etapa_extravio")])
-                .when(c("resultado_transporte") == "Em trânsito", ORDEM[posicao_em_transito])
+                F.when(plan_entregue, F.lit(100))
+                .when(c("resultado_planejado") == "Extraviado", ORDEM[c("codigo_etapa_extravio")])
                 .otherwise(F.lit(10)))
 )
+
+entregue = c("resultado_transporte").isin(*ENTREGUES)
 
 # COMMAND ----------
 
@@ -204,7 +203,7 @@ aplica = (
     .when(cod == "PARTIDA_VOO", desp & c("aereo"))
     .when(cod.isin("CHEGADA_ALFANDEGA", "LIBERACAO_ALFANDEGA"), desp & c("internacional"))
     .when(cod == "CHEGADA_ARMAZEM", desp & c("tem_armazem"))
-    .when(cod == "EXTRAVIO_CONFIRMADO", c("resultado_transporte") == "Extraviado")
+    .when(cod == "EXTRAVIO_CONFIRMADO", c("resultado_planejado") == "Extraviado")
     .otherwise(F.lit(False))
 )
 especial = cod.isin(*ESPECIAIS)
@@ -242,10 +241,10 @@ u = F.pmod(F.xxhash64(c("id_pedido"), cod, F.lit(CENARIO)), F.lit(10000)) / 1000
 ev = ev.withColumn("_w", F.when((c("ordem") >= 30) & ~especial, c("peso") * (0.7 + 0.6 * u)).otherwise(0.0))
 
 t_envio = F.unix_timestamp("data_envio")
-janela_s = F.coalesce(c("transito_real_dias"), c("transito_padrao_dias")) * DIA
+janela_s = F.coalesce(c("transito_plan_dias"), c("transito_padrao_dias")) * DIA
 total_w = F.sum("_w").over(por_pedido)
 ts_seg = (
-    F.when(cod == "ENTREGUE", t_envio + c("transito_real_dias") * DIA)
+    F.when(cod == "ENTREGUE", t_envio + c("transito_plan_dias") * DIA)
     .when(cod == "EXTRAVIO_CONFIRMADO", t_envio + (c("transito_padrao_dias") + DIAS_PARA_CONFIRMAR_EXTRAVIO) * DIA)
     # denominador NULL quando 0 (pedido sem jornada): evita divisão por zero no modo ANSI
     .otherwise(t_envio + F.sum("_w").over(acumulado) / F.when(total_w > 0, total_w) * janela_s)
@@ -257,8 +256,9 @@ ev = ev.withColumn(
     .otherwise(F.date_trunc("minute", F.timestamp_seconds(ts_seg)))
 )
 
-# Corte da jornada conforme o resultado (os pesos acima usaram a jornada completa)
-ev = ev.where(especial | (c("ordem") <= c("corte_ordem")))
+# Corte da jornada conforme o resultado planejado (os pesos usaram a jornada completa)
+# e FOTO EM D: nenhum evento depois da data de referência da base.
+ev = ev.where((especial | (c("ordem") <= c("corte_ordem"))) & (c("ts_evento") <= c("data_referencia_base")))
 
 # COMMAND ----------
 
@@ -313,6 +313,7 @@ problema = (
     .when(c("_ts_anterior").isNotNull() & (c("ts_evento") < c("_ts_anterior")), F.lit("ORDEM_TEMPORAL_INVALIDA"))
     .when(c("hub_esperado") & c("id_hub").isNull(), F.lit("HUB_NAO_ENCONTRADO"))
     .when(c("dado_simulado") & (c("ts_evento") < c("data_envio")), F.lit("ANTES_DO_DESPACHO"))
+    .when(c("ts_evento") > c("data_referencia_base"), F.lit("DEPOIS_DA_DATA_DE_REFERENCIA"))
 )
 ev = ev.withColumn("_problema", problema)
 
@@ -358,8 +359,10 @@ df_eventos = (
 #    data_entrega_prevista  = data_despacho_prevista + trânsito padrão
 #    data_entrega_realizada = data_despacho_real + trânsito real
 # -----------------------------------------------------------------------------
+data_ref = F.to_date("data_referencia_base")
 df_entregas = (
     df_ped.join(quarentena_geracao.select("id_pedido"), "id_pedido", "left_anti")
+    .withColumn("transito_real_dias", F.when(entregue, c("transito_plan_dias")))
     .withColumn("data_despacho_real", F.when(c("despachado"), F.to_date("data_envio")))
     .withColumn("data_entrega_prevista",
                 F.when(c("despachado"), F.expr("date_add(to_date(data_pedido), dias_envio_programado + transito_padrao_dias)")))
@@ -367,21 +370,29 @@ df_entregas = (
                 F.when(entregue, F.expr("date_add(to_date(data_envio), transito_real_dias)")))
     .withColumn("dias_recuperados_transporte",
                 F.when(entregue, c("transito_padrao_dias") - c("transito_real_dias")))
-    .withColumn("dias_atraso_entrega", F.when(entregue, F.datediff("data_entrega_realizada", "data_entrega_prevista")))
-    .withColumn("flag_atraso_entrega", F.when(entregue, (c("dias_atraso_entrega") > 0).cast("int")))
+    # Entregue: realizada - prevista. Em trânsito em D: atraso acumulado até D (0 se ainda no prazo).
+    .withColumn("dias_atraso_entrega",
+                F.when(entregue, F.datediff("data_entrega_realizada", "data_entrega_prevista"))
+                .when(c("resultado_transporte") == "Em trânsito",
+                      F.greatest(F.lit(0), F.datediff(data_ref, "data_entrega_prevista"))))
+    .withColumn("flag_atraso_entrega",
+                F.when(entregue | (c("resultado_transporte") == "Em trânsito"),
+                       (c("dias_atraso_entrega") > 0).cast("int")))
     .withColumn("causa_atraso_entrega",
-                F.when(~entregue, F.lit(None))
+                F.when(c("flag_atraso_entrega").isNull(), F.lit(None))
                 .when(c("flag_atraso_entrega") == 0, "Sem atraso")
+                .when(c("resultado_planejado") == "Extraviado", "Volume sem atualização de rastreio")
                 .otherwise("Atraso no despacho não recuperado no transporte"))
     .withColumn("situacao_entrega",
                 F.when(c("grupo_status") == "cancelado", "Cancelado")
-                .when(c("grupo_status") == "aguardando", "Não despachado")
+                .when(c("grupo_status") == "aguardando", "Aguardando pagamento")
+                .when(c("grupo_status") == "nao_pago", "Não pago (expirado)")
                 .when(c("resultado_transporte") == "Em trânsito", "Em trânsito")
                 .when(c("resultado_transporte") == "Extraviado", "Extraviado")
                 .when(c("flag_atraso_entrega") == 1, "Entregue com atraso")
                 .otherwise("Entregue no prazo"))
-    .withColumn("etapa_extravio", ETAPA_TXT[ETAPA[etapa_cod]])
-    .withColumn("motivo_extravio", MOTIVO[etapa_cod])
+    .withColumn("etapa_extravio", F.when(c("resultado_transporte") == "Extraviado", ETAPA_TXT[ETAPA[etapa_cod]]))
+    .withColumn("motivo_extravio", F.when(c("resultado_transporte") == "Extraviado", MOTIVO[etapa_cod]))
     .select(
         "cenario", F.lit(VERSAO).alias("versao"), F.lit(ESCOPO).alias("escopo"),
         "id_pedido", "grupo_status", "status_pedido", "tipo_rota", "modal_transporte", "modo_envio",
@@ -389,6 +400,7 @@ df_entregas = (
         "resultado_transporte", "etapa_extravio", "motivo_extravio",
         "data_despacho_real", "data_entrega_prevista", "data_entrega_realizada",
         "dias_atraso_entrega", "flag_atraso_entrega", "causa_atraso_entrega", "situacao_entrega",
+        c("data_referencia_base").cast("date").alias("data_referencia_base"),
         F.lit(True).alias("dado_simulado"), agora.alias("dt_processamento"),
     )
 )
@@ -425,7 +437,7 @@ CREATE TABLE IF NOT EXISTS silver.eventos_logisticos_quarentena (
 spark.sql("""
 CREATE TABLE IF NOT EXISTS silver.entregas_simuladas (
     cenario STRING, versao STRING, escopo STRING, id_pedido INT,
-    grupo_status STRING COMMENT 'concluido, em_transito, aguardando, cancelado (base real)',
+    grupo_status STRING COMMENT 'despachado, aguardando, nao_pago, cancelado (situação em D)',
     status_pedido STRING, tipo_rota STRING, modal_transporte STRING, modo_envio STRING, mercado_logistico STRING,
     transito_padrao_dias INT COMMENT 'Parâmetro: dias do despacho até a entrega pela rota/modal',
     transito_real_dias INT COMMENT 'Trânsito usado (menor que o padrão quando recuperou atraso do despacho)',
@@ -435,7 +447,9 @@ CREATE TABLE IF NOT EXISTS silver.entregas_simuladas (
     data_despacho_real DATE COMMENT 'Shipping date (real)',
     data_entrega_prevista DATE COMMENT 'data_despacho_prevista + trânsito padrão',
     data_entrega_realizada DATE COMMENT 'data_despacho_real + trânsito real',
-    dias_atraso_entrega INT, flag_atraso_entrega INT, causa_atraso_entrega STRING, situacao_entrega STRING,
+    dias_atraso_entrega INT COMMENT 'Entregue: realizada - prevista. Em trânsito: atraso acumulado até D',
+    flag_atraso_entrega INT, causa_atraso_entrega STRING, situacao_entrega STRING,
+    data_referencia_base DATE COMMENT 'Foto da base: última transação registrada',
     dado_simulado BOOLEAN, dt_processamento TIMESTAMP
 ) COMMENT 'Silver: entrega SIMULADA por pedido (60% no prazo / 20% atraso / 20% extravio). Grão = pedido por versão/escopo'
 """)

@@ -10,6 +10,10 @@
 --   origem_cliente_cidade, origem_cliente_estado, origem_cliente_pais.
 -- contexto = país ORIGINAL do DataCo (usado em destino_estado e destino_cidade, porque o
 --   mesmo nome existe em países diferentes). valor_pt vazio = mantém o original.
+-- modo_envio: 4 linhas fixas neste notebook (não vêm do CSV). O nome original ("Same Day",
+--   "First Class") sugere prazo de ENTREGA, mas o DataCo só mede o DESPACHO (doc 04); o rótulo
+--   novo deixa isso explícito. Aplicado só nas saídas (consumo_* e Gold), sem mudar o nome da
+--   coluna. As tabelas internas guardam o original, porque as regras da simulação dependem dele.
 -- Ordem de execução: 01 -> 01b -> 02a -> 02d -> 02e -> 02b -> 02c
 -- =============================================================================
 
@@ -27,13 +31,21 @@ FROM read_files(
     header => true,
     inferSchema => false,
     encoding => 'UTF-8'
-);
+)
+UNION ALL
+SELECT coluna, CAST(NULL AS STRING), valor_original, valor_pt
+FROM VALUES
+    ('modo_envio', 'Same Day',       'Expresso (despacho no mesmo dia)'),
+    ('modo_envio', 'First Class',    'Prioritário (despacho em 1 dia)'),
+    ('modo_envio', 'Second Class',   'Rápido (despacho em 2 dias)'),
+    ('modo_envio', 'Standard Class', 'Padrão (despacho em 4 dias)')
+    AS m(coluna, valor_original, valor_pt);
 
 -- COMMAND ----------
 
 -- Conferência: linhas por coluna (esperado: destino_cidade 3665, destino_estado 1117,
 -- origem_cliente_cidade 562, destino_pais 164, origem_cliente_estado 44,
--- destino_regiao 23, origem_cliente_pais 2; total 5577)
+-- destino_regiao 23, modo_envio 4, origem_cliente_pais 2; total 5581)
 SELECT coluna, COUNT(*) AS linhas
 FROM silver.dim_traducao
 GROUP BY coluna
