@@ -32,6 +32,14 @@ Decidido em 16/11: a fonte é `workspace.silver.consumo_pedidos` + `consumo_iten
 
 - [x] **Simplificação antes do code freeze**: barra de protótipo removida (`features/dev-bar/`, presets por URL e estados forçados; `app.tsx` de 423 para ~280 linhas; a banca não vê mais a barra); troca de pedido no chat fixada em "divisor" (a conversa continua, com `Alternado para o pedido #N`); `radix-ui` e `class-variance-authority` (sem uso) removidos, com ~1.780 linhas a menos no `pnpm-lock.yaml`; código morto (`SHIPPING_MODE_SLA`, `formatDelayLabel`) removido; `enabled` dos hooks de consulta (só a barra usava) removido; menções a `prototipos/` (pasta removida pelo Matheus) atualizadas nos docs, no `biome.json` e no `.dockerignore`; `node_modules` reinstalado do zero (sem as sobras do `npm i @databricks/sql`).
 
+## Fase 4: agente de IA do Marco integrado (17/11)
+
+Código oficial de `agent/` (não alterado), em Docker; toda a configuração para o portal fica em `portal/`.
+
+- [x] **1. Agente em Docker a partir de `agent/`**: `agent.Dockerfile` (contexto `../agent`, `python:3.12.16-slim-trixie`, lock sem `msvc_runtime` filtrado no build, `PYTHONPATH=/app/src`, usuário `agente`, `adk api_server --no_use_local_storage`, encerra com "ERRO: falta GOOGLE_API_KEY" se a chave estiver vazia) e `agent.Dockerfile.dockerignore` (sem `.env`, `.venv`, `.state`, `.cache`, `data`); `config/agente-mapa-colunas.json` (8 campos ← `consumo_pedidos`, nunca `status_pedido`); `docker-compose.agente.yml` (serviço `agent` com `env_file: ../agent/.env` obrigatório, `TRANSLOG_*` → `/data/consumo_pedidos.csv` e `/config/agente-mapa-colunas.json`, volumes somente leitura, healthcheck em `/list-apps`, porta só em `127.0.0.1:8001`; API com `AGENT=adk`, `AGENT_URL=http://agent:8001` e `depends_on: service_healthy`); `pnpm agent:up` / `pnpm agent:down`. Resultado (17/11, sem chamar o Gemini): build ok (contexto de 935 B, imagem ~900 MB, Python 3.12.16, ADK 2.14.1); nenhum `.env` na imagem e chave ausente do `inspect`, `history` e log; sem `agent/.env` o compose recusa subir, com chave vazia o container sai com a mensagem; `healthy` em 7 s; `/list-apps` `200`; sessão `200` e de novo `409`; `/run` em sessão inexistente `404`; `consultar_pedido('76902')` no container = `found` (Em trânsito, despacho 1 dia atrasado, First Class), em 3,3 s.
+- [ ] **2. Portal + agente juntos e documentação**: combinações `pnpm dev` + agente, compose com CSVs + agente e com Databricks; revisão do `adk-agent.ts`; README, `docs/backend.md`, `CLAUDE.md`, `.env.example`, `pendencias.md`.
+- [ ] **3. Verificação de ponta a ponta e limpeza**: perguntas reais pela API e pela tela, roteiro da banca em `mock`; remoção de `_contexto/teste-agente/`, `setup.sh`, container e imagem de teste.
+
 ## Próximas fases (fora desta etapa)
 
 - [ ] **Agente no Docker Compose**: depende do Dockerfile do agente na `main` (Marco).

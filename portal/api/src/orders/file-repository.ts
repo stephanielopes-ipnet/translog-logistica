@@ -54,19 +54,20 @@ export async function loadFileRepository(dir: string, log: LoadLogger): Promise<
     open: () => createReadStream(files[table]),
   });
   try {
-    return await loadConsumoRepository(
+    const orders = await loadConsumoOrders(
       { orders: source("orders"), items: source("items"), events: source("events") },
       log,
       { dataDir: dir },
     );
+    return createInMemoryRepository(orders);
   } catch (error) {
     throw new Error(`Não foi possível ler DATA_DIR (${dir}): ${describeError(error)}`);
   }
 }
 
 /**
- * Carga comum às fontes em CSV: lê as três tabelas em streaming, uma de cada vez, e mantém os
- * pedidos em memória (`Map` por número do pedido).
+ * Carga comum às fontes em CSV: lê as três tabelas em streaming, uma de cada vez, e devolve os
+ * pedidos convertidos (`Map` por número do pedido).
  *
  * - Só as colunas de `READ_COLUMNS` são copiadas de cada registro; as proibidas (dados do
  *   cliente, preço, desconto etc.) são descartadas ali mesmo, antes de agrupar ou converter.
@@ -76,11 +77,11 @@ export async function loadFileRepository(dir: string, log: LoadLogger): Promise<
  * - `logContext` entra no log final (ex.: `{ dataDir }`), junto com pedidos, linhas
  *   inválidas e tempo.
  */
-export async function loadConsumoRepository(
+export async function loadConsumoOrders(
   sources: ConsumoSources,
   log: LoadLogger,
   logContext: object = {},
-): Promise<OrderRepository> {
+): Promise<Map<number, Order>> {
   const startedAt = performance.now();
   const strings: StringPool = new Map();
   const intern = (text: string) => internText(strings, text);
@@ -135,7 +136,7 @@ export async function loadConsumoRepository(
 
   const durationMs = Math.round(performance.now() - startedAt);
   log.info({ ...logContext, orders: orders.size, invalidRows, durationMs }, "Pedidos carregados");
-  return createInMemoryRepository(orders);
+  return orders;
 
   /** Itens ou eventos agrupados por número do pedido. */
   async function readChildren<Column extends string>(

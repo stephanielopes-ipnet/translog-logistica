@@ -13,7 +13,9 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "export:dados": "pnpm --filter @translog/api export:dados"
+    "export:dados": "pnpm --filter @translog/api export:dados",
+    "agent:up": "docker compose -f docker-compose.yml -f docker-compose.agente.yml up -d --build --wait agent",
+    "agent:down": "docker compose -f docker-compose.yml -f docker-compose.agente.yml rm --stop --force agent"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7"

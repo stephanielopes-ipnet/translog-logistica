@@ -3,8 +3,9 @@ import { z } from "zod";
 
 // Cliente mínimo da SQL Statement Execution API do Databricks, com `fetch` nativo:
 // POST /api/2.0/sql/statements → espera o estado SUCCEEDED → baixa os pedaços em CSV pelos
-// links pré-assinados (EXTERNAL_LINKS). O token só vai no header das chamadas ao workspace:
-// nunca nos links pré-assinados, nas mensagens de erro ou no log.
+// links pré-assinados (EXTERNAL_LINKS). E a versão de cada tabela pela API do Unity Catalog
+// (sem usar o warehouse). O token só vai no header das chamadas ao workspace: nunca nos links
+// pré-assinados, nas mensagens de erro ou no log.
 
 export interface DatabricksClientOptions {
   /** `https://<host>` do workspace (nos testes, o servidor falso). Sem barra no fim. */
@@ -31,6 +32,11 @@ export interface CsvResult {
 export interface DatabricksClient {
   /** Executa a consulta e devolve o resultado em CSV. Erros em pt-BR, com o que fazer. */
   queryCsv(statement: string): Promise<CsvResult>;
+  /**
+   * Versão atual da tabela (`catalogo.schema.tabela`), como texto opaco: muda a cada escrita.
+   * Vem do Unity Catalog em ~200 ms, sem acordar o warehouse.
+   */
+  tableVersion(fullName: string): Promise<string>;
 }
 
 /** Erro do Databricks com a orientação para quem opera; nunca contém o token. */
@@ -69,6 +75,18 @@ const statementSchema = z.object({
 type Statement = z.infer<typeof statementSchema>;
 
 const chunkSchema = z.object({ external_links: z.array(externalLinkSchema).optional() });
+
+/**
+ * Tabela no Unity Catalog. Em tabela Delta gerenciada, `delta.lastUpdateVersion` e
+ * `delta.lastCommitTimestamp` acompanham cada escrita (conferido em 17/11 contra o
+ * `DESCRIBE HISTORY`). O `updated_at` também muda com comentário ou permissão, então só
+ * entra quando as propriedades Delta faltam. O `table_id` muda num DROP + CREATE.
+ */
+const tableInfoSchema = z.object({
+  table_id: z.string().optional(),
+  updated_at: z.number().optional(),
+  properties: z.record(z.string(), z.string()).optional(),
+});
 
 const RUNNING_STATES = new Set(["PENDING", "RUNNING"]);
 
@@ -208,6 +226,18 @@ export function createDatabricksClient({
         totalRows: current.manifest?.total_row_count ?? 0,
         chunks: () => downloadChunks(firstLinks, columns.join(",")),
       };
+    },
+
+    async tableVersion(fullName) {
+      const info = tableInfoSchema.parse(
+        await callApi("GET", `/api/2.1/unity-catalog/tables/${encodeURIComponent(fullName)}`),
+      );
+      const version = info.properties?.["delta.lastUpdateVersion"];
+      const commit = info.properties?.["delta.lastCommitTimestamp"];
+      const id = info.table_id ?? "";
+      return version !== undefined && commit !== undefined
+        ? `${id}@${version}@${commit}`
+        : `${id}@${info.updated_at ?? ""}`;
     },
   };
 
