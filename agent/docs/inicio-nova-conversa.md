@@ -17,6 +17,7 @@ Estado consolidado em **17/11/2026**. Ler este arquivo junto de `AGENTS.md` e `A
 - Checkout do repositório do grupo: `C:\Users\marco.leal_ipnet\Documents\Codex\translog-logistica`, IA em `agent/`.
 - Repositório único: `stephanielopes-ipnet/translog-logistica`, conta `Marco-Leal96`.
 - Branch: `feat/agente-silver-v2-rag`; [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32), rascunho no último estado conferido. PR #30 já integrado. Conferir remoto antes de agir; não criar PR duplicado ou fazer merge por inferência.
+- Versão funcional consolidada publicada em `fdd5f31` em 17/11; FAQ completa, atendimento e guias de testes já sincronizados. Descrição do PR atualizada e 51 testes passaram também no destino. Não repetir a publicação sem novas mudanças; os registros posteriores de documentação podem acrescentar commits ao mesmo PR.
 - Marco autorizou manter `AGENTS.md`, `Agentes.md`, documentação e GitHub atualizados com alterações necessárias ao projeto, sem confirmações repetidas para commits/push/PR dentro desse escopo. Não publicar segredos, dados privados, caches, índices ou ambiente virtual.
 - Escritas pelo conector GitHub retornaram 403; Git local já autenticado foi usado para push. PR criado pelo navegador e verificado pelo conector. Não trocar de conta ou criar remoto alternativo por isso.
 

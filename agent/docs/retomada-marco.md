@@ -2,6 +2,8 @@
 
 ## Ponto de entrada consolidado e autorização permanente — 17/11
 
+Publicação desta consolidação concluída: código/FAQ/guias em `fdd5f31`, PR #32 atualizado em rascunho sem merge; 51 testes passaram no destino. A descrição agora reflete FAQ fechada, atendimento sem rodapés, localização e autorização permanente. Não usar o texto anterior do PR ou tratar ajustes recentes como ainda não publicados.
+
 Para uma conversa nova, começar por **[inicio-nova-conversa.md](inicio-nova-conversa.md)** e ler `AGENTS.md`/`Agentes.md`. Os arquivos de instruções foram consolidados para remover decisões antigas que contradiziam o estado atual. O histórico abaixo permanece datado e não deve reabrir FAQ, escolha da fonte ou instruções de redação revogadas.
 
 Marco autorizou expressamente manter ambos os arquivos de orientação atualizados e publicar no GitHub as mudanças necessárias ao projeto sem confirmação repetida para commits/push/PR dentro desse escopo. Repositório e conta permanecem os mesmos; não inclui segredos, dados privados, alterações alheias ou merge/deploy por inferência. O pacote desta atualização sincroniza FAQ fechada de 18 trechos, atendimento natural, ausência de rodapés, evidência de localização, 51 testes e guia de casos no PR #32. Conferir estado remoto antes de novas publicações.

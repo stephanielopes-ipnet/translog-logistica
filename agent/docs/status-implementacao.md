@@ -4,6 +4,8 @@ Atualização documental: 17/11/2026. Os registros datados abaixo preservam o hi
 
 ## Consolidação de contexto e sincronização da versão atual — 17/11
 
+**Publicação concluída e conferida:** versão funcional consolidada em `fdd5f31ea1189ff60afd1b58d0b1e6048972099e`, no mesmo [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32), rascunho e sem merge. Título/descrição atualizados para FAQ fechada de 18 trechos, atendimento para apresentação e nova retomada. **51 testes passaram no destino, 10 avisos, em 45,55 s**. Conector de escrita retornou 403 e a interface de edição do navegador ficou indisponível; a descrição foi atualizada via API oficial com autenticação do helper Git somente em memória, sem exibir/gravar credenciais. Push e leitura do PR confirmados. Não houve inferência generativa nesta etapa.
+
 Marco autorizou manter instruções e GitHub atualizados no escopo necessário do projeto. `AGENTS.md` e `Agentes.md` consolidados: fonte Databricks já alinhada, FAQ fechada com 18 trechos, atendimento natural e fontes apenas nos metadados, evidência de localização e permissões de manutenção. Novo ponto de entrada: [inicio-nova-conversa.md](inicio-nova-conversa.md), com mensagem pronta, pastas e próximo aceite. Histórico anterior preservado em registros datados; não reutilizar instruções revogadas. Sincronização desta revisão no mesmo PR #32, sem merge, com código/testes/FAQ/guias e sem credenciais ou CSVs privados. Conferir o resultado remoto registrado ao final da publicação; preparação não equivale a push concluído.
 ## Guia de perguntas, continuidade e apresentação salvo — 17/11
 
