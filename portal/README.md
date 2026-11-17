@@ -45,7 +45,7 @@ A fonte dos dados é escolhida no arquivo `portal/.env` (copie de `.env.example`
 |---|---|---|
 | `fixtures` (padrão) | 9 pedidos de exemplo que vêm no código | Desenvolver a tela, testar sem nada instalado |
 | `file` | as 3 tabelas em CSV na pasta `portal/dados/` | **Plano B da banca**: funciona sem internet e sem Databricks |
-| `databricks` | as 3 tabelas direto do Databricks | A demonstração "oficial", com dados ao vivo |
+| `databricks` | as 3 tabelas direto do Databricks | A demonstração "oficial", lendo da fonte do time de dados |
 
 ### Com os exemplos (sem configurar nada)
 
@@ -91,6 +91,8 @@ Com o Databricks, as credenciais saem do `portal/.env` na hora de ligar o contai
 
 - `AGENT=mock` (padrão): assistente **simulado**, com respostas prontas a partir dos dados do pedido. Funciona sempre, sem IA, e é o plano B da banca.
 - `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001`: o **agente de IA do Marco**, que precisa estar ligado.
+
+Ao abrir outro pedido, a conversa continua, com um aviso "Alternado para o pedido #N" separando os assuntos. O botão "Nova conversa" limpa tudo e começa do zero.
 
 O nome do assistente ("Assistente TransLog") ainda não foi confirmado pelo grupo; muda num lugar só.
 
