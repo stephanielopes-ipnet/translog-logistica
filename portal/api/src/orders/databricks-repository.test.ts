@@ -1,11 +1,18 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { orderSchema } from "@translog/contracts";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { z } from "zod";
 import { loadConfig } from "../config.ts";
 import { type FakeDatabricksOptions, startFakeDatabricks } from "../testing/fake-databricks.ts";
+import { tempDir } from "../testing/temp-dir.ts";
 import { FORBIDDEN_COLUMNS } from "./consumo-mapper.ts";
-import { loadDatabricksRepository } from "./databricks-repository.ts";
+import { cacheKey, readOrderCache, writeOrderCache } from "./databricks-cache.ts";
+import {
+  type CachedDatabricksOptions,
+  loadCachedDatabricksRepository,
+  loadDatabricksRepository,
+} from "./databricks-repository.ts";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
 
 // Contra um Databricks falso que serve a amostra dos 9 pedidos da demo. Nenhum teste chama o
@@ -178,6 +185,193 @@ describe("loadDatabricksRepository (Databricks falso)", () => {
       /A consulta não terminou em 0 s \(estado (PENDING|RUNNING)\)\. O warehouse pode estar ligando/,
     );
     expect(message).toContain("use DATA_SOURCE=file");
+  });
+});
+
+describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () => {
+  async function setup(options: FakeDatabricksOptions = {}) {
+    const fake = await startFakeDatabricks(options);
+    const cacheFile = join(tempDir(), "cache-databricks.json.gz");
+    const source: CachedDatabricksOptions = {
+      baseUrl: fake.baseUrl,
+      warehouseId: "wh-teste",
+      token: TOKEN,
+      catalogSchema: "workspace.silver",
+      pollIntervalMs: 5,
+      timeoutMs: 5000,
+      cacheFile,
+      refreshIntervalMs: 0,
+    };
+    /** Sobe o repositório (como a API ao subir); fecha ao fim do teste. */
+    const boot = async (overrides: Partial<CachedDatabricksOptions> = {}) => {
+      const log = fakeLog();
+      const repository = await loadCachedDatabricksRepository({ ...source, ...overrides }, log);
+      onTestFinished(() => repository.close());
+      return { repository, log };
+    };
+    const catalogCalls = () =>
+      fake.requests.filter((r) => r.path.startsWith("/api/2.1/unity-catalog/")).length;
+    const messages = (log: ReturnType<typeof fakeLog>, level: "info" | "warn" = "info") =>
+      log[level].mock.calls.map(([, message]) => message);
+    return { fake, options, cacheFile, source, boot, catalogCalls, messages };
+  }
+
+  it("sem cache: baixa do Databricks antes de responder e grava o cache com a versão", async () => {
+    const { fake, cacheFile, source, boot } = await setup();
+
+    const { repository, log } = await boot();
+
+    expect(await repository.count()).toBe(9);
+    expect(fake.statements).toHaveLength(3);
+    expect(log.info).toHaveBeenCalledWith(
+      { cacheFile, reason: "ausente" },
+      "Sem cache local; carregando do Databricks",
+    );
+    const saved = await readOrderCache(cacheFile, await cacheKey(source));
+    expect(saved.ok && saved.cache.orders.size).toBe(9);
+    expect(saved.ok && saved.cache.version).toMatch(/consumo_pedidos@1@/);
+  });
+
+  it("com cache: sobe sem consultar o warehouse e só confere a versão no Unity Catalog", async () => {
+    const { fake, boot, catalogCalls, messages } = await setup();
+    await boot();
+    fake.statements.length = 0;
+
+    const { repository, log } = await boot();
+    await repository.refresh();
+
+    for (const order of fixtures) {
+      expect(await repository.findById(order.orderId)).toStrictEqual(order);
+    }
+    expect(fake.statements).toHaveLength(0);
+    expect(catalogCalls()).toBe(6); // 3 tabelas na primeira subida + 3 na conferência
+    expect(messages(log)).toEqual([
+      "Pedidos carregados do cache local; conferindo o Databricks em segundo plano",
+      "Tabelas sem mudança no Databricks",
+    ]);
+    expect(JSON.stringify(log.info.mock.calls)).not.toMatch(/token|Jacarta|adidas/);
+  });
+
+  it("tabela mudou: baixa de novo em segundo plano, troca os pedidos e regrava o cache", async () => {
+    const { fake, cacheFile, source, boot, messages } = await setup();
+    // Cache antigo com um pedido só, de uma versão anterior das tabelas.
+    const key = await cacheKey(source);
+    const [first] = fixtures;
+    if (!first) throw new Error("fixtures vazios");
+    await writeOrderCache(cacheFile, key, "versao-antiga", new Map([[first.orderId, first]]));
+
+    const { repository, log } = await boot();
+    expect(await repository.count()).toBe(1); // já responde com o cache
+    await repository.refresh();
+
+    expect(await repository.count()).toBe(9);
+    expect(fake.statements).toHaveLength(3);
+    expect(messages(log)).toContain("Pedidos trocados pela versão nova");
+    const saved = await readOrderCache(cacheFile, key);
+    expect(saved.ok && saved.cache.orders.size).toBe(9);
+    expect(saved.ok && saved.cache.version).toMatch(/consumo_pedidos@1@/);
+  });
+
+  it("nova escrita no Databricks com a API no ar: a conferência seguinte recarrega", async () => {
+    const { fake, boot } = await setup();
+    const { repository } = await boot();
+
+    fake.tableVersion = 2;
+    await repository.refresh();
+    await repository.refresh(); // sem mudança desde a última: não baixa de novo
+
+    expect(fake.statements).toHaveLength(6);
+  });
+
+  it("Unity Catalog fora do ar ao subir com cache: serve o cache e avisa no log", async () => {
+    const { options, boot, messages } = await setup();
+    await boot();
+    options.catalogUnavailable = true;
+
+    const { repository, log } = await boot();
+    await repository.refresh();
+
+    expect(await repository.count()).toBe(9);
+    expect(messages(log, "warn")).toEqual([
+      "Não foi possível conferir a versão das tabelas no Databricks; seguindo com os pedidos atuais",
+    ]);
+  });
+
+  it("falha ao recarregar (token recusado): segue com os pedidos atuais e o cache", async () => {
+    const { fake, options, cacheFile, source, boot, messages } = await setup();
+    const { repository, log } = await boot();
+    fake.tableVersion = 2;
+    options.httpStatus = 401;
+
+    await repository.refresh();
+
+    expect(await repository.count()).toBe(9);
+    expect(messages(log, "warn")).toEqual([
+      "Não foi possível conferir a versão das tabelas no Databricks; seguindo com os pedidos atuais",
+    ]);
+    expect(JSON.stringify(log.warn.mock.calls)).not.toContain(TOKEN);
+    expect((await readOrderCache(cacheFile, await cacheKey(source))).ok).toBe(true);
+  });
+
+  it("falha no download durante a recarga: segue com os pedidos atuais", async () => {
+    const { fake, options, boot, messages } = await setup();
+    const { repository, log } = await boot();
+    fake.tableVersion = 2;
+    options.missingTable = "consumo_itens_pedido";
+
+    await repository.refresh();
+
+    expect(await repository.count()).toBe(9);
+    expect(messages(log, "warn")).toEqual([
+      "Falha ao recarregar do Databricks; seguindo com os pedidos atuais",
+    ]);
+  });
+
+  it("sem cache e Databricks recusando: a API não sobe (como sem cache)", async () => {
+    const { boot } = await setup({ httpStatus: 401 });
+
+    expect(await failure(boot())).toMatch(/Confira DATABRICKS_TOKEN.*use DATA_SOURCE=file/);
+  });
+
+  it("cache de outro código ou workspace: ignora e baixa do Databricks", async () => {
+    const { fake, cacheFile, boot } = await setup();
+    await writeOrderCache(cacheFile, "chave-de-outro-codigo", "v1", new Map());
+
+    const { repository, log } = await boot();
+
+    expect(await repository.count()).toBe(9);
+    expect(fake.statements).toHaveLength(3);
+    expect(log.info).toHaveBeenCalledWith(
+      { cacheFile, reason: "de outra versão do código ou da fonte" },
+      "Sem cache local; carregando do Databricks",
+    );
+  });
+
+  it("não consegue gravar o cache: sobe do Databricks e avisa", async () => {
+    const { boot, messages } = await setup();
+    // A "pasta" do cache é um arquivo: a gravação falha.
+    const blocker = join(tempDir(), "arquivo");
+    writeFileSync(blocker, "");
+
+    const { repository, log } = await boot({ cacheFile: join(blocker, "cache.json.gz") });
+
+    expect(await repository.count()).toBe(9);
+    expect(messages(log, "warn")).toEqual([
+      "Não foi possível gravar o cache local; a próxima subida vai baixar do Databricks",
+    ]);
+  });
+
+  it("confere de novo a cada intervalo e para ao fechar", async () => {
+    const { boot, catalogCalls } = await setup();
+    const { repository } = await boot({ refreshIntervalMs: 10 });
+
+    await vi.waitFor(() => expect(catalogCalls()).toBeGreaterThanOrEqual(9));
+    repository.close();
+    await repository.refresh(); // espera uma conferência que esteja em andamento
+    const afterClose = catalogCalls();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(catalogCalls()).toBe(afterClose);
   });
 });
 

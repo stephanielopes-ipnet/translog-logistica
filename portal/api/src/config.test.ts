@@ -200,8 +200,29 @@ describe("loadConfig", () => {
         warehouseId: "abc123",
         token: "dapi-segredo-de-teste",
         catalogSchema: "workspace.silver",
+        cacheFile: join(defaults.dataDir, "cache-databricks.json.gz"),
+        refreshIntervalMs: 600_000,
       },
     });
+  });
+
+  it("cache do databricks dentro de DATA_DIR e conferência a cada DATABRICKS_REFRESH_MINUTES", () => {
+    const config = loadConfig({
+      ...DATABRICKS_ENV,
+      DATA_DIR: "/tmp/dados-teste",
+      DATABRICKS_REFRESH_MINUTES: "0",
+    });
+
+    expect(config.databricks).toMatchObject({
+      cacheFile: "/tmp/dados-teste/cache-databricks.json.gz",
+      refreshIntervalMs: 0,
+    });
+  });
+
+  it.each(["-1", "1441", "2.5", "dez"])("rejeita DATABRICKS_REFRESH_MINUTES=%s", (minutes) => {
+    expect(configError({ ...DATABRICKS_ENV, DATABRICKS_REFRESH_MINUTES: minutes })).toMatch(
+      /DATABRICKS_REFRESH_MINUTES deve ser um número inteiro de minutos entre 0 \(só ao subir\) e 1440/,
+    );
   });
 
   it.each([

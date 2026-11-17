@@ -6,7 +6,8 @@ import { onTestFinished } from "vitest";
 import { consumoFiles } from "../orders/file-repository.ts";
 
 // Só para testes (fora da imagem Docker): um Databricks falso que responde à SQL Statement
-// Execution API com as linhas da amostra `orders/fixtures/consumo/`. Interpreta o SELECT que o
+// Execution API com as linhas da amostra `orders/fixtures/consumo/` e à consulta de tabela do
+// Unity Catalog (versão das tabelas, que o teste muda em `tableVersion`). Interpreta o SELECT que o
 // portal gera: devolve só as colunas pedidas (na ordem pedida) e corta as datas de
 // `date_format(..., 'yyyy-MM-dd')`, como o warehouse. Nenhum teste chama o Databricks real.
 
@@ -30,6 +31,8 @@ export interface FakeDatabricksOptions {
   missingTable?: string;
   /** Linhas a mais (como objetos coluna → valor) no resultado de uma tabela. */
   extraRows?: Record<string, Record<string, string>[]>;
+  /** A consulta de tabela do Unity Catalog responde HTTP 503 (o resto funciona). */
+  catalogUnavailable?: boolean;
 }
 
 export interface FakeDatabricks {
@@ -39,6 +42,8 @@ export interface FakeDatabricks {
   statements: string[];
   /** Header Authorization de cada requisição, por caminho. */
   requests: { path: string; authorization: string | undefined }[];
+  /** Versão Delta das tabelas no Unity Catalog; o teste aumenta para simular uma escrita. */
+  tableVersion: number;
 }
 
 interface Statement {
@@ -53,6 +58,7 @@ export async function startFakeDatabricks(
 ): Promise<FakeDatabricks> {
   const statements: string[] = [];
   const requests: FakeDatabricks["requests"] = [];
+  const fake: FakeDatabricks = { baseUrl: "", statements, requests, tableVersion: 1 };
   const byId = new Map<string, Statement>();
   let baseUrl = "";
 
@@ -73,6 +79,23 @@ export async function startFakeDatabricks(
         json(res, options.httpStatus, {
           error_code: "UNAUTHENTICATED",
           message: "Credential was not sent or was invalid",
+        });
+        return;
+      }
+      const table = path.match(/^\/api\/2\.1\/unity-catalog\/tables\/([\w.]+)$/)?.[1];
+      if (table) {
+        if (options.catalogUnavailable) {
+          json(res, 503, { error_code: "TEMPORARILY_UNAVAILABLE", message: "try again" });
+          return;
+        }
+        json(res, 200, {
+          full_name: table,
+          table_id: `id-${table}`,
+          updated_at: 1_763_000_000_000,
+          properties: {
+            "delta.lastUpdateVersion": String(fake.tableVersion),
+            "delta.lastCommitTimestamp": String(1_763_000_000_000 + fake.tableVersion),
+          },
         });
         return;
       }
@@ -186,7 +209,8 @@ export async function startFakeDatabricks(
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   onTestFinished(() => new Promise<void>((resolve) => server.close(() => resolve())));
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  return { baseUrl, statements, requests };
+  fake.baseUrl = baseUrl;
+  return fake;
 }
 
 function json(res: ServerResponse, status: number, body: object) {

@@ -59,6 +59,7 @@ export async function buildServer(config: Config, options: ServerOptions = {}) {
   await app.register(swaggerUi, { routePrefix: "/docs" });
 
   const container = await createContainer(config, { log: app.log, overrides: options.overrides });
+  app.addHook("onClose", async () => container.close());
   await app.register(healthRoutes, { prefix: "/api", container });
   await app.register(orderRoutes, { prefix: "/api", orderService: container.orderService });
   await app.register(chatRoutes, { prefix: "/api", chatService: container.chatService });

@@ -27,6 +27,12 @@ const agentUrl = z.url({ protocol: /^https?$/ }).transform((value) => value.repl
 /** Nome do app no ADK: vai no caminho da URL, então só letras, números, `_` e `-`. */
 const agentAppName = z.string().regex(/^[\w-]+$/);
 
+/** Intervalo da conferência de mudanças no Databricks, em minutos (0 = só ao subir). */
+const databricksRefreshMinutes = z.coerce.number().int().min(0).max(1440);
+
+/** Arquivo do cache local do adapter `databricks`, dentro de `DATA_DIR`. */
+const DATABRICKS_CACHE_FILE = "cache-databricks.json.gz";
+
 /** Limite por resposta do agente, em milissegundos. */
 const agentTimeoutMs = z.coerce.number().int().min(1000).max(600_000);
 
@@ -73,6 +79,7 @@ const envSchema = z
     DATABRICKS_WAREHOUSE_ID: databricksWarehouseId.optional(),
     DATABRICKS_TOKEN: z.string().optional(),
     DATABRICKS_CATALOG_SCHEMA: databricksCatalogSchema.default("workspace.silver"),
+    DATABRICKS_REFRESH_MINUTES: databricksRefreshMinutes.default(10),
     NODE_ENV: z.string().optional(),
   })
   .superRefine((env, ctx) => {
@@ -123,36 +130,44 @@ const expectations: Record<EnvName, string> = {
     "deve ser o id do SQL warehouse (letras, números, _ ou -), obrigatório com DATA_SOURCE=databricks",
   DATABRICKS_TOKEN: "é obrigatória com DATA_SOURCE=databricks (token de acesso, só no portal/.env)",
   DATABRICKS_CATALOG_SCHEMA: "deve ser catalogo.schema (ex.: workspace.silver)",
+  DATABRICKS_REFRESH_MINUTES: "deve ser um número inteiro de minutos entre 0 (só ao subir) e 1440",
   NODE_ENV: "deve ser um texto",
 };
 
-const configSchema = envSchema.transform((env) => ({
-  apiPort: env.API_PORT,
-  dataSource: env.DATA_SOURCE,
-  /** Pasta absoluta dos CSVs (`DATA_SOURCE=file`); relativo no ambiente = relativo a `portal/`. */
-  dataDir: resolve(PORTAL_DIR, env.DATA_DIR),
-  /** Pedidos de exemplo da tela, na ordem configurada. */
-  sampleOrderIds: env.SAMPLE_ORDER_IDS,
-  /** Assistente do chat. */
-  agent: env.AGENT,
-  /** Endereço do agente ADK, sem barra no fim; obrigatório com `adk`. */
-  agentUrl: env.AGENT_URL,
-  agentAppName: env.AGENT_APP_NAME,
-  agentTimeoutMs: env.AGENT_TIMEOUT_MS,
-  /** Acesso ao Databricks (`DATA_SOURCE=databricks`); o token nunca vai para log nem resposta. */
-  databricks:
-    env.DATABRICKS_HOST !== undefined &&
-    env.DATABRICKS_WAREHOUSE_ID !== undefined &&
-    env.DATABRICKS_TOKEN !== undefined
-      ? {
-          baseUrl: env.DATABRICKS_HOST,
-          warehouseId: env.DATABRICKS_WAREHOUSE_ID,
-          token: env.DATABRICKS_TOKEN,
-          catalogSchema: env.DATABRICKS_CATALOG_SCHEMA,
-        }
-      : undefined,
-  nodeEnv: env.NODE_ENV,
-}));
+const configSchema = envSchema.transform((env) => {
+  /** Pasta absoluta dos CSVs (`DATA_SOURCE=file`) e do cache do `databricks`. */
+  const dataDir = resolve(PORTAL_DIR, env.DATA_DIR);
+  return {
+    apiPort: env.API_PORT,
+    dataSource: env.DATA_SOURCE,
+    /** Relativo no ambiente = relativo a `portal/`. */
+    dataDir,
+    /** Pedidos de exemplo da tela, na ordem configurada. */
+    sampleOrderIds: env.SAMPLE_ORDER_IDS,
+    /** Assistente do chat. */
+    agent: env.AGENT,
+    /** Endereço do agente ADK, sem barra no fim; obrigatório com `adk`. */
+    agentUrl: env.AGENT_URL,
+    agentAppName: env.AGENT_APP_NAME,
+    agentTimeoutMs: env.AGENT_TIMEOUT_MS,
+    /** Acesso ao Databricks (`DATA_SOURCE=databricks`); o token nunca vai para log nem resposta. */
+    databricks:
+      env.DATABRICKS_HOST !== undefined &&
+      env.DATABRICKS_WAREHOUSE_ID !== undefined &&
+      env.DATABRICKS_TOKEN !== undefined
+        ? {
+            baseUrl: env.DATABRICKS_HOST,
+            warehouseId: env.DATABRICKS_WAREHOUSE_ID,
+            token: env.DATABRICKS_TOKEN,
+            catalogSchema: env.DATABRICKS_CATALOG_SCHEMA,
+            /** Pedidos já convertidos, para subir sem esperar o Databricks (fora do Git). */
+            cacheFile: resolve(dataDir, DATABRICKS_CACHE_FILE),
+            refreshIntervalMs: env.DATABRICKS_REFRESH_MINUTES * 60_000,
+          }
+        : undefined,
+    nodeEnv: env.NODE_ENV,
+  };
+});
 
 export type Config = z.output<typeof configSchema>;
 

@@ -4,7 +4,7 @@ import { type ChatLogger, type ChatService, createChatService } from "./chat/cha
 import { createMockAgent } from "./chat/mock-agent.ts";
 import type { SupportAgent } from "./chat/support-agent.ts";
 import type { Config } from "./config.ts";
-import { loadDatabricksRepository } from "./orders/databricks-repository.ts";
+import { loadCachedDatabricksRepository } from "./orders/databricks-repository.ts";
 import { type LoadLogger, loadFileRepository } from "./orders/file-repository.ts";
 import { createFixturesRepository } from "./orders/fixtures-repository.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
@@ -17,6 +17,8 @@ export interface Container {
   config: Config;
   orderService: OrderService;
   chatService: ChatService;
+  /** Para as tarefas em segundo plano (chamado quando o Fastify encerra). */
+  close(): void;
 }
 
 /** Substituições usadas só nos testes (ex.: repositório que devolve campos a mais). */
@@ -45,6 +47,7 @@ export async function createContainer(
     config,
     orderService,
     chatService: createChatService({ agent, orders: orderService, log: chatLog }),
+    close: () => orders.close?.(),
   };
 }
 
@@ -83,6 +86,6 @@ async function createOrderRepository(config: Config, log: LoadLogger): Promise<O
           "DATABRICKS_HOST, DATABRICKS_WAREHOUSE_ID e DATABRICKS_TOKEN são obrigatórias.",
         );
       }
-      return loadDatabricksRepository(config.databricks, log);
+      return loadCachedDatabricksRepository(config.databricks, log);
   }
 }

@@ -315,4 +315,49 @@ describe("createDatabricksClient", () => {
       "Falha ao baixar o pedaço 0 do resultado (HTTP 403).",
     );
   });
+
+  it("tableVersion: lê a versão Delta no Unity Catalog (GET com o token, sem o warehouse)", async () => {
+    const { baseUrl, requests } = await fakeDatabricks((_request, response) => {
+      json(response, 200, {
+        table_id: "abc",
+        updated_at: 1_763_325_007_792,
+        properties: {
+          "delta.lastUpdateVersion": "3",
+          "delta.lastCommitTimestamp": "1763313537000",
+        },
+      });
+    });
+
+    const version = await client(baseUrl).tableVersion("workspace.silver.consumo_pedidos");
+
+    expect(version).toBe("abc@3@1763313537000");
+    expect(requests).toMatchObject([
+      {
+        method: "GET",
+        url: "/api/2.1/unity-catalog/tables/workspace.silver.consumo_pedidos",
+        authorization: `Bearer ${TOKEN}`,
+      },
+    ]);
+  });
+
+  it("tableVersion: sem as propriedades Delta, usa o updated_at", async () => {
+    const { baseUrl } = await fakeDatabricks((_request, response) => {
+      json(response, 200, { table_id: "abc", updated_at: 1_763_325_007_792 });
+    });
+
+    expect(await client(baseUrl).tableVersion("a.b.c")).toBe("abc@1763325007792");
+  });
+
+  it("tableVersion: tabela ausente vira erro claro", async () => {
+    const { baseUrl } = await fakeDatabricks((_request, response) => {
+      json(response, 404, {
+        error_code: "TABLE_DOES_NOT_EXIST",
+        message: "Table 'a.b.c' does not exist.",
+      });
+    });
+
+    await expect(client(baseUrl).tableVersion("a.b.c")).rejects.toThrow(
+      /HTTP 404: Table 'a\.b\.c' does not exist\./,
+    );
+  });
 });

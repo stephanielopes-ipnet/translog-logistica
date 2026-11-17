@@ -9,6 +9,7 @@ import type { ContainerOverrides } from "./container.ts";
 import { FIXTURES_FILE } from "./orders/fixtures-repository.ts";
 import { buildServer } from "./server.ts";
 import { startFakeDatabricks } from "./testing/fake-databricks.ts";
+import { tempDir } from "./testing/temp-dir.ts";
 
 // Regra fixa do portal: nenhuma resposta traz dado do cliente, de pagamento ou financeiro
 // interno. Estes testes varrem todas as chaves (em qualquer nível) de todas as respostas.
@@ -56,6 +57,7 @@ const SOURCES = [
       DATABRICKS_HOST: (await startFakeDatabricks()).baseUrl,
       DATABRICKS_WAREHOUSE_ID: "wh-teste",
       DATABRICKS_TOKEN: "token-de-teste",
+      DATA_DIR: tempDir(),
     }),
   },
 ];
