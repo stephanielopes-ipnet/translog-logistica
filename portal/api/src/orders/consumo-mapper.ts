@@ -1,5 +1,5 @@
-import { type Order, orderSchema } from "@translog/contracts";
 import { shouldEscalateToSupport } from "./escalation.ts";
+import { type OrderRecord, orderRecordSchema } from "./order-record.ts";
 
 // Único arquivo que conhece o formato das tabelas `consumo_*` da Silver (pedidos, itens e
 // eventos). Mudança no contrato de dados do Mateus bate aqui. Levantamento das colunas e
@@ -32,6 +32,7 @@ export const ORDER_COLUMNS = [
   "destino_pais",
   "destino_regiao",
   "prazo_despacho_dias",
+  "dias_ate_despacho",
   "data_despacho_prevista",
   "data_despacho_real",
   "dias_atraso_despacho",
@@ -45,6 +46,9 @@ export const ORDER_COLUMNS = [
   "etapa_atual_desc",
   "local_atual",
   "etapa_extravio",
+  "rota_servico",
+  "resumo_pedido",
+  "linha_do_tempo",
 ] as const;
 
 /** Colunas de `consumo_itens_pedido` que o portal lê (1 linha por item). */
@@ -97,7 +101,7 @@ export type OrderRow = Record<(typeof ORDER_COLUMNS)[number], string>;
 export type ItemRow = Record<(typeof ITEM_COLUMNS)[number], string>;
 export type EventRow = Record<(typeof EVENT_COLUMNS)[number], string>;
 
-export type OrderMappingResult = ReturnType<typeof orderSchema.safeParse>;
+export type OrderMappingResult = ReturnType<typeof orderRecordSchema.safeParse>;
 
 /** Guarda uma instância só de cada texto repetido (o adapter `file` passa o seu pool). */
 export type Intern = (text: string) => string;
@@ -105,7 +109,8 @@ export type Intern = (text: string) => string;
 const keepText: Intern = (text) => text;
 
 /**
- * Linha do pedido + linhas dos seus itens e eventos → `Order`, validado contra o contrato.
+ * Linha do pedido + linhas dos seus itens e eventos → `OrderRecord` (o que a API guarda; as
+ * visões do cliente e do colaborador saem dele em `order-views.ts`), validado.
  * Itens em ordem de `id_item_pedido` e eventos em ordem de `sequencia`, venham como vierem.
  */
 export function mapConsumoOrder(
@@ -123,7 +128,7 @@ export function mapConsumoOrder(
     probableCause: cause(row.causa_atraso_entrega),
   };
 
-  return orderSchema.safeParse({
+  return orderRecordSchema.safeParse({
     orderId: toNumber(row.id_pedido),
     orderDate: calendarDate(row.data_pedido, intern),
     referenceDate: calendarDate(row.data_referencia_base, intern),
@@ -137,6 +142,7 @@ export function mapConsumoOrder(
     destination: intern(place(row.destino_cidade, row.destino_estado, row.destino_pais)),
     region: row.destino_regiao,
     market: row.mercado_logistico,
+    routeService: row.rota_servico,
     dispatch: {
       promisedDays: toNumber(row.prazo_despacho_dias),
       expectedDate: calendarDate(row.data_despacho_prevista, intern),
@@ -145,6 +151,7 @@ export function mapConsumoOrder(
       status: row.status_prazo_despacho,
       probableCause: cause(row.causa_atraso_despacho),
     },
+    daysToDispatch: optionalInteger(row.dias_ate_despacho),
     delivery,
     explanation: optionalText(row.motivo_ocorrencia),
     currentStage: stage(row.etapa_atual_desc, intern),
@@ -169,7 +176,11 @@ export function mapConsumoOrder(
     // Soma em centavos: evita 0.1 + 0.2 = 0.30000000000000004.
     total: itemCents.reduce((sum, cents) => sum + cents, 0) / 100,
     escalateToSupport: shouldEscalateToSupport({ status: row.situacao_pedido, delivery }),
-  } satisfies Record<keyof Order, unknown>);
+    // No Databricks, o resumo dos não despachados termina com espaço (no CSV do Mateus, não):
+    // aparado, sai igual nos dois modos.
+    aiSummary: optionalText(row.resumo_pedido.trim()),
+    rawTimeline: optionalText(row.linha_do_tempo),
+  } satisfies Record<keyof OrderRecord, unknown>);
 }
 
 /**

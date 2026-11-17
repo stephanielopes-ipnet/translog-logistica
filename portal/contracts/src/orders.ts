@@ -63,8 +63,8 @@ const probableCause = z
   .min(1)
   .nullable()
   .describe(
-    "Motivo provável do atraso nesta etapa, como vem da base (ex.: Promessa irreal). " +
-      "null = sem atraso ou não se aplica. Nunca é causa comprovada",
+    "Motivo provável do atraso nesta etapa, em linguagem do cliente (ex.: houve demora na " +
+      "preparação do envio). null = sem atraso ou não se aplica. Nunca é causa comprovada",
   );
 
 /** Etapa da viagem: 0 Pedido · 1 Coleta · 2 Voo · 3 Alfândega · 4 Transferência · 5 Última milha. */
@@ -124,8 +124,10 @@ export const orderItemSchema = z.object({
 export type OrderItem = z.infer<typeof orderItemSchema>;
 
 /**
- * Pedido pronto para a tela (view model). Não tem dados do cliente, de pagamento
- * nem financeiros internos (preço unitário, valor bruto, desconto).
+ * Pedido como o **cliente** vê (`GET /api/orders/:orderId`, pública): situação, prazos, onde
+ * está e o motivo provável em linguagem do cliente. Não tem dados do cliente, de pagamento nem
+ * financeiros internos, e também não tem o diagnóstico interno (frase técnica da base, causas
+ * nos termos da base, mercado logístico): isso fica no `StaffOrder` (`staff-orders.ts`).
  */
 export const orderSchema = z.object({
   orderId: orderIdSchema,
@@ -140,14 +142,8 @@ export const orderSchema = z.object({
   origin: z.string().describe("Origem do despacho: Cidade, Estado, País"),
   destination: z.string().describe("Destino: Cidade, Estado, País"),
   region: z.string().describe("Região de destino, ex.: América Central"),
-  market: marketSchema,
   dispatch: dispatchSchema,
   delivery: deliverySchema,
-  explanation: z
-    .string()
-    .min(1)
-    .nullable()
-    .describe("Explicação pronta da base sobre prazos e ocorrências do pedido"),
   currentStage: stageSchema.nullable().describe("Etapa atual (ou última) da viagem"),
   currentLocation: z
     .string()

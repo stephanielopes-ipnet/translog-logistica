@@ -38,10 +38,8 @@ describe("format utilities", () => {
     });
   });
 
-  it("builds technical manifest codes", () => {
-    expect(formatManifestCode({ orderId: 375, market: "LATAM" })).toBe("TL-000375-LATAM");
-    expect(formatManifestCode({ orderId: 20322, market: "Pacific Asia" })).toBe(
-      "TL-020322-PACIFICASIA",
-    );
+  it("builds manifest codes without the internal market", () => {
+    expect(formatManifestCode({ orderId: 375 })).toBe("TL-000375");
+    expect(formatManifestCode({ orderId: 20322 })).toBe("TL-020322");
   });
 });

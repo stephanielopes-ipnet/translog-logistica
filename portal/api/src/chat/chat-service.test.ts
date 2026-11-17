@@ -2,6 +2,7 @@ import type { Order } from "@translog/contracts";
 import { describe, expect, it } from "vitest";
 import { createFixturesRepository } from "../orders/fixtures-repository.ts";
 import { createOrderService } from "../orders/order-service.ts";
+import { NO_PROMISE_SCENARIO } from "../orders/promise-scenario.ts";
 import { ChatBusyError, type ChatLogger, createChatService } from "./chat-service.ts";
 import {
   AgentTimeoutError,
@@ -13,7 +14,11 @@ import {
 const SESSION_A = "11111111-1111-4111-8111-111111111111";
 const SESSION_B = "22222222-2222-4222-8222-222222222222";
 
-const orders = createOrderService({ orders: await createFixturesRepository(), sampleOrderIds: [] });
+const orders = createOrderService({
+  orders: await createFixturesRepository(),
+  sampleOrderIds: [],
+  promiseScenario: NO_PROMISE_SCENARIO,
+});
 
 /** Log em memória, para conferir o que foi (e o que não foi) registrado. */
 function memoryLog() {

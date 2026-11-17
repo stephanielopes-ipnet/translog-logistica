@@ -1,5 +1,4 @@
 import { Readable } from "node:stream";
-import type { Order } from "@translog/contracts";
 import { CONSUMO_TABLES, type ConsumoTable } from "./consumo-mapper.ts";
 import { selectStatement } from "./consumo-sql.ts";
 import { cacheKey, readOrderCache, writeOrderCache } from "./databricks-cache.ts";
@@ -14,6 +13,7 @@ import {
   type LoadLogger,
   loadConsumoOrders,
 } from "./file-repository.ts";
+import type { OrderRecord } from "./order-record.ts";
 import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
 
 export interface DatabricksRepositoryOptions extends DatabricksClientOptions {
@@ -111,6 +111,7 @@ export async function loadCachedDatabricksRepository(
   return {
     findById: (orderId) => orders.findById(orderId),
     count: () => orders.count(),
+    stats: () => orders.stats(),
     refresh,
     close() {
       closed = true;
@@ -131,7 +132,7 @@ export async function loadCachedDatabricksRepository(
       return;
     }
     log.info({ catalogSchema }, "Tabelas mudaram no Databricks; recarregando em segundo plano");
-    let loaded: Map<number, Order>;
+    let loaded: Map<number, OrderRecord>;
     try {
       loaded = await loadDatabricksOrders(source, log);
     } catch (error) {
@@ -164,7 +165,10 @@ export async function loadCachedDatabricksRepository(
   }
 
   /** Grava o cache; falha só avisa (a próxima subida baixa do Databricks de novo). */
-  async function save(loaded: ReadonlyMap<number, Order>, savedVersion: SourceVersion | null) {
+  async function save(
+    loaded: ReadonlyMap<number, OrderRecord>,
+    savedVersion: SourceVersion | null,
+  ) {
     const savingAt = performance.now();
     try {
       await writeOrderCache(cacheFile, key, savedVersion, loaded);
@@ -202,7 +206,7 @@ export async function loadDatabricksRepository(
 export async function loadDatabricksOrders(
   { catalogSchema, ...client }: DatabricksRepositoryOptions,
   log: LoadLogger,
-): Promise<Map<number, Order>> {
+): Promise<Map<number, OrderRecord>> {
   const databricks = createDatabricksClient(client);
   const name = (table: ConsumoTable) => `${catalogSchema}.${CONSUMO_TABLES[table]}`;
 

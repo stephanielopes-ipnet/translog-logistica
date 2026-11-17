@@ -2,7 +2,6 @@ import { createReadStream } from "node:fs";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import type { Order } from "@translog/contracts";
 import { parse } from "csv-parse";
 import type { z } from "zod";
 import {
@@ -12,6 +11,7 @@ import {
   type OrderRow,
   READ_COLUMNS,
 } from "./consumo-mapper.ts";
+import type { OrderRecord } from "./order-record.ts";
 import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
 
 /** O que a carga precisa do log (o `app.log` do Fastify serve). */
@@ -81,7 +81,7 @@ export async function loadConsumoOrders(
   sources: ConsumoSources,
   log: LoadLogger,
   logContext: object = {},
-): Promise<Map<number, Order>> {
+): Promise<Map<number, OrderRecord>> {
   const startedAt = performance.now();
   const strings: StringPool = new Map();
   const intern = (text: string) => internText(strings, text);
@@ -105,7 +105,7 @@ export async function loadConsumoOrders(
   const itemsByOrder = await readChildren(sources.items, READ_COLUMNS.items);
   const eventsByOrder = await readChildren(sources.events, READ_COLUMNS.events);
 
-  const orders = new Map<number, Order>();
+  const orders = new Map<number, OrderRecord>();
   for (const [orderId, row] of orderRows) {
     // Solta as linhas assim que o pedido é montado. Medido (14/11): o closure do pipeline
     // mantém o contexto desta função vivo depois da carga, e com ele estes Maps.

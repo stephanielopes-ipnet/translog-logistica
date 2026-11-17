@@ -5,8 +5,10 @@ import { z } from "zod";
 import { loadConfig } from "../config.ts";
 import { buildServer } from "../server.ts";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
+import { orderRecordSchema } from "./order-record.ts";
+import { toCustomerOrder } from "./order-views.ts";
 
-const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
+const fixtures = z.array(orderRecordSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
 
 async function buildTestServer(env: NodeJS.ProcessEnv = {}) {
   const app = await buildServer(loadConfig(env), { logger: false });
@@ -32,9 +34,18 @@ describe("GET /api/orders/:orderId", () => {
       origin: "San Jose, Califórnia, Estados Unidos",
       destination: "Jacarta, Jacarta, Indonésia",
       region: "Sudeste Asiático",
-      market: "Pacific Asia",
-      dispatch: { status: "Atrasado", delayDays: 1, probableCause: "Promessa irreal" },
-      delivery: { expectedDate: "2018-02-01", actualDate: null, delayDays: 5 },
+      dispatch: {
+        status: "Atrasado",
+        delayDays: 1,
+        probableCause:
+          "o prazo de despacho prometido para esta modalidade costuma ser curto demais",
+      },
+      delivery: {
+        expectedDate: "2018-02-01",
+        actualDate: null,
+        delayDays: 5,
+        probableCause: "seu pedido está sem novas atualizações de rastreio",
+      },
       currentStage: { number: 3, label: "Alfândega" },
       currentLocation: "Alfândega Jacarta (Indonésia)",
       lostAtStage: null,
@@ -44,14 +55,14 @@ describe("GET /api/orders/:orderId", () => {
   });
 
   it.each(fixtures.map((order) => [order.orderId, order] as const))(
-    "devolve o pedido %i dos fixtures sem alteração",
-    async (orderId, order) => {
+    "devolve o pedido %i dos fixtures na visão do cliente",
+    async (orderId, record) => {
       const app = await buildTestServer();
 
       const response = await app.inject({ method: "GET", url: `/api/orders/${orderId}` });
 
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toStrictEqual(order);
+      expect(response.json()).toStrictEqual(toCustomerOrder(record));
     },
   );
 

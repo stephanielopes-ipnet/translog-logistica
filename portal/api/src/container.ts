@@ -9,6 +9,7 @@ import { type LoadLogger, loadFileRepository } from "./orders/file-repository.ts
 import { createFixturesRepository } from "./orders/fixtures-repository.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
 import { createOrderService, type OrderService } from "./orders/order-service.ts";
+import { NO_PROMISE_SCENARIO } from "./orders/promise-scenario.ts";
 
 /**
  * Dependências da aplicação. A escolha dos adapters (`DATA_SOURCE` e `AGENT`) acontece só aqui.
@@ -40,7 +41,12 @@ export async function createContainer(
   { log, overrides = {} }: ContainerOptions,
 ): Promise<Container> {
   const orders = overrides.orderRepository ?? (await createOrderRepository(config, log));
-  const orderService = createOrderService({ orders, sampleOrderIds: config.sampleOrderIds });
+  const orderService = createOrderService({
+    orders,
+    sampleOrderIds: config.sampleOrderIds,
+    // Tarefa 2 do escopo novo: o cenário "Promessa ajustada" passa a vir da Gold nos 3 modos.
+    promiseScenario: NO_PROMISE_SCENARIO,
+  });
   const chatLog = log.child({ agent: config.agent });
   const agent = overrides.supportAgent ?? createSupportAgent(config, orderService, chatLog);
   return {

@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import type { Order } from "@translog/contracts";
 import { parse } from "csv-parse/sync";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -12,6 +11,7 @@ import {
   READ_COLUMNS,
 } from "./consumo-mapper.ts";
 import { consumoFiles } from "./file-repository.ts";
+import type { OrderRecord } from "./order-record.ts";
 
 /**
  * Amostra das 3 tabelas com os pedidos da demo (gerada por `pnpm --filter @translog/api
@@ -50,7 +50,7 @@ function rowsOf(orderId: number): { row: OrderRow; items: ItemRow[]; events: Eve
   };
 }
 
-function mapOrder(row: OrderRow, items: ItemRow[], events: EventRow[]): Order {
+function mapOrder(row: OrderRow, items: ItemRow[], events: EventRow[]): OrderRecord {
   const result = mapConsumoOrder(row, items, events);
   if (!result.success) {
     throw new Error(z.prettifyError(result.error));
@@ -58,7 +58,7 @@ function mapOrder(row: OrderRow, items: ItemRow[], events: EventRow[]): Order {
   return result.data;
 }
 
-function mapSample(orderId: number, change: Partial<OrderRow> = {}): Order {
+function mapSample(orderId: number, change: Partial<OrderRow> = {}): OrderRecord {
   const { row, items, events } = rowsOf(orderId);
   return mapOrder({ ...row, ...change }, items, events);
 }
@@ -85,6 +85,8 @@ describe("mapConsumoOrder: pedidos da demo", () => {
       destination: "Saltillo, Coahuila, México",
       region: "América Central",
       market: "LATAM",
+      routeService: "América Latina - América Central - Second Class",
+      daysToDispatch: 6,
       dispatch: {
         promisedDays: 2,
         expectedDate: "2015-01-08",
@@ -253,31 +255,78 @@ describe("mapConsumoOrder: pedidos da demo", () => {
   });
 });
 
+describe("mapConsumoOrder: colunas da visão do colaborador", () => {
+  it("375: resumo para a IA e linha do tempo bruta, como vêm da base", () => {
+    const order = mapSample(375);
+
+    expect(order.aiSummary).toMatch(/^Pedido nº 375, feito em 06\/01\/2015\. Itens: /);
+    expect(order.rawTimeline).toMatch(
+      /^06\/01\/2015 Pedido registrado · 12\/01\/2015 Pedido despachado/,
+    );
+  });
+
+  it("apara o espaço do fim do resumo (o Databricks o tem; o CSV do Mateus, não)", () => {
+    const { row } = rowsOf(9);
+
+    expect(mapSample(9, { resumo_pedido: `${row.resumo_pedido} ` }).aiSummary).toBe(
+      mapSample(9).aiSummary,
+    );
+  });
+
+  it("9: não despachado não tem dias até o despacho", () => {
+    expect(mapSample(9).daysToDispatch).toBeNull();
+  });
+
+  it.each([
+    ["dias_ate_despacho", "1.5", "daysToDispatch"],
+    ["dias_ate_despacho", "-1", "daysToDispatch"],
+    ["rota_servico", "", "routeService"],
+  ] as const)("recusa %s = %j, apontando %s", (column, value, field) => {
+    const { row, items, events } = rowsOf(375);
+
+    expect(failedFields({ ...row, [column]: value }, items, events)).toContain(field);
+  });
+
+  it("resumo e linha do tempo vazios viram null", () => {
+    expect(mapSample(375, { resumo_pedido: "", linha_do_tempo: "" })).toMatchObject({
+      aiSummary: null,
+      rawTimeline: null,
+    });
+  });
+});
+
 describe("mapConsumoOrder: datas", () => {
+  // Pedido 76385: nos CSVs do Mateus, data_pedido = 2018-01-20T00:43:00.000Z (UTC). A amostra
+  // vem do export (datas já cortadas no SQL); estes testes recolocam o horário na linha.
+  const PLACED_AT = "2018-01-20T00:43:00.000Z";
+
+  function withTimestamps(orderId: number) {
+    const { row, items, events } = rowsOf(orderId);
+    const [first, ...rest] = events;
+    if (!first) throw new Error("sem eventos");
+    return {
+      row: { ...row, data_pedido: PLACED_AT },
+      items,
+      events: [{ ...first, ts_evento: PLACED_AT }, ...rest],
+    };
+  }
+
   it("armadilha de fuso: hora antes de 03:00Z não leva o pedido para o dia anterior", () => {
-    // Pedido 76385: data_pedido 2018-01-20T00:43:00.000Z. Sanidade: com new Date(), em
-    // Brasília (os testes rodam em America/Sao_Paulo, no horário de verão) cairia em 19/01.
-    const placedAt = "2018-01-20T00:43:00.000Z";
-    expect(new Date(placedAt).toLocaleDateString("sv-SE")).toBe("2018-01-19");
+    // Sanidade: com new Date(), em Brasília (os testes rodam em America/Sao_Paulo, no horário
+    // de verão) cairia em 19/01.
+    expect(new Date(PLACED_AT).toLocaleDateString("sv-SE")).toBe("2018-01-19");
+    const { row, items, events } = withTimestamps(76385);
 
-    const order = mapSample(76385);
+    const order = mapOrder(row, items, events);
 
-    expect(rowsOf(76385).row.data_pedido).toBe(placedAt);
     expect(order.orderDate).toBe("2018-01-20");
     expect(order.events[0]?.date).toBe("2018-01-20");
   });
 
-  it("aceita o formato do export (datas já cortadas no SQL) igual ao dos CSVs do Mateus", () => {
-    const { row, items, events } = rowsOf(375);
-    const cut = (text: string) => text.slice(0, 10);
+  it("aceita o formato dos CSVs do Mateus (timestamp) igual ao do export (data cortada)", () => {
+    const { row, items, events } = withTimestamps(76385);
 
-    const fromExport = mapOrder(
-      { ...row, data_pedido: cut(row.data_pedido) },
-      items,
-      events.map((event) => ({ ...event, ts_evento: cut(event.ts_evento) })),
-    );
-
-    expect(fromExport).toStrictEqual(mapSample(375));
+    expect(mapOrder(row, items, events)).toStrictEqual(mapSample(76385));
   });
 
   it.each([

@@ -40,6 +40,16 @@ Código oficial de `agent/` (não alterado), em Docker; toda a configuração pa
 - [ ] **2. Portal + agente juntos e documentação**: combinações `pnpm dev` + agente, compose com CSVs + agente e com Databricks; revisão do `adk-agent.ts`; README, `docs/backend.md`, `CLAUDE.md`, `.env.example`, `pendencias.md`.
 - [ ] **3. Verificação de ponta a ponta e limpeza**: perguntas reais pela API e pela tela, roteiro da banca em `mock`; remoção de `_contexto/teste-agente/`, `setup.sh`, container e imagem de teste.
 
+## Fase 5: escopo novo, backend (17/11)
+
+Plano em `portal/_contexto/escopo-novo.md` (seções 4, 5, 9, 10 e 11). Duas visões do pedido (cliente e colaborador), "Promessa ajustada" da Gold, login do colaborador e Torre de controle. Code freeze em 19/11.
+
+- [x] **1. Contratos: cliente × colaborador**: `Order` (cliente) sem `explanation` e `market`, com `probableCause` em linguagem do cliente (mapa único em `orders/customer-language.ts`, com texto genérico para causa nova); `StaffOrder` (`contracts/src/staff-orders.ts`) com causas da base, `explanation`, `market`, `routeService`, diagnóstico do despacho (prometido, `daysToDispatch`, atraso, prazo sugerido, se estaria no prazo), do transporte (trânsito padrão, real, dias recuperados), dias por etapa (por data), origem do dado, contexto (% de despachos atrasados da modalidade, % de entregas atrasadas da rota), valor em risco, `aiSummary` e `rawTimeline`. A API guarda só o `OrderRecord` (`orders/order-record.ts`: o que vem da base) e projeta as duas visões na consulta (`orders/order-views.ts`); o contexto sai de `orders/order-stats.ts`, calculado uma vez na carga (`OrderRepository.stats()`). Colunas novas lidas: `dias_ate_despacho`, `rota_servico`, `resumo_pedido` (aparado), `linha_do_tempo`. Cache do `databricks` no formato 2 (o antigo é descartado). Prazo sugerido ainda vazio (`NO_PROMISE_SCENARIO`) até a tarefa 2. Fixtures regenerados; mock-agent com o motivo em linguagem do cliente; `ASSISTANT_NAME` = LogBot; tela só adaptada (sem frase técnica, sem mercado, guia `TL-000375`). Testes: contratos, mapa (4 causas), diagnóstico (76902, 375, 34, 222, 31298, 9), estatísticas, serviço e privacidade separada (cliente sem diagnóstico nem termos internos, nos 3 modos; colaborador sem colunas proibidas). Resultado (17/11, `file` com os CSVs reais): carga 10,4 → 10,8 s; RSS 431–436 → 538–543 MB; heap retido ~103 → 152 MB (os +~50 MB são `resumo_pedido` + `linha_do_tempo`, 44 MB de texto).
+- [ ] **2. "Promessa ajustada" da Gold nos 3 modos**
+- [ ] **3. Login do colaborador**
+- [ ] **4. Rotas do colaborador e Torre de controle**
+- [ ] **5. Docs e verificação**
+
 ## Próximas fases (fora desta etapa)
 
 - [ ] **Agente no Docker Compose**: depende do Dockerfile do agente na `main` (Marco).

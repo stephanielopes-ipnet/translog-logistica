@@ -181,9 +181,6 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
 
             <div className="flex flex-col items-center justify-center px-2 min-w-[200px]">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="rounded bg-white border border-slate-200 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-slate-700">
-                  {order.market}
-                </span>
                 <span className="text-xs text-slate-500 whitespace-nowrap">{order.region}</span>
               </div>
               <div className="w-full flex items-center gap-2">

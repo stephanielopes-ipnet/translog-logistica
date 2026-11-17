@@ -47,9 +47,10 @@ export function splitPlace(place: string): { city: string; rest: string } {
   };
 }
 
-/** Código técnico de guia de remessa: `TL-000375-LATAM`. */
-export function formatManifestCode(order: Pick<Order, "orderId" | "market">): string {
-  const paddedId = String(order.orderId).padStart(6, "0");
-  const marketCode = order.market.replace(/\s+/g, "").toUpperCase();
-  return `TL-${paddedId}-${marketCode}`;
+/**
+ * Código de guia de remessa: `TL-000375`. Sem o mercado logístico interno (ex.: `LATAM`), que
+ * saiu da visão do cliente.
+ */
+export function formatManifestCode(order: Pick<Order, "orderId">): string {
+  return `TL-${String(order.orderId).padStart(6, "0")}`;
 }

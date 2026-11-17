@@ -1,5 +1,7 @@
-import type { Order } from "@translog/contracts";
+import type { Order, StaffOrder } from "@translog/contracts";
 import type { OrderRepository } from "./order-repository.ts";
+import { toCustomerOrder, toStaffOrder } from "./order-views.ts";
+import type { PromiseScenario } from "./promise-scenario.ts";
 
 /** Erro de domínio: o pedido não existe na fonte. Vira `404` em `http/errors.ts`. */
 export class OrderNotFoundError extends Error {
@@ -13,10 +15,12 @@ export class OrderNotFoundError extends Error {
 }
 
 export interface OrderService {
-  /** Pedido pelo número. Lança `OrderNotFoundError` se não existir. */
+  /** Visão do cliente. Lança `OrderNotFoundError` se não existir. */
   getOrder(orderId: number): Promise<Order>;
-  /** Pedido pelo número, ou `null` se não existir (o chat usa para conferir pedidos citados). */
+  /** Visão do cliente, ou `null` se não existir (o chat usa para conferir pedidos citados). */
   findOrder(orderId: number): Promise<Order | null>;
+  /** Visão do colaborador, com o diagnóstico. Lança `OrderNotFoundError` se não existir. */
+  getStaffOrder(orderId: number): Promise<StaffOrder>;
   /** Pedidos de exemplo configurados que existem na fonte, na ordem configurada. */
   sampleOrderIds(): Promise<number[]>;
   /** Quantos pedidos a fonte tem. */
@@ -27,19 +31,36 @@ export interface OrderServiceDeps {
   orders: OrderRepository;
   /** `SAMPLE_ORDER_IDS`, na ordem de exibição. */
   sampleOrderIds: readonly number[];
+  /** Prazo de despacho sugerido por modalidade (Promessa ajustada, da Gold). */
+  promiseScenario: PromiseScenario;
 }
 
-export function createOrderService({ orders, sampleOrderIds }: OrderServiceDeps): OrderService {
+export function createOrderService({
+  orders,
+  sampleOrderIds,
+  promiseScenario,
+}: OrderServiceDeps): OrderService {
+  async function getRecord(orderId: number) {
+    const record = await orders.findById(orderId);
+    if (!record) {
+      throw new OrderNotFoundError(orderId);
+    }
+    return record;
+  }
+
   return {
-    async getOrder(orderId) {
-      const order = await orders.findById(orderId);
-      if (!order) {
-        throw new OrderNotFoundError(orderId);
-      }
-      return order;
+    getOrder: async (orderId) => toCustomerOrder(await getRecord(orderId)),
+
+    async findOrder(orderId) {
+      const record = await orders.findById(orderId);
+      return record ? toCustomerOrder(record) : null;
     },
 
-    findOrder: (orderId) => orders.findById(orderId),
+    getStaffOrder: async (orderId) =>
+      toStaffOrder(await getRecord(orderId), {
+        stats: orders.stats(),
+        scenario: promiseScenario,
+      }),
 
     async sampleOrderIds() {
       const found = await Promise.all(sampleOrderIds.map((id) => orders.findById(id)));

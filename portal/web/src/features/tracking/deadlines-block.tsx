@@ -1,5 +1,5 @@
 import type { Order } from "@translog/contracts";
-import { Info, MessageSquareMore, TriangleAlert } from "lucide-react";
+import { MessageSquareMore, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatDate, pluralize } from "@/lib/format.ts";
 
@@ -10,7 +10,8 @@ interface DeadlinesBlockProps {
 
 /**
  * Despacho e entrega lado a lado (previsto, realizado e atraso de cada um) e, abaixo, o motivo
- * provável de cada etapa com a explicação da base. O rótulo da causa é sempre "Motivo provável", nunca certeza.
+ * provável de cada etapa, já em linguagem do cliente (vem pronto da API). O rótulo da causa é
+ * sempre "Motivo provável", nunca certeza.
  */
 export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
   const { dispatch, delivery } = order;
@@ -66,9 +67,6 @@ export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
                 </span>
               )}
             </p>
-            {order.explanation && (
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">{order.explanation}</p>
-            )}
           </div>
           <div className="px-4 py-3 grid place-items-center shrink-0">
             <button
@@ -81,14 +79,7 @@ export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
             </button>
           </div>
         </div>
-      ) : (
-        order.explanation && (
-          <p className="flex items-start gap-2 text-xs text-slate-600 leading-relaxed">
-            <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
-            {order.explanation}
-          </p>
-        )
-      )}
+      ) : null}
     </div>
   );
 }

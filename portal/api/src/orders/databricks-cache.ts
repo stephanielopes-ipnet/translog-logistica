@@ -3,19 +3,19 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { gunzip, gzip } from "node:zlib";
-import { type Order, orderSchema } from "@translog/contracts";
 import { z } from "zod";
+import { type OrderRecord, orderRecordSchema } from "./order-record.ts";
 
-// Cache local do adapter `databricks`: os pedidos já convertidos (o view model `Order`, o mesmo
-// que a API devolve, sem nenhuma coluna proibida) num JSON com gzip dentro de `DATA_DIR`, que
+// Cache local do adapter `databricks`: os pedidos já convertidos (o `OrderRecord` que a API
+// guarda, de onde saem as visões do cliente e do colaborador, sem nenhuma coluna proibida) num JSON com gzip dentro de `DATA_DIR`, que
 // fica fora do Git e da imagem Docker. Medido em 17/11 com os 65.752 pedidos: ~7 MB no disco,
 // leitura em ~3 s, contra 25 s a 3 min de consulta e download no Databricks.
 
 /** Muda quando o formato do arquivo muda (o cache antigo é descartado). */
-const FORMAT = 1;
+const FORMAT = 2;
 
 /**
- * Código que define como as tabelas viram `Order`. Mudou um deles, os pedidos do cache podem
+ * Código que define como as tabelas viram `OrderRecord`. Mudou um deles, os pedidos do cache podem
  * estar diferentes do que a API produziria: a chave muda e o cache é descartado.
  */
 const CONVERSION_FILES = [
@@ -23,7 +23,9 @@ const CONVERSION_FILES = [
   new URL("./consumo-sql.ts", import.meta.url),
   new URL("./escalation.ts", import.meta.url),
   new URL("./file-repository.ts", import.meta.url),
+  new URL("./order-record.ts", import.meta.url),
   new URL("../../../contracts/src/orders.ts", import.meta.url),
+  new URL("../../../contracts/src/staff-orders.ts", import.meta.url),
 ];
 
 export interface OrderCache {
@@ -31,7 +33,7 @@ export interface OrderCache {
   version: string | null;
   /** Quando o cache foi gravado (ISO 8601, UTC). */
   savedAt: string;
-  orders: Map<number, Order>;
+  orders: Map<number, OrderRecord>;
 }
 
 export type CacheReadResult =
@@ -80,9 +82,9 @@ export async function readOrderCache(file: string, key: string): Promise<CacheRe
       return { ok: false, reason: "de outra versão do código ou da fonte" };
     }
     internStrings(content.orders);
-    const orders = new Map<number, Order>();
+    const orders = new Map<number, OrderRecord>();
     for (const value of content.orders) {
-      const order = orderSchema.parse(value);
+      const order = orderRecordSchema.parse(value);
       orders.set(order.orderId, order);
     }
     return { ok: true, cache: { version: content.version, savedAt: content.savedAt, orders } };
@@ -99,7 +101,7 @@ export async function writeOrderCache(
   file: string,
   key: string,
   version: string | null,
-  orders: ReadonlyMap<number, Order>,
+  orders: ReadonlyMap<number, OrderRecord>,
 ): Promise<void> {
   const content = JSON.stringify({
     format: FORMAT,

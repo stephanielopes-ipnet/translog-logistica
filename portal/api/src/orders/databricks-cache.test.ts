@@ -1,14 +1,14 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
-import { orderSchema } from "@translog/contracts";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { tempDir } from "../testing/temp-dir.ts";
 import { cacheKey, readOrderCache, writeOrderCache } from "./databricks-cache.ts";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
+import { orderRecordSchema } from "./order-record.ts";
 
-const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
+const fixtures = z.array(orderRecordSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
 const ORDERS = new Map(fixtures.map((order) => [order.orderId, order]));
 const SOURCE = {
   baseUrl: "https://dbc-teste.cloud.databricks.com",
