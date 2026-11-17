@@ -1,0 +1,8 @@
+order_id,order_item_id,order_status,delivery_status,scheduled_days,actual_days,shipping_mode,destination_region
+1001,1,COMPLETE,Late delivery,4,6,Standard Class,Sudeste
+1002,2,COMPLETE,Shipping on time,3,3,Second Class,Sul
+1003,3,COMPLETE,Advance shipping,4,2,Standard Class,Nordeste
+1004,4,COMPLETE,Late delivery,2,3,First Class,Sudeste
+1004,5,COMPLETE,Shipping on time,2,2,First Class,Sudeste
+1005,6,PROCESSING,,4,,Standard Class,Norte
+0007,7,COMPLETE,Shipping on time,2,2,Second Class,Centro-Oeste
