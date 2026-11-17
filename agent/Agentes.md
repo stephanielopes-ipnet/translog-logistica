@@ -77,6 +77,8 @@ Guia principal para os testes e banca: **`docs/casos-teste-e-apresentacao-agente
 
 ## 7. Próximos passos
 
+Esclarecimento de Marco nesta retomada de 17/11: houve teste de integração anterior com Matheus, mas a Silver v2/FAQ atual ainda não foi testada junto no portal. Usar `docs/guia-matheus-fullstack.md` atualizado e registrar em `docs/aceite-portal-v2-2026-11-17.md`; não contar esse relato como aceite da v2.
+
 1. Registrar resultados manuais dos casos, preservando fatos e estilo de atendimento. Erro 503 deve ser separado de divergência dos dados.
 2. Aceite conjunto com Matheus FullStack: portal → backend → ADK, mesma fonte v2 e mesma FAQ, pedido aberto como contexto, novas sessões e tratamento de erro.
 3. Planejar/implementar e demonstrar contingência para 503 dentro do escopo acordado. Não confundir fonte Databricks escolhida com conector SQL direto do agente já implementado.

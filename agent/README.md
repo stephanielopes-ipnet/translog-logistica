@@ -63,6 +63,7 @@ Para iniciar a interface se estiver parada:
 ## Integração com o portal
 
 - [Guia de Matheus FullStack](docs/guia-matheus-fullstack.md).
+- [Registro do aceite conjunto da v2](docs/aceite-portal-v2-2026-11-17.md): integração anterior relatada; teste atual ainda pendente.
 - [Contrato HTTP ADK](docs/api-chat.md): sessões e `POST /run`; não existe `/chat` adicional no agente.
 - [Contrato e casos da fonte v2](docs/integracao-silver-v2-2026-11-17.md).
 - [Ajustes de atendimento](docs/ajuste-atendimento-apresentacao.md).

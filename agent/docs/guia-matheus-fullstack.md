@@ -1,132 +1,120 @@
-# Primeiro teste do agente com o portal
+# Teste conjunto com Matheus: portal e agente Silver v2
 
-Atualização de 17/11: há uma [nova fonte de consumo v2](integracao-silver-v2-2026-11-17.md), já ativada na pasta local de Marco. Ela precisa ser sincronizada ao código do grupo e configurada na máquina da demonstração. Usa três CSVs privados, separados do Git, e índice técnico Chroma recriável. Os exemplos antigos deste guia usam amostra; não comparar o pedido 1001 da amostra ao da Silver v2. As rotas ADK abaixo permanecem iguais.
+Atualizado em **17/11/2026**. Marco esclareceu que já testou a integração anterior com Matheus, mas **a Silver v2 e a FAQ atual ainda não foram testadas juntos no portal**. Este é o próximo aceite. Aproveitar ambiente e chave existentes.
 
-Guia para Matheus FullStack, preparado em 14/11/2026. Objetivo: executar o agente localmente, validar uma pergunta pela API e depois ligar o backend do portal a ela. A integração na máquina do colega ainda precisa ser executada.
+## Como funciona e quem faz o quê
 
-## 1. Obter o código da branch correta
+O navegador envia a pergunta ao backend do portal. O backend chama o agente ADK, que consulta os pedidos nos CSVs e recupera orientações da FAQ pelo Chroma. O Gemini redige a resposta, que volta ao chat.
 
-Os arquivos estão na branch **`feat/agente-integracao`**, pasta [agent](https://github.com/stephanielopes-ipnet/translog-logistica/tree/feat/agente-integracao/agent), no [PR #30](https://github.com/stephanielopes-ipnet/translog-logistica/pull/30). O PR é rascunho; não procurar essa implementação na `main` antes do merge.
-
-Se ainda não tiver uma cópia dessa branch, pode baixar em uma pasta separada, preservando o trabalho existente do portal:
-
-```powershell
-git clone --branch feat/agente-integracao https://github.com/stephanielopes-ipnet/translog-logistica.git translog-logistica-integracao
-cd .\translog-logistica-integracao\agent
+```text
+Portal → backend do portal → agente ADK → pedido / FAQ → resposta ao cliente
 ```
 
-Se já tiver uma cópia atualizada dessa branch, basta abrir a pasta `agent` dela. Todos os comandos seguintes partem de **`agent`**, não da raiz do repositório nem de `portal`.
+Fazer primeiro tudo **na máquina de Matheus**, por compartilhamento de tela se estiverem separados. Matheus configura e executa o portal; Marco confere fonte, ferramentas e respostas. `localhost` de Matheus não é a porta 8003 do computador de Marco.
 
-## 2. Preparar o ambiente Python
+## 1. Conferir código e dados
 
-No Windows, com Python 3.12 instalado e disponível pelo launcher `py`:
+Usar a pasta `agent/` da branch `feat/agente-silver-v2-rag`, [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32). O PR #30 é histórico e já foi integrado. Conferir o estado atual do PR #32; publicação da branch não significa merge.
 
-```powershell
-py -3.12 --version
-.\scripts\setup.ps1
-```
+Matheus deve preservar suas alterações locais. Se a cópia de integração já acompanha essa branch e está limpa, pode atualizá-la com `git pull --ff-only`. Se está em outra branch ou tem trabalho próprio, preparar uma cópia de integração preservando esse trabalho; não forçar troca nem substituir componentes do portal.
 
-O script instala as dependências na `.venv`, cria `.cache/tmp` e copia `.env.example` para `.env` apenas se esse arquivo ainda não existir. O diagnóstico ao final pode informar chave ainda ausente — preencher no passo seguinte. Não é necessário ativar a `.venv` para usar os comandos deste guia.
+Obter privadamente os mesmos três CSVs da v2 com Mateus de Dados ou Marco:
 
-Se a política do ambiente bloquear o script, usar os comandos manuais de preparação, sem alterar políticas globais:
+- `consumo_pedidos.csv`;
+- `consumo_itens_pedido.csv`;
+- `consumo_eventos_logisticos.csv`.
 
-```powershell
-New-Item -ItemType Directory -Path .\.cache -Force | Out-Null
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.lock -e '.[dev]'
-if (-not (Test-Path -LiteralPath '.env')) {
-    Copy-Item -LiteralPath '.env.example' -Destination '.env'
-}
-```
+Colocar em `agent/data/silver/v2-2026-11-17/` e usar cópias dos **mesmos arquivos** em `portal/dados/` para comparar tela e chat. CSVs completos, `.env`, índices e caches ficam fora do Git.
 
-Se um comando falhar, conferir o erro antes de executar o próximo.
+A fonte continua Databricks `consumo_*`; este teste usa a alternativa local exportada já acordada. Se o portal usar Databricks diretamente, comparar versão/exportação e os pedidos antes do aceite: o agente ainda lê CSV e pode divergir de uma tabela atualizada depois.
 
-## 3. Configurar a chave já criada para os testes
+## 2. Conferir e executar o agente
 
-**Marco optou por disponibilizar a mesma chave Gemini já criada para os testes do projeto. Matheus não precisa criar outra chave ou outro projeto no AI Studio para este fluxo.** O compartilhamento será feito por um meio privado seguro entre os dois; o valor não está neste guia ou no GitHub e não foi lido/copiado pelo assistente.
-
-Após receber a chave, abrir **`agent/.env`** no editor local e ajustar:
+Na pasta **`agent/`**, preservar a chave existente em `.env` e conferir as opções abaixo, sem mostrar a chave na tela compartilhada:
 
 ```dotenv
-GOOGLE_API_KEY=SUBSTITUA_PELA_CHAVE_RECEBIDA_PRIVADAMENTE
 GEMINI_MODEL=gemini-3.5-flash-lite
-TRANSLOG_ORDER_BACKEND=csv
-TRANSLOG_ORDERS_CSV=data/samples/orders.csv
-TRANSLOG_DATA_ORIGIN=sample
+TRANSLOG_ORDER_BACKEND=csv_v2
+TRANSLOG_DATA_ORIGIN=silver
+TRANSLOG_CONSUMPTION_DIR=data/silver/v2-2026-11-17
+TRANSLOG_KNOWLEDGE_DIR=.state/chroma
 TRANSLOG_ALLOW_DEMO_KNOWLEDGE=false
 ```
 
-O texto após `GOOGLE_API_KEY=` é um marcador: substituir pelo valor real somente no arquivo local. Preservar as demais configurações do modelo de arquivo. A `.env.example` ainda traz o modelo inicialmente proposto `gemini-3.8-flash`; ajustar a `.env` como acima para repetir o modelo que funcionou com Marco. Acesso ao modelo e cota continuam sujeitos ao projeto Google usado pela chave.
-
-A chave fica no processo do agente e não deve ser enviada ao navegador, ao grupo ou ao GitHub. Usar a mesma chave compartilha a cota do mesmo projeto. Se houver uma variável `GOOGLE_API_KEY` ou `GEMINI_MODEL` já configurada no ambiente do processo, ela tem precedência sobre `.env`; conferir isso localmente sem imprimir o segredo se a configuração não corresponder ao esperado.
-
-## 4. Conferir a preparação
+Usando o ambiente Python já preparado, executar dentro de `agent/`:
 
 ```powershell
 .\.venv\Scripts\python.exe -m translog.cli doctor
 .\.venv\Scripts\python.exe -m translog.cli order 1001
+.\.venv\Scripts\python.exe -m translog.cli index --input knowledge/approved
+.\.venv\Scripts\python.exe -m translog.cli search 'Qual o horário da central de atendimento?'
 ```
 
-Esperado: diagnóstico com `api_key_configured=true`, modelo configurado, backend `csv` e origem `sample`; consulta com 4 dias previstos, 6 registrados e 2 de atraso. O diagnóstico não mostra a chave. Ausência de índice revisado é esperada neste momento.
+Esperado: backend `csv_v2`, origem `silver`, chave configurada sem mostrar o valor. O 1001 está entregue no prazo, tem quatro linhas de itens e 14 unidades. A indexação deve informar **18 trechos**, revisão `321eb6586e641c21af3d`; a busca deve recuperar central **9h–18h, segunda a sexta**, versão `2-conciliada-2026-11-17`. Se diferir, conferir os arquivos aprovados antes de avançar.
 
-Esses comandos não chamam Gemini: confirmam configuração preenchida e consulta à amostra, não validade da credencial nem cota. Se desejar conferir a suíte sem consumir Gemini:
+Esses comandos não fazem chamada generativa ao Gemini. O primeiro uso do índice pode baixar embeddings. Variáveis já definidas no processo têm precedência sobre `.env`.
+
+Conferir se há agente na porta antes de iniciar outro. Se estiver parada, em um terminal dedicado:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\adk.exe web agents --host 127.0.0.1 --port 8003 --no_use_local_storage
 ```
 
-A suíte teve 30 testes aprovados na integração local apresentada por Marco. A preparação independente desta máquina ainda precisa ser conferida.
+Manter aberto e conferir `http://127.0.0.1:8003/list-apps`: deve listar `translog_agent`. Se houver instância antiga, reiniciar somente o processo identificado para carregar código/configuração atuais. Depois usar nova conversa.
 
-## 5. Iniciar a API
+## 3. Ligar o backend ao agente
 
-Em um terminal dentro de `agent`:
+Em **`portal/.env`**, ajustar estas opções e preservar as demais configurações privadas:
+
+```dotenv
+DATA_SOURCE=file
+DATA_DIR=dados
+AGENT=adk
+AGENT_URL=http://127.0.0.1:8003
+AGENT_APP_NAME=translog_agent
+AGENT_TIMEOUT_MS=90000
+```
+
+`AGENT=mock` usa o simulado do portal e não comprova integração com Gemini/FAQ. A chave Gemini fica somente no agente.
+
+Na pasta **`portal/`**, iniciar pelo fluxo de desenvolvimento já usado por Matheus:
 
 ```powershell
-.\.venv\Scripts\adk.exe api_server agents --host 127.0.0.1 --port 8001 --no_use_local_storage
+pnpm dev
 ```
 
-Manter esse terminal aberto. Se já houver um servidor usando a porta 8001, conferir qual é antes de iniciar outro. Para trocar de `adk web` para `api_server` nessa porta, encerrar o servidor anterior de forma combinada. Não há necessidade de parar o ADK do computador de Marco para executar um servidor no computador de Matheus.
+Se já estiver rodando, Matheus reinicia os processos necessários para carregar a configuração. Conferir `http://127.0.0.1:3333/api/health`: esperado `status=ok`, `dataSource=file`, `orders=65752`, `agent=adk`. Health não consulta o agente; ainda falta testar o chat. Abrir o endereço do frontend informado no terminal, normalmente `http://localhost:5173`.
 
-Na máquina que está executando a API, abrir [documentação interativa local](http://127.0.0.1:8001/docs). Ela ajuda a conferir as rotas; o sucesso ao abrir a página ainda não testa o Gemini.
+Este roteiro usa processos locais. Dentro de contêiner, `127.0.0.1` aponta para o próprio contêiner e exige outro endereço/configuração. Não é necessário expor o agente na internet.
 
-## 6. Fazer uma pergunta antes de integrar o portal
+O backend já cria sessões e chama `POST /run`; não criar `/chat` adicional no agente. O prefixo `[Pedido aberto no portal: CÓDIGO]` leva contexto da tela; o agente consulta a ferramenta e não repete o prefixo ao cliente.
 
-Em outro terminal, também dentro de `agent`:
+## 4. Testar juntos no portal
 
-```powershell
-.\.venv\Scripts\python.exe scripts/chat_demo.py 'Qual o status do pedido 1001?'
-```
+Estas mensagens fazem chamadas reais ao Gemini com a cota configurada. Executar durante o teste combinado. Começar cada caso com **Nova conversa**, exceto a troca de pedido, que continua o primeiro caso.
 
-Esse comando chama o Gemini usando a chave configurada, cria uma conversa própria e imprime os IDs e a resposta final. Esperado: pedido 1001 encontrado na amostra, com 4 dias previstos, 6 registrados e 2 de atraso, identificado como fictício/histórico. A resposta pode variar na redação.
+| Caso | Ação | O que conferir |
+| --- | --- | --- |
+| Contexto | Abrir **7** na tela; perguntar **“Por que aparece atraso?”** e **“Preciso falar com alguém?”** | Usa o 7 sem pedir novamente o código. Despacho +1, entrega 0; não é atraso crítico de entrega. |
+| Troca | Na mesma conversa, abrir **1001** e perguntar **“Quantos itens ele tem?”** | Usa 1001: quatro linhas, 14 unidades, entregue no prazo. Não reaproveita dados do 7/amostra antiga. |
+| Pedido e FAQ | Abrir **76380**; perguntar **“Qual a situação e o que devo fazer?”**, depois **“Qual o horário da central?”** | Em trânsito, entrega +7; orienta central 9h–18h, segunda a sexta. Não alega transferência executada. |
+| Localização | Abrir **16**; perguntar **“Onde está meu pedido?”** | Não pago (expirado), sem despacho/localização física. Brasília/DF é somente destino. |
+| Sessão | Usar **Nova conversa**, limpar pedido aberto e perguntar **“Onde está meu pedido?”** | Pede apenas o código; não herda pedido de outra conversa. Se a tela ainda tiver pedido aberto, esse contexto continua válido. |
 
-Só avançar à ligação com o portal depois que esse teste funcionar. Se falhar, conferir servidor, credencial, acesso ao modelo, cota e logs locais, sem compartilhar o segredo.
+Comparar tela e chat, guardar resposta pública e conferir chamadas/retornos das ferramentas no ADK quando disponíveis. No caso misto, observar `consultar_pedido` e `buscar_faq_e_politicas`: resposta correta sozinha não comprova recuperação da FAQ. Não compartilhar raciocínio interno, credenciais ou dados pessoais.
 
-## 7. Ligar o backend do portal ao agente
+Atendimento simples e acolhedor, sem rodapés de fonte/versão; proveniência nos eventos e disponível se perguntada. Preservar datas originais; não inventar GPS, chegada a partir de hoje ou ação executada.
 
-Fluxo previsto:
+## 5. Falhas e aceite
 
-```text
-Navegador -> backend do portal -> API ADK -> ferramenta de pedido/Gemini
-Navegador <- backend do portal <- resposta final do agente
-```
+Após os casos normais, Matheus pode encerrar **a instância dedicada ao teste**, identificada no terminal, e enviar uma pergunta nova. Esperado: portal mostra falha clara, sem inventar resposta ou dizer que o pedido inexiste. Reiniciar a mesma instância e abrir nova conversa. Isso testa conexão indisponível; **não comprova contingência para 503 do Gemini**, ainda não implementada.
 
-O backend deverá:
+Se aparecer 503/alta demanda, registrar horário, caso e erro como indisponibilidade do provedor. O backend pode apresentar 502 para falha do agente; conferir o código do provedor no registro técnico sem expor dados privados. Após timeout, não disparar reenvios repetidos: a mensagem pode continuar em processamento.
 
-1. Criar uma sessão para cada nova conversa do usuário, sem compartilhar contexto entre clientes.
-2. Enviar a mensagem para `POST http://127.0.0.1:8001/run`, com os IDs da sessão.
-3. Extrair a resposta final da lista de eventos retornada pelo ADK.
-4. Devolver esse texto ao frontend e tratar falhas claramente.
+Registrar em [aceite-portal-v2-2026-11-17.md](aceite-portal-v2-2026-11-17.md), usando a ficha de [casos-teste-e-apresentacao-agente.md](casos-teste-e-apresentacao-agente.md). Só marcar passou depois de observar. Separar relato de Marco, conferência técnica local e aceite na máquina de Matheus.
 
-Os corpos HTTP completos e a referência para extração estão em [api-chat.md](api-chat.md). O exemplo completo já está em `scripts/chat_demo.py` e a função de extração em `src/translog/client.py`.
+## Mensagem pronta para Marco encaminhar
 
-O endereço `127.0.0.1` funciona para processos na mesma máquina. Para este primeiro teste, executar backend e agente juntos na máquina de Matheus; uma implantação em outra máquina, contêiner ou servidor exigirá ajustar o endereço e o acesso. Não foi preparado um endpoint público neste escopo.
+> Matheus, já testamos a integração anterior, mas falta validar juntos a Silver v2 e a FAQ atual. A versão está no PR #32, branch feat/agente-silver-v2-rag. Podemos fazer por compartilhamento de tela na sua máquina: usar os mesmos três CSVs no portal e no agente, indexar os 18 trechos da FAQ e apontar o backend para o ADK com AGENT=adk. O guia agent/docs/guia-matheus-fullstack.md tem os comandos. Vamos conferir pedido 7, troca para 1001, atraso/central no 76380, localização do 16, nova conversa e falha de conexão. Eu confiro respostas e ferramentas com você. Não precisa criar outra chave.
 
-O backend pode manter a rota própria que já utiliza, após alinharmos seu contrato; a API nativa do agente usa `/run`, não um `/chat` implementado nesta base. Nenhuma alteração no código do portal foi feita por esta documentação.
-
-## 8. Conferência conjunta
-
-Primeiro objetivo: digitar no portal “Qual o status do pedido 1001?” e receber a resposta fundamentada na amostra fictícia.
-
-Depois conferir 1004 com os dois itens, 9999 não encontrado e uma nova conversa sem código solicitando identificação. Confirmar também que duas conversas não compartilham histórico e que indisponibilidade não vira resposta inventada.
-
-O aceite dessa etapa será a comunicação funcionando entre portal, backend e agente na máquina do colega, com evidência registrada. Uso da Silver, definição do banco e conteúdo oficial de FAQ/políticas permanecem alinhamentos separados; não são declarados concluídos por esse teste.
+Mensagem preparada; o assistente não a enviou.

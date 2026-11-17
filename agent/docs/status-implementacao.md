@@ -2,6 +2,12 @@
 
 Atualização documental: 17/11/2026. Os registros datados abaixo preservam o histórico de cada etapa.
 
+## Retomada: preparar aceite conjunto da v2 no portal — 17/11
+
+Marco esclareceu que testou uma integração anterior com Matheus, mas ainda não a Silver v2 e a FAQ atual no portal. Solicitou um roteiro para testar juntos. Atualizado [guia-matheus-fullstack.md](guia-matheus-fullstack.md), que ainda direcionava ao PR #30 e à amostra antiga: agora usa PR #32, configuração v2, mesmos CSVs, índice de 18 trechos, `AGENT=adk`, casos de continuidade/troca/FAQ/localização, sessão nova e falha de conexão. Registro em [aceite-portal-v2-2026-11-17.md](aceite-portal-v2-2026-11-17.md), sem marcar casos como aprovados antes de observar.
+
+Conferência local: diagnóstico confirma `csv_v2`, origem `silver`, modelo atual e índice aprovado presentes; `GET /list-apps` em 8003 retornou HTTP 200 e `translog_agent`. Portas 3333 e 5173 recusaram conexão nesta máquina; isso não diagnostica a máquina de Matheus. Sem reinício, novas chamadas Gemini ou alterações no portal. Verificação local sem LLM concluída: nove pedidos, um código inexistente e quatro recuperações reais com os trechos esperados em top3 (`.state/acceptance-retomada-v2-2026-11-17.json`, fora do Git). Isso não avalia redação Gemini/portal. Suíte completa não repetida para esta mudança documental; 51 testes anteriores continuam evidência histórica. Fonte Databricks, FAQ fechada e atendimento humanizado preservados.
+
 ## Consolidação de contexto e sincronização da versão atual — 17/11
 
 **Publicação concluída e conferida:** versão funcional consolidada em `fdd5f31ea1189ff60afd1b58d0b1e6048972099e`, no mesmo [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32), rascunho e sem merge. Título/descrição atualizados para FAQ fechada de 18 trechos, atendimento para apresentação e nova retomada. **51 testes passaram no destino, 10 avisos, em 45,55 s**. Conector de escrita retornou 403 e a interface de edição do navegador ficou indisponível; a descrição foi atualizada via API oficial com autenticação do helper Git somente em memória, sem exibir/gravar credenciais. Push e leitura do PR confirmados. Não houve inferência generativa nesta etapa.

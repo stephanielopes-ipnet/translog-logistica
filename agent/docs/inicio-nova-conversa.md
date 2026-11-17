@@ -31,6 +31,8 @@ Perguntas/casos para testar e apresentar: [casos-teste-e-apresentacao-agente.md]
 
 ## Próximo foco de trabalho
 
+Marco esclareceu nesta retomada de 17/11 que já testou uma integração anterior com Matheus, **mas ainda não a Silver v2 e a FAQ atual no portal**. Roteiro atualizado em [guia-matheus-fullstack.md](guia-matheus-fullstack.md), com configuração dos dois processos, mesmos CSVs, teste de contexto/FAQ/sessões e falha de conexão. Evidências e pendências em [aceite-portal-v2-2026-11-17.md](aceite-portal-v2-2026-11-17.md). Não tratar o relato anterior como aceite desta versão nem voltar ao guia antigo do PR #30/amostra.
+
 Registrar os casos manuais e testar a versão atual com Matheus FullStack no fluxo **portal → backend → ADK**, com a mesma v2 e FAQ na máquina da demo. Verificar continuidade, código do pedido aberto, orientação da FAQ e mensagens de falha. Contingência 503 permanece sem implementação; não confundir isso com erro dos dados. Consultar `docs/status-implementacao.md` e `docs/decisoes.md` para evidências.
 
 ## Mensagem para colar na nova conversa

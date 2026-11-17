@@ -1,5 +1,9 @@
 # Retomada do acompanhamento de Marco
 
+## Retomada posterior — teste com Matheus ainda sem v2
+
+Marco esclareceu em 17/11 que a integração anterior já foi testada, mas a Silver v2 e FAQ atual ainda não foram testadas juntos no portal. Pediu direção para executar com Matheus. Guia atualizado em [guia-matheus-fullstack.md](guia-matheus-fullstack.md), substituindo instruções da amostra/PR #30. Registro em [aceite-portal-v2-2026-11-17.md](aceite-portal-v2-2026-11-17.md). Próximo: combinar teste na máquina de Matheus, mesmos CSVs no agente/portal, FAQ de 18 trechos e modo `adk`; guardar respostas/ferramentas. Não reenviar mensagem automaticamente nem presumir aceite atual.
+
 ## Ponto de entrada consolidado e autorização permanente — 17/11
 
 Publicação desta consolidação concluída: código/FAQ/guias em `fdd5f31`, PR #32 atualizado em rascunho sem merge; 51 testes passaram no destino. A descrição agora reflete FAQ fechada, atendimento sem rodapés, localização e autorização permanente. Não usar o texto anterior do PR ou tratar ajustes recentes como ainda não publicados.
