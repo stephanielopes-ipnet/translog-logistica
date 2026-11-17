@@ -1,0 +1,82 @@
+[
+  {
+    "id": "tecnico-rastrear-pedido",
+    "title": "Projeto acadêmico: como acompanhar um pedido",
+    "text": "Informe o código do pedido no chat. A ferramenta consulta a tabela de pedidos, todos os seus itens e os eventos correspondentes. Na Silver v2, o rastreio é um cenário histórico com complemento simulado; informe a data de referência do pedido. Cidade, hub e local de evento não são GPS em tempo real. Mostre a situação e as datas que estiverem registradas, sem inventar dados ausentes.",
+    "kind": "faq",
+    "source": "FAQ Stephanie v1 (pergunta 1), adaptada ao contrato técnico Silver v2; revisão técnica local",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente a pedido de Marco; não é aprovação final das políticas de Stephanie"
+  },
+  {
+    "id": "tecnico-prazos-despacho",
+    "title": "Projeto acadêmico: diferença entre despacho e entrega",
+    "text": "Marco confirmou em 17/11/2026 que os prazos de 4/2/1 dias são de despacho, não de entrega. Consulte o prazo_despacho_dias do pedido. A data de entrega prevista é um campo separado do cenário, assim como os atrasos de despacho e de entrega. Não converter dias de despacho em uma promessa de chegada. Não classificar os dias como úteis ou corridos sem definição da fonte.",
+    "kind": "faq",
+    "source": "Confirmação explícita de Marco em 17/11/2026 e cabeçalhos da exportação Silver v2 de Mateus",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente com correção explícita de Marco"
+  },
+  {
+    "id": "tecnico-atraso",
+    "title": "Projeto acadêmico: atraso, adiantamento e informação não avaliada",
+    "text": "Despacho e entrega têm campos distintos. Use os indicadores e valores registrados na consulta, sem recalcular. Valor negativo em dias_atraso_despacho representa despacho adiantado e em dias_atraso_entrega representa entrega adiantada no cenário. Valor nulo significa informação ausente ou não avaliada, não zero. Não deduzir causa, pagamento ou verificação individual apenas pelo nulo. Causas e ocorrências adicionadas ao cenário devem ser identificadas como simuladas. Nenhuma nova data ou indenização pode ser prometida sem fonte.",
+    "kind": "faq",
+    "source": "Contrato técnico da IA e exportação Silver v2; FAQ Stephanie v1 (regras 1 a 3), com restrições para evitar inferências",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente; regras comerciais pendentes excluídas"
+  },
+  {
+    "id": "tecnico-alteracao-endereco",
+    "title": "Projeto acadêmico: alteração de endereço de entrega",
+    "text": "As ferramentas atuais do assistente são somente de consulta e não alteram endereço de entrega. Não afirmar que uma alteração foi feita nem garantir que será possível. Não há ferramenta de encaminhamento automático ou contato confirmado disponível nesta versão. O procedimento oficial de alteração de endereço ainda depende da revisão das políticas pela equipe.",
+    "kind": "policy",
+    "source": "Limites implementados das ferramentas da IA; FAQ Stephanie v1 (regra 7), somente parte técnica conferida",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente; não aprova fluxo de atendimento"
+  },
+  {
+    "id": "tecnico-cancelamento-reembolso",
+    "title": "Projeto acadêmico: cancelamento, reembolso e indenização",
+    "text": "O assistente não executa cancelamento, reembolso, indenização, reagendamento ou encaminhamento. Ele pode consultar a situação registrada do pedido. Não há regra final revisada neste corpus que confirme indenização automática, direito a reembolso, prazo de pagamento ou canal de atendimento. Não inventar esses procedimentos ou afirmar que uma solicitação foi registrada.",
+    "kind": "policy",
+    "source": "Limites implementados das ferramentas da IA; FAQ Stephanie v1 (regras 5 e 6), sem regras comerciais pendentes",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente; não é política comercial final de Stephanie"
+  },
+  {
+    "id": "tecnico-pedido-nao-encontrado",
+    "title": "Projeto acadêmico: número de pedido não encontrado",
+    "text": "Se a fonte disponível retornar pedido não encontrado, peça à pessoa que confira o código e tente novamente. Não invente um pedido. Se houver falha na fonte, informe que não foi possível consultar; falha não significa que o pedido não existe. Códigos iguais na amostra fictícia e na Silver v2 representam fontes diferentes.",
+    "kind": "faq",
+    "source": "FAQ Stephanie v1 (regra 8) e contrato técnico da ferramenta consultar_pedido",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente"
+  },
+  {
+    "id": "tecnico-varios-itens",
+    "title": "Projeto acadêmico: pedido com vários itens",
+    "text": "A consulta preserva todos os itens do pedido e suas quantidades. Na Silver v2 recebida, a situação logística é por pedido; a tabela de itens não contém situação individual de entrega. Não invente diferenças de status entre itens. Se uma fonte futura fornecer situações distintas por item, preserve e explique as diferenças comprovadas.",
+    "kind": "faq",
+    "source": "FAQ Stephanie v1 (regra 9), adaptada à granularidade dos três CSVs de Mateus",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente"
+  },
+  {
+    "id": "tecnico-dados-pessoais",
+    "title": "Projeto acadêmico: dados necessários para consultar um pedido",
+    "text": "Para consultar um pedido, solicite apenas seu código. Não peça senha, documentos, dados de cartão, nome ou endereço completo. A consulta seleciona os campos necessários ao rastreio, sem expor identificador de cliente, contatos, endereço residencial ou informações financeiras. Responda de forma simples, amigável e respeitosa.",
+    "kind": "policy",
+    "source": "FAQ Stephanie v1 (regra 10) e minimização implementada na ferramenta de consulta",
+    "version": "2026-11-17-local-v1",
+    "status": "approved",
+    "approved_by": "Revisão técnica local do assistente"
+  }
+]

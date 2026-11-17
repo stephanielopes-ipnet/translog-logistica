@@ -1,0 +1,46 @@
+# Decisões e mudanças
+
+| Data | Estado | Decisão | Impacto / responsável |
+| --- | --- | --- | --- |
+| 12/11/2026 | Confirmada | Briefing atualizado é a referência oficial | Todo o grupo |
+| 12/11/2026 | Confirmada | Marco recebe Silver em 13/11, não depende de Gold para começar | Dados + Marco; validar formato ao receber |
+| 12/11/2026 | Confirmada | ADK com consulta estruturada e Chroma para FAQ e políticas | Marco; conteúdo coordenado por Stephanie |
+| 12/11/2026 | Pendente | Escolha do banco: PostgreSQL sugerido; aguardar grupo | Dados + FullStack + Marco; conector real não será implementado por suposição |
+| 12/11/2026 | Confirmada | Stephanie cria um único repositório | Trabalhar localmente até receber URL; não criar remoto paralelo |
+| 12/11/2026 | Proposta | Modelo inicial Gemini 3.8 Flash | Conferir acesso/cota; variável `GEMINI_MODEL` permite ajuste |
+| 12/11/2026 | Proposta | Montagem conjunta na máquina de Matheus | Validar portal, backend e ADK na mesma máquina |
+| 13/11/2026 | Confirmada | Repositório único disponível em `stephanielopes-ipnet/translog-logistica`; usar a conta `Marco-Leal96` | Preferência explícita de Marco; identidade e acesso de contribuição conferidos pelo conector; nenhuma publicação efetuada |
+| 13/11/2026 | Confirmada | Arquivo `silver_pedidos_rastreio.csv` recebido e inspecionado localmente | Cópia em `data/silver/`; significado das colunas e uso no agente ainda precisam de validação com Dados |
+| 13/11/2026 | Pendente | Conciliar os contratos locais com os textos do GitHub sobre DuckDB, Gold e `/chat` | Discutir na issue #1; Marco não tem confirmação de decisão posterior; não escolher banco nem alterar API por inferência |
+| 13/11/2026 | Pendente | Definir tratamento de atraso não avaliado/cancelado e diferença negativa da Silver | Dados + Marco; apenas mapear nomes de colunas não basta; ver `roteiro-marco-13-11.md` |
+| 14/11/2026 | Proposta de trabalho | Cenário internacional, com visibilidade gerencial e atendimento ao cliente; substituir referências a 300 caminhões/15 estados/18% como base do cenário | Contexto explícito de Marco e discussão final da reunião de 13/11; aprovação formal do mentor para o reenquadramento ainda não confirmada |
+| 14/11/2026 | Confirmada por Marco | Permitir complemento simulado se necessário, preservando identificação e separação da base histórica | Autorização do usuário nesta conversa, não atribuída ao mentor; nenhum complemento novo criado nesta revisão |
+| 14/11/2026 | Verificada na Silver | Cinco mercados e quatro classes de serviço; EUA/Porto Rico em `origem_cliente_pais` | Leitura completa local; a coluna não comprova sede nem local de despacho. Ver `alinhamento-cenario-2026-11-14.md` |
+| 14/11/2026 | Pendente | Conferir exportação mais recente e dicionário após reunião | A cópia recebida contém coordenadas; reunião posterior discute retirada. Validar também status e elegibilidade do atraso com Dados |
+| 14/11/2026 | Confirmada, substitui o estado de proposta acima | Cenário internacional e possibilidade de complemento simulado aprovados pelo mentor Othon | Fonte: confirmação explícita de Marco nesta conversa, posterior à análise da transcrição. Mantêm-se identificação de simulações e pendências de banco, API e semântica dos campos |
+| 14/11/2026 | Contexto informado pelo grupo | Sede em Porto Rico informada por Matheus de Dados; distinguir os dois Matheus por papel | Fonte: esclarecimento explícito de Marco. A sede não é inferida das colunas de cliente; origem de despacho ainda precisa de dicionário |
+| 14/11/2026 | Verificação concluída | Auditoria de todas as linhas e colunas da exportação recebida, sem alterar a base | Relatório `revisao-silver-2026-11-14.md`; correções pontuais e definições a encaminhar a Matheus de Dados. Não equivale a validar Bronze/pipeline não fornecidos |
+
+## Como registrar uma novidade
+
+Complemento posterior de 17/11 — Marco autorizou explicitamente as duas conversas Gemini antes bloqueadas. Ambas executadas, sem 503 observado. Rastreio 1001 correto; pergunta mista 12 chamou ambas as ferramentas e respeitou limites, mas omitiu citação da fonte/versão. Prompt reforçado após a observação; efeito do reforço ainda não reavaliado. Respostas e evidência em `avaliacao-gemini-v2-2026-11-17.md`; não declarar avaliação integral concluída nem disponibilidade garantida. Nenhuma publicação no GitHub ou reinício de servidor.
+
+Registro posterior de 17/11 — Marco entregou ZIP `silver_v2` de Mateus e link da FAQ de Stephanie, solicitando continuar a integração. Recebimento/auditoria das três tabelas concluídos; `csv_v2` integrado e ativado localmente, com despacho/entrega separados, diferenças com sinal, eventos e rótulo histórico/simulado. Marco confirmou que 4/2/1 dias são despacho. FAQ original declara “para revisão”; somente oito orientações técnicas conferidas localmente entraram no Chroma, sem aprovação de regras comerciais pendentes ou atribuição de aprovação final à autora. 49 testes passaram e recuperação real foi verificada. Avaliação Gemini bloqueada por revisão automática devido à transmissão de dados mínimos ao Google; depende de autorização explícita, sem contorno. Não houve decisão de banco, implementação SQL, sincronização/publicação no GitHub ou reinício de servidor. Relatório: `integracao-silver-v2-2026-11-17.md`.
+
+Registro de 17/11 — solicitação explícita de Marco: configurar comunicação amigável no agente. Instrução local atualizada para linguagem simples, acolhimento profissional, respostas curtas e empatia sem promessas; contrato das ferramentas preservado. Reavaliação de estilo com Gemini pendente, conforme `comunicacao-agente.md`. Marco informou que Mateus de Dados enviará a Gold; lista priorizada e mensagem preparada em `solicitacao-gold-mateus-2026-11-17.md`. Envio anunciado não significa arquivo recebido ou schema aprovado. Banco e integração à fonte final continuam pendentes; nenhuma mensagem externa ou publicação foi realizada.
+
+Complemento de 15/11 — Marco apresentou resposta atribuída a Othon: primeiro investigar documentação/nomenclatura e, se a dúvida permanecer, seguir com a abordagem de despacho/eventos simulados justificando as premissas. Não houve confirmação de semântica pelo mentor. Pesquisa localizou e leu `DescriptionDataCoSupplyChain.csv` da publicação original Mendeley; definição breve dos dias reais não explicita o evento final. A existência do dicionário corrige a afirmação genérica de ausência de documentação, sem encerrar a ambiguidade. Registro em `interpretacao-dataco-fontes-2026-11-15.md`; não houve mudança de banco, fonte, código ou envio ao grupo.
+
+Registro de 15/11 — conversa do grupo apresentada por Marco: Stephanie confirmou que preparará FAQ/políticas; entrega do conteúdo ainda não apresentada. Mateus de Dados relatou finalizar tabela, revisar inconsistências e criar dois cenários com eventos de entrega além do despacho. Proposta citada: `silver.trechos_entrega`, recebendo concordância, mas com texto de modal e referência aos pontos 1/2 truncados. Não confirmar schema/critério/modal sem artefato. FullStack relatou interface → backend, mas falha ao executar agente e dados parciais da Silver no portal; banco futuro mencionado sem escolha de tecnologia. Fonte e consequências em `alinhamento-grupo-2026-11-15.md`. Nenhum contrato de execução ou fonte ativa alterado.
+
+Atualização posterior de 14/11 — retorno de Dados apresentado por Marco:
+
+- **Correção confirmada por Marco:** responsável por Dados é **Mateus, sem H**; FullStack é **Matheus, com H**. Substitui a grafia anterior usada no acompanhamento.
+- **Esclarecimento de Mateus de Dados:** atraso vazio corresponde a pagamento não processado ou cancelamento pelo cliente/por suspeita de fraude. Não preencher com zero nem deduzir o motivo individual só pela ausência; mapeamento por status e adaptação ainda pendentes.
+- **Atualização anunciada, não recebida:** a exportação de 13/11 era a atual ao responder, mas Mateus planejava atualizá-la em 14/11, com novas colunas na base final. Dicionário, esquema final, banco e fonte de consulta não foram definidos nessas mensagens. Ofereceu chamada após envio. Ver `alinhamento-dados-2026-11-14.md`.
+
+Execução de 14/11: Marco usa provisoriamente chave Google pessoal para aprender/testar com amostra, após restrição de acesso corporativo. Modelo local alterado para `gemini-3.5-flash-lite` após 503 repetidos em `gemini-3.8-flash`; primeiro retorno coerente com 1001 relatado por Marco, sem concluir avaliação integral. Nenhum segredo registrado. Ver `retomada-marco.md`.
+
+Complemento de 14/11 — WhatsApp de 13/11: o grupo discute extra de inteligência de rotas e novas colunas; quantidade de agentes, esquema final, P80 e limiares de classificação permanecem propostos. Ver `revisao-propostas-whatsapp-2026-11-14.md`, com avaliação das dez colunas e percentuais recalculados por pedido elegível na Silver. Nenhuma dessas sugestões foi implementada ou promovida a contrato confirmado.
+
+Data; informação e fonte; estado (proposta/confirmada/pendente); motivo; componentes afetados; pessoas a avisar; testes a repetir. Aprender e mudar de ideia é previsto. Registrar antes de alterar uma interface compartilhada.

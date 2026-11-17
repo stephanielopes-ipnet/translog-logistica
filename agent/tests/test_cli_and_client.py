@@ -23,6 +23,7 @@ def test_cli_queries_sample_without_model(monkeypatch, capsys):
 
 
 def test_cli_validation_failure_is_explicit(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("TRANSLOG_ORDER_BACKEND", "csv")
     monkeypatch.setenv("TRANSLOG_ORDERS_CSV", str(tmp_path / "missing.csv"))
     assert main(["validate-orders"]) == 1
     assert json.loads(capsys.readouterr().out)["status"] == "error"

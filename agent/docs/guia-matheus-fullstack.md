@@ -1,5 +1,7 @@
 # Primeiro teste do agente com o portal
 
+Atualização de 17/11: há uma [nova fonte de consumo v2](integracao-silver-v2-2026-11-17.md), já ativada na pasta local de Marco. Ela precisa ser sincronizada ao código do grupo e configurada na máquina da demonstração. Usa três CSVs privados, separados do Git, e índice técnico Chroma recriável. Os exemplos antigos deste guia usam amostra; não comparar o pedido 1001 da amostra ao da Silver v2. As rotas ADK abaixo permanecem iguais.
+
 Guia para Matheus FullStack, preparado em 14/11/2026. Objetivo: executar o agente localmente, validar uma pergunta pela API e depois ligar o backend do portal a ela. A integração na máquina do colega ainda precisa ser executada.
 
 ## 1. Obter o código da branch correta
@@ -54,7 +56,7 @@ TRANSLOG_DATA_ORIGIN=sample
 TRANSLOG_ALLOW_DEMO_KNOWLEDGE=false
 ```
 
-O texto após `GOOGLE_API_KEY=` é um marcador: substituir pelo valor real somente no arquivo local. Preservar as demais configurações do modelo de arquivo. O modelo padrão da `.env.example` agora é `gemini-3.5-flash-lite`, o mesmo usado por Marco e nesta integração. Acesso e disponibilidade continuam sujeitos à cota e à capacidade do serviço Google no momento da apresentação.
+O texto após `GOOGLE_API_KEY=` é um marcador: substituir pelo valor real somente no arquivo local. Preservar as demais configurações do modelo de arquivo. A `.env.example` ainda traz o modelo inicialmente proposto `gemini-3.8-flash`; ajustar a `.env` como acima para repetir o modelo que funcionou com Marco. Acesso ao modelo e cota continuam sujeitos ao projeto Google usado pela chave.
 
 A chave fica no processo do agente e não deve ser enviada ao navegador, ao grupo ou ao GitHub. Usar a mesma chave compartilha a cota do mesmo projeto. Se houver uma variável `GOOGLE_API_KEY` ou `GEMINI_MODEL` já configurada no ambiente do processo, ela tem precedência sobre `.env`; conferir isso localmente sem imprimir o segredo se a configuração não corresponder ao esperado.
 
