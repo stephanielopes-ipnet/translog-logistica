@@ -202,7 +202,6 @@ Além das 32 originais, a view tem **9 colunas criadas**, somando **41 colunas**
 | `Sales` / `Order Item Discount` / `Order Item Total` | `valor_bruto_venda` / `valor_desconto` / `valor_item_pedido` | 2 casas decimais |
 | `Order Profit Per Order` | **`lucro_item`** | 2 casas decimais. **Renomeada**: o nome original engana (seção 10). |
 | `Order Item Profit Ratio` | `margem_lucro_item` | 4 casas decimais |
-| `Latitude` / `Longitude` | `latitude_origem` / `longitude_origem` | `TRY_CAST DOUBLE` (ver seção 11) |
 | `Type` | `tipo_pagamento` | `UPPER` |
 
 ### 5.3 Colunas mantidas só na tabela, fora da view (6)
@@ -267,7 +266,6 @@ Registros que violam alguma regra vão para `silver.pedidos_quarentena` com o mo
 | Dias nulos ou negativos | `dias_envio_invalido` |
 | `Late_delivery_risk` incoerente com o `Delivery Status` | `flag_risco_incoerente_com_status` |
 | Estado de origem numérico ou cidade de origem nula | `origem_invalida` |
-| Latitude fora de ±90 ou longitude fora de ±180 | `coordenada_fora_do_intervalo` |
 
 **Resultado atual: 0 registros**, depois da correção da seção 6.4.
 
@@ -309,7 +307,7 @@ O idioma do dataset varia **por coluna**, não pela origem do pedido:
 Seis nomes chegavam com **"?"** no lugar de letras que não existem na codificação ISO-8859-1 usada na leitura do CSV (ex.: `Bra?ov`, `Gy?r`, `Klaip?da`). O de-para usou o valor corrompido como chave e **restaurou o nome correto** (Brașov, Győr, Klaipėda).
 
 ### 7.4 O que não foi traduzido
-`mercado_logistico`, `categoria_produto`, `departamento`, `modo_envio`, `segmento_cliente`, `tipo_pagamento` e `status_pedido` continuam no original. `destino_cidade` e `nome_produto` também, por serem nomes próprios.
+`mercado_logistico`, `categoria_produto`, `departamento`, `segmento_cliente`, `tipo_pagamento` e `status_pedido` continuam no original. `modo_envio` fica no original nas tabelas internas e recebe um rótulo pt-BR que explicita o prazo de despacho nas saídas (`consumo_*` e Gold), via `silver.dim_traducao`: Same Day → Expresso (despacho no mesmo dia), First Class → Prioritário (despacho em 1 dia), Second Class → Rápido (despacho em 2 dias), Standard Class → Padrão (despacho em 4 dias). `destino_cidade` e `nome_produto` também, por serem nomes próprios.
 
 ### 7.5 Validação (02b, seções 3b a 3e)
 - Nenhum valor da Silver ficou sem par no de-para.
@@ -364,7 +362,7 @@ O cenário ideal é o BI consumir **só a Gold** (dados agregados). Por decisão
 | Redundância | Provas de que as colunas removidas eram cópias |
 | Tradução | Cobertura total, sem chaves duplicadas, sem "?" |
 
-**`02c_silver_auditoria_consumidores.py`**: auditoria para FullStack e IA (nulos, domínios, consistência financeira, datas, armadilhas para Text-to-SQL, RAG, coordenadas) e teste de aceitação na view (busca por pedido, busca por cliente, KPI oficial, colunas expostas).
+**`02c_silver_auditoria_consumidores.py`**: auditoria para FullStack e IA (nulos, domínios, consistência financeira, datas, armadilhas para Text-to-SQL, RAG) e teste de aceitação na view (busca por pedido, busca por cliente, KPI oficial, colunas expostas).
 
 ---
 
@@ -384,15 +382,14 @@ O cenário ideal é o BI consumir **só a Gold** (dados agregados). Por decisão
 | 10 | Risco de o agente de IA contar atrasos errados | Auditoria do 02c (98.977 × 57.811) | Colunas originais fora da view |
 | 11 | 940 linhas onde bruto − desconto ≠ total | Auditoria do 02c | Diferença máxima de 0,01: só arredondamento, sem ação |
 | 12 | 33.784 itens com lucro negativo | Auditoria do 02c | Dado real (prejuízo), mantido. Pode virar insight para o BI. |
-| 13 | 227 coordenadas fora dos EUA e de Porto Rico | Caixa geográfica + análise por cidade | Mantidas; limitação conhecida (seção 11) |
+| 13 | 227 coordenadas fora dos EUA e de Porto Rico | Caixa geográfica + análise por cidade | Colunas removidas da Silver (sem uso e não confiáveis) |
 
 ---
 
 ## 11. Premissas e limitações
 
 - **"Em Trânsito" é uma premissa de simulação.** O DataCo é histórico e não tem status de trânsito. Tratamos `PROCESSING` como "Em Trânsito" para o portal.
-- **Não há rastreio em tempo real no dataset.** Latitude e longitude formam **um ponto fixo por item**, sem horário e sempre no país de origem, mesmo para pedidos entregues na Europa ou na Ásia. São um ponto de **origem** (loja ou cliente: o dataset é ambíguo), não a posição do pacote. O rastreio do portal é **simulado** a partir das datas e da situação, o que é coerente com o briefing: *"a TransLog não tem rastreio em tempo real"*.
-- **227 coordenadas incoerentes** (sinal de menos perdido, vírgula deslocada) são erro do dado original. Não foram tratadas e podem aparecer fora do lugar no mapa.
+- **Não há rastreio em tempo real no dataset.** Latitude e longitude do DataCo formam **um ponto fixo por item**, sem horário e sempre no país de origem (loja ou cliente: o dataset é ambíguo), não a posição do pacote, e 227 delas são incoerentes (sinal de menos perdido, vírgula deslocada). Por isso **as colunas foram removidas da Silver**: ficam só na Bronze. O rastreio do portal é **simulado** a partir das datas e da situação, coerente com o briefing: *"a TransLog não tem rastreio em tempo real"*.
 - **`data_envio` (Shipping date) = data da entrega** (premissa da v2, seção 13.2): pedido + dias reais em 100% das linhas. Só a data é confiável (a hora tem erro de ±12h em 5,4% das linhas). Na view, a data de entrega aparece como `data_entrega_real`, só para entregues.
 - **Os 18% do briefing contra os 57% do dataset:** o DataCo não reflete os números da TransLog. Os indicadores demonstram o **método**, não o valor real do cliente.
 - **Arredondamento:** os valores estão em `DOUBLE` com 2 casas decimais, o que gera diferenças de até 0,01 entre totais.
@@ -593,6 +590,6 @@ O DataCo não tem documentação oficial, e a nomenclatura do setor e os dados i
 **Views sem marca de simulação:** `dado_simulado`, fonte, versão e escopo ficam só nas tabelas. O texto da IA usa linguagem de operação.
 
 ### 14.3 Ordem de execução
-01 → 01b → 02a → 02d (hubs) → 02g (eventos; chama o 02f) → 02i (rastreio) → 02e (view) → 02b (testes Silver) → 02h (testes da simulação) → 03b (Gold v3).
+01 → 01b → 02a → 02d (hubs) → 02g (eventos; chama o 02f) → 02i (rastreio) → 02e (view) → 02b (testes Silver) → 02h (testes da simulação) → 03c (Gold OBT) → 03d (testes da Gold).
 
 A arquitetura completa, o dicionário de colunas e o uso por consumidor estão em `05_arquitetura_dados_silver.md`.

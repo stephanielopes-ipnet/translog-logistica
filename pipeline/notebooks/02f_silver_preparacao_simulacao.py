@@ -44,10 +44,13 @@ print(f"cenário={CENARIO} versão={VERSAO} escopo={ESCOPO} pedidos_por_grupo={P
 CAMPOS_PEDIDO = [
     "data_pedido", "data_envio", "modo_envio", "status_pedido", "dias_envio_programado",
     "dias_envio_real", "dias_atraso_despacho", "mercado_logistico", "origem_cliente_pais", "tipo_rota",
-    "destino_pais", "destino_estado", "destino_cidade", "destino_regiao",
+    "destino_pais", "destino_estado", "destino_cidade", "destino_regiao", "situacao_rastreio",
 ]
 
 itens = spark.table("silver.pedidos_rastreio").select("id_pedido", "id_item_pedido", *CAMPOS_PEDIDO)
+
+# Data de referência da base (D, foto histórica na última transação) — calculada no 02a
+DATA_REF = spark.table("silver.pedidos_rastreio").agg(F.max("data_referencia_base").alias("data_referencia_base"))
 
 # -----------------------------------------------------------------------------
 # 2. Granularidade: itens do mesmo pedido têm que concordar em todos os campos de pedido.
@@ -76,22 +79,22 @@ pedidos = (
 
 # -----------------------------------------------------------------------------
 # 3. Classificação do pedido, modal e hubs
-#    grupo_status (base REAL, até o despacho):
-#      concluido   = COMPLETE/CLOSED: despachado e pedido concluído -> recebe resultado da
-#                    entrega simulado (60% no prazo / 20% atraso / 20% extravio)
-#      em_transito = PROCESSING: despachado, pedido ainda aberto -> jornada parcial
-#      aguardando  = não pago / retido: não despachado
-#      cancelado   = CANCELED / SUSPECTED_FRAUD
+#    grupo_status (situação operacional em D, calculada no 02a):
+#      despachado = COMPLETE/CLOSED/PROCESSING: tem despacho -> jornada simulada até D;
+#                   desfecho (60/20/20) se ele acontece até D, senão "Em trânsito" em D
+#      aguardando = status de espera com pedido nos últimos 7 dias antes de D
+#      nao_pago   = status de espera mais antigo ("Não pago (expirado)")
+#      cancelado  = CANCELED / SUSPECTED_FRAUD
 #    modal_transporte (PREMISSA de simulação, regra fixa):
 #      Same Day / First Class -> Aéreo expresso; doméstico EUA saindo dos EUA -> Rodoviário;
 #      demais (internacional ou saindo de Porto Rico) -> Aéreo consolidado.
 # -----------------------------------------------------------------------------
 c = F.col
 grupo_status = (
-    F.when(c("status_pedido").isin("COMPLETE", "CLOSED"), "concluido")
-    .when(c("status_pedido") == "PROCESSING", "em_transito")
-    .when(c("status_pedido").isin("CANCELED", "SUSPECTED_FRAUD"), "cancelado")
-    .when(c("status_pedido").isin("PENDING", "PENDING_PAYMENT", "PAYMENT_REVIEW", "ON_HOLD"), "aguardando")
+    F.when(c("situacao_rastreio") == "Despachado", "despachado")
+    .when(c("situacao_rastreio") == "Cancelado", "cancelado")
+    .when(c("situacao_rastreio") == "Aguardando pagamento", "aguardando")
+    .when(c("situacao_rastreio") == "Não pago (expirado)", "nao_pago")
 )
 
 domestico = c("tipo_rota") == "Doméstica"
@@ -133,7 +136,8 @@ tc = trad.where("coluna = 'destino_cidade'").select(
 df_pedidos_base = (
     pedidos.join(pedidos_divergentes.select("id_pedido"), "id_pedido", "left_anti")
     .withColumn("grupo_status", grupo_status)
-    .withColumn("despachado", c("grupo_status").isin("concluido", "em_transito"))
+    .withColumn("despachado", c("grupo_status") == "despachado")
+    .crossJoin(DATA_REF)
     .withColumn("modal_transporte", F.when(c("despachado"), modal))
     .withColumn("internacional", c("tipo_rota") == "Internacional")
     .withColumn("aereo", F.coalesce(c("modal_transporte").startswith("Aéreo"), F.lit(False)))
@@ -180,7 +184,8 @@ df_pedidos_base = _prep.where("motivo IS NULL").drop("motivo")
 # -----------------------------------------------------------------------------
 # 5. Entrada do gerador
 #    piloto: amostra estratificada e determinística (hash do id_pedido), sem inventar registros.
-#      - despachados: até N por (tipo_rota x modo_envio x grupo_status)
+#      - despachados: até N por (tipo_rota x modo_envio x status_pedido original)
+#      - despachados nos últimos 15 dias antes de D: até N por tipo_rota (testam o "em trânsito")
 #      - +1 por região de destino ainda não coberta
 #      - aguardando e cancelado: até N cada (só para validar que não ganham jornada)
 #    completo: todos os pedidos de df_pedidos_base.
@@ -189,7 +194,12 @@ _h = F.xxhash64(c("id_pedido"), F.lit("piloto"))
 
 estratos = (
     df_pedidos_base.where("despachado")
-    .withColumn("_rn", F.row_number().over(W.partitionBy("tipo_rota", "modo_envio", "grupo_status").orderBy(_h)))
+    .withColumn("_rn", F.row_number().over(W.partitionBy("tipo_rota", "modo_envio", "status_pedido").orderBy(_h)))
+    .where(c("_rn") <= POR_GRUPO).select("id_pedido")
+)
+recentes = (
+    df_pedidos_base.where(c("despachado") & (c("data_envio") >= c("data_referencia_base") - F.expr("INTERVAL 15 DAYS")))
+    .withColumn("_rn", F.row_number().over(W.partitionBy("tipo_rota").orderBy(_h)))
     .where(c("_rn") <= POR_GRUPO).select("id_pedido")
 )
 nao_despachados = (
@@ -204,7 +214,7 @@ regioes = (
     .withColumn("_rn", F.row_number().over(W.partitionBy("destino_regiao").orderBy(_h)))
     .where("_rn = 1").select("id_pedido")
 )
-ids_piloto = estratos.unionByName(regioes).unionByName(nao_despachados).distinct()
+ids_piloto = estratos.unionByName(recentes).unionByName(regioes).unionByName(nao_despachados).distinct()
 
 if ESCOPO == "piloto":
     df_pedidos_entrada = df_pedidos_base.join(ids_piloto, "id_pedido")
@@ -212,7 +222,7 @@ else:
     df_pedidos_entrada = df_pedidos_base
 
 # Cobertura do piloto: grupos que existem na base x grupos presentes na entrada
-_grade = ["tipo_rota", "modo_envio", "grupo_status"]
+_grade = ["tipo_rota", "modo_envio", "status_pedido"]
 df_cobertura_piloto = (
     df_pedidos_base.where("despachado").groupBy(*_grade).agg(F.count("*").alias("pedidos_na_base"))
     .join(df_pedidos_entrada.where("despachado").groupBy(*_grade).agg(F.count("*").alias("pedidos_no_piloto")),

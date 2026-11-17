@@ -108,10 +108,6 @@ base_limpa AS (
         -- O lucro do pedido inteiro está na view: lucro_total_pedido = SUM por id_pedido.
         ROUND(TRY_CAST(`Order Profit Per Order` AS DOUBLE), 2) AS lucro_item,
 
-        -- Coordenadas para Mapa
-        TRY_CAST(`Latitude` AS DOUBLE)                   AS latitude_origem,
-        TRY_CAST(`Longitude` AS DOUBLE)                  AS longitude_origem,
-
         -- [Adicionadas] Colunas recuperadas da Bronze
         -- Preço: Order Item Product Price = preço praticado NA VENDA (o fato do pedido);
         -- Product Price = preço de catálogo. Validação na seção 5 ao final do script.
@@ -136,7 +132,13 @@ avaliacao AS (
         COALESCE(status_pedido IN ('CANCELED', 'SUSPECTED_FRAUD')
               OR status_entrega_original = 'Shipping canceled', FALSE)          AS pedido_cancelado,
         COALESCE(status_pedido IN ('COMPLETE', 'CLOSED', 'PROCESSING')
-             AND status_entrega_original <> 'Shipping canceled', FALSE)         AS avaliado_prazo
+             AND status_entrega_original <> 'Shipping canceled', FALSE)         AS avaliado_prazo,
+        -- DATA DE REFERÊNCIA DA BASE (D): a base é uma foto histórica tirada na última transação
+        -- registrada = maior data entre pedido e despacho. Calculada, nunca fixa.
+        -- Motivo: o Order Status é distribuído igualmente no tempo (~12% PROCESSING e ~40% em
+        -- espera em TODO trimestre de 2015 a 2018), ou seja, não é uma foto atual. Com D, só
+        -- faz sentido estar "aberto" quem é recente em relação a D (doc 04).
+        GREATEST(MAX(data_pedido) OVER (), MAX(data_envio) OVER ())             AS data_referencia_base
     FROM base_limpa
 ),
 regras_negocio AS (
@@ -166,7 +168,7 @@ regras_negocio AS (
         -- Janela de Atraso (Entregável Obrigatório Eng. de Dados)
         CASE
             WHEN pedido_cancelado    THEN '5. Envios Cancelados'
-            WHEN NOT avaliado_prazo  THEN '0. Não Avaliado (Aguardando Liberação)'
+            WHEN NOT avaliado_prazo  THEN '0. Não Avaliado (sem pagamento confirmado)'
             WHEN (dias_envio_real - dias_envio_programado) < 0  THEN '1. Adiantado (< 0 dias)'
             WHEN (dias_envio_real - dias_envio_programado) = 0  THEN '2. No Prazo (0 dias)'
             WHEN (dias_envio_real - dias_envio_programado) BETWEEN 1 AND 2 THEN '3. Atraso Leve (1 a 2 dias)'
@@ -182,16 +184,20 @@ regras_negocio AS (
             ELSE 'Atrasado'
         END AS status_prazo_despacho,
 
-        -- Situação do pedido na base REAL (até o despacho). Usa Order Status:
-        --   COMPLETE/CLOSED = pedido concluído e despachado; PROCESSING = despachado, pedido
-        --   ainda aberto (em trânsito); pendentes = aguardando liberação; cancelados.
-        -- A situação da ENTREGA (entregue, atrasada, extraviada) é simulada: situacao_entrega.
+        -- Situação OPERACIONAL do pedido na data de referência D (status_pedido = original).
+        --   CANCELED / SUSPECTED_FRAUD                         -> Cancelado
+        --   COMPLETE / CLOSED / PROCESSING (têm despacho)       -> Despachado
+        --     (se já chegou, atrasou, extraviou ou está em trânsito em D = situacao_entrega)
+        --   PENDING / PENDING_PAYMENT / PAYMENT_REVIEW / ON_HOLD:
+        --     pedido nos últimos 7 dias antes de D            -> Aguardando pagamento
+        --     mais antigo (espera de até 1.126 dias)           -> Não pago (expirado)
         CASE
             WHEN pedido_cancelado                                       THEN 'Cancelado'
-            WHEN status_pedido IN ('COMPLETE', 'CLOSED')                THEN 'Despachado'
-            WHEN status_pedido = 'PROCESSING'                           THEN 'Em Trânsito'
-            WHEN status_pedido IN ('PENDING', 'PENDING_PAYMENT',
-                                   'PAYMENT_REVIEW', 'ON_HOLD')         THEN 'Aguardando Liberação'
+            WHEN avaliado_prazo                                         THEN 'Despachado'
+            WHEN status_pedido IN ('PENDING', 'PENDING_PAYMENT', 'PAYMENT_REVIEW', 'ON_HOLD')
+                 AND data_pedido >= data_referencia_base - INTERVAL 7 DAYS THEN 'Aguardando pagamento'
+            WHEN status_pedido IN ('PENDING', 'PENDING_PAYMENT', 'PAYMENT_REVIEW', 'ON_HOLD')
+                                                                        THEN 'Não pago (expirado)'
             ELSE 'Desconhecido'
         END AS situacao_rastreio,
 
@@ -218,10 +224,7 @@ regras_negocio AS (
             CASE WHEN COALESCE(risco_atraso_flag, -1) <> CASE WHEN status_entrega_original = 'Late delivery' THEN 1 ELSE 0 END
                  THEN 'flag_risco_incoerente_com_status' END,
             CASE WHEN origem_cliente_estado RLIKE '^[0-9]+$' OR origem_cliente_cidade IS NULL
-                 THEN 'origem_invalida' END,
-            CASE WHEN latitude_origem  NOT BETWEEN -90  AND 90
-                   OR longitude_origem NOT BETWEEN -180 AND 180
-                 THEN 'coordenada_fora_do_intervalo' END
+                 THEN 'origem_invalida' END
         ), '') AS motivo_quarentena
     FROM avaliacao
 ),
@@ -251,7 +254,7 @@ indicadores_pmo AS (
         -- não é usada como causa (no DataCo o atraso em nov/dez é 58,1% contra 57,1% no resto do ano).
         CASE WHEN MONTH(data_pedido) IN (11, 12) THEN 1 ELSE 0 END AS periodo_pico,
 
-        -- receita_em_risco agora é da ENTREGA (atrasada ou extraviada) e fica só na Gold (03b).
+        -- receita_em_risco agora é da ENTREGA (atrasada ou extraviada) e fica só na Gold (03c).
 
         -- causa_atraso_despacho do atraso no DESPACHO (derivada só de dados reais):
         --   Promessa irreal = atrasado com prazo de despacho prometido <= 1 dia (Same Day e

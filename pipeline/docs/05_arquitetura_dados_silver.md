@@ -74,11 +74,10 @@ A empresa cresceu sem enxergar a própria operação:
  └────┬─────────────────────────────────────────────────────────┘
       ▼ silver.vw_pedidos_rastreio                               grão: item    → IA (RAG) / Portal
  ┌────────────────────────────────────────┐
- │ 03b  Gold v3 (lê as TABELAS Silver)    │──► gold.kpi_executivo_v3 · funil_despacho_entrega ·
- └────────────────────────────────────────┘    desempenho_modalidade · desempenho_rota ·
-                                               extravios_por_etapa · tendencia_mensal_v3  → BI / PMO
- Testes: 02b (Silver, 37 PASS) · 02h (simulação, 28 PASS, com assert)
- 03 = Gold legado (Delivery Status original), substituída pela 03b
+ │ 03c  Gold OBT (só despachados)         │──► gold.obt_pedidos_logistica · obt_itens_risco ·
+ └────────────────────────────────────────┘    obt_eventos_etapas · param_cenario_prazo ·
+                                               vw_cenarios_prazo  → BI (dashboard)
+ Testes: 02b (Silver, 37 PASS) · 02h (simulação, 28 PASS, com assert) · 03d (Gold OBT, com assert)
 ```
 
 ---
@@ -184,15 +183,8 @@ A empresa cresceu sem enxergar a própria operação:
 | `silver.pedidos_quarentena`, `silver.eventos_logisticos_quarentena` | registro | Reprovados + motivo |
 | `silver.simulacao_publicada` | 1 linha | Fatia consumida pelas views |
 
-### 5.4 Gold v3 (03b)
-| Tabela | Grão | Pergunta |
-|---|---|---|
-| `gold.kpi_executivo_v3` | 1 linha | Quanto atrasa (despacho e entrega), quanto extravia, quanto o transporte recupera, receita em risco, cobertura |
-| `gold.funil_despacho_entrega` | status do despacho × desfecho | O despacho é a etapa crítica? (100% das entregas atrasadas vêm de despacho atrasado) |
-| `gold.desempenho_modalidade` | modalidade | Onde nasce o atraso e por quê (promessa irreal x operacional) |
-| `gold.desempenho_rota` | rota × mercado × região × modal | Quais rotas mais atrasam e extraviam |
-| `gold.extravios_por_etapa` | etapa × rota × mercado | Onde a carga se perde |
-| `gold.tendencia_mensal_v3` | mês | Evolução de despacho, entrega e receita em risco |
+### 5.4 Gold (03c)
+A Gold consumida é só a OBT (`gold.obt_*`) e a view de cenários (`gold.vw_cenarios_prazo`), com os parâmetros em `gold.param_cenario_prazo`. O 03d confere os KPIs da OBT contra um gabarito recalculado direto da Silver. Dicionário completo: `07_guia_gold_obt_analista.md`.
 
 `receita_em_risco` = venda bruta (`Sales`) dos pedidos com **entrega atrasada ou extraviada**. Existe só na Gold.
 
@@ -202,7 +194,7 @@ A empresa cresceu sem enxergar a própria operação:
 
 | Consumidor | O que lê | Perguntas que responde | O que **não** deve fazer |
 |---|---|---|---|
-| **BI / PMO** | Gold v3 (03b) | Quanto atrasa no despacho (real) e na entrega; onde (modalidade, rota, etapa do extravio); por quê (causa do despacho, recuperação no transporte); quanto custa (receita em risco) | Usar `Delivery Status`/`Late delivery`; somar itens como pedidos; ler a Gold legado (03) |
+| **BI / PMO** | Gold OBT (03c) | Quanto atrasa no despacho (real) e na entrega; onde (modalidade, rota, etapa do extravio); por quê (causa do despacho, recuperação no transporte); quanto custa (receita em risco) | Usar `Delivery Status`/`Late delivery`; somar itens como pedidos; ler a Gold legado (03) |
 | **Agente de IA** | `resumo_rastreio_rag`, `vw_rastreio_eventos`, `vw_eventos_logisticos` | "Onde está meu pedido?", "Quando chega?", "Por que atrasou?", "Foi extraviado?", linha do tempo | Ler as tabelas (têm PII e marcas internas); responder sobre pedido não pago como despachado |
 | **Portal FullStack** | `vw_rastreio_eventos` (situação), `vw_eventos_logisticos` (linha do tempo) | Tela de rastreio | Ler as tabelas direto |
 
@@ -246,7 +238,7 @@ A empresa cresceu sem enxergar a própria operação:
 | 4 | Fatias antigas na tabela de eventos (`v1`, `v2`) | Fora das views | Quem ler a **tabela** deve filtrar pela fatia publicada. Limpeza: decisão do Mateus |
 | 5 | Colunas de versões antigas em `entregas_simuladas` (`etapa_ocorrencia`, `data_entrega_simulada`...) | NULL na fatia v3 (mergeSchema) | Limpeza junto com as fatias antigas |
 | 6 | Gold v3 no piloto cobre só 43 pedidos com desfecho (0,1%) | Indicadores de entrega ainda não representativos | **Geração completa** (escopo `completo`) antes de publicar o dashboard |
-| 7 | Gold legado (03) usa `Late delivery` (98.977 itens x 57.811 reais) | Mantido só para não quebrar | Usar a 03b |
+| 7 | Gold legado (03) usa `Late delivery` (98.977 itens x 57.811 reais) | Notebook removido | Usar a Gold OBT (03c) |
 | 8 | Itens divergentes, país sem hub, cidade sem tradução | 0 / 0 / 0 | Monitorar a cada carga |
 
 ### Resultado da validação (piloto v3)
