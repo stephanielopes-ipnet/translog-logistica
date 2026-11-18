@@ -37,7 +37,7 @@ export const attentionOrderSchema = z.object({
 });
 export type AttentionOrder = z.infer<typeof attentionOrderSchema>;
 
-/** Promessa × realidade de uma modalidade. */
+/** Atrasos de uma modalidade (prazo prometido × despachos e entregas atrasados). */
 export const promiseByModeSchema = z.object({
   shippingMode: shippingModeSchema,
   promisedDays: count.describe("Prazo de despacho prometido, em dias"),
@@ -45,12 +45,6 @@ export const promiseByModeSchema = z.object({
   lateDispatchPct: percent.describe("% dos despachos que atrasaram"),
   evaluatedDeliveries: count.describe("Entregas avaliadas (entregues ou em trânsito)"),
   lateDeliveryPct: percent.describe("% das entregas que atrasaram"),
-  suggestedDays: count
-    .nullable()
-    .describe('Prazo sugerido ("Promessa ajustada" da Gold); null = sem cenário'),
-  lateDispatchPctWithSuggested: percent.describe(
-    "% dos despachos que estariam atrasados com o prazo sugerido",
-  ),
 });
 export type PromiseByMode = z.infer<typeof promiseByModeSchema>;
 

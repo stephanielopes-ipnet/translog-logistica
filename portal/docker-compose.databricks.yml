@@ -14,7 +14,6 @@ services:
       DATABRICKS_WAREHOUSE_ID: ${DATABRICKS_WAREHOUSE_ID:?defina DATABRICKS_WAREHOUSE_ID no portal/.env}
       DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:?defina DATABRICKS_TOKEN no portal/.env}
       DATABRICKS_CATALOG_SCHEMA: ${DATABRICKS_CATALOG_SCHEMA:-workspace.silver}
-      DATABRICKS_GOLD_SCHEMA: ${DATABRICKS_GOLD_SCHEMA:-workspace.gold}
     healthcheck:
       # O warehouse da edição gratuita pode estar dormindo: a carga leva até ~3 min.
       start_period: 240s

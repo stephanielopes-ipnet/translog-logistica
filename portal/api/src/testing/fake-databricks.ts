@@ -4,7 +4,6 @@ import type { AddressInfo } from "node:net";
 import { parse } from "csv-parse/sync";
 import { onTestFinished } from "vitest";
 import { consumoFiles } from "../orders/file-repository.ts";
-import { GOLD_SCENARIO_FILE } from "../orders/promise-scenario.ts";
 
 // Só para testes (fora da imagem Docker): um Databricks falso que responde à SQL Statement
 // Execution API com as linhas da amostra `orders/fixtures/consumo/` e à consulta de tabela do
@@ -18,8 +17,6 @@ const SAMPLE_BY_TABLE: Record<string, string> = {
   consumo_pedidos: SAMPLE.orders,
   consumo_itens_pedido: SAMPLE.items,
   consumo_eventos_logisticos: SAMPLE.events,
-  // Cenário "Promessa ajustada" da Gold (o WHERE da consulta é ignorado: o leitor filtra de novo).
-  param_cenario_prazo: `${SAMPLE_DIR}${GOLD_SCENARIO_FILE}`,
 };
 
 export interface FakeDatabricksOptions {
@@ -133,7 +130,7 @@ export async function startFakeDatabricks(
   });
 
   function createStatement(sql: string, id: string): Statement {
-    const table = sql.match(/ FROM [\w.]+\.(consumo_\w+|param_cenario_prazo)/)?.[1] ?? "";
+    const table = sql.match(/ FROM [\w.]+\.(consumo_\w+)/)?.[1] ?? "";
     const file = SAMPLE_BY_TABLE[table];
     if (!file || table === options.missingTable) {
       return { id, table, chunks: [], polls: 0 };

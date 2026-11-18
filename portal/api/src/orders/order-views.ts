@@ -9,7 +9,6 @@ import type {
 import { customerCause } from "./customer-language.ts";
 import type { OrderRecord } from "./order-record.ts";
 import { latePercent, type OrderStats } from "./order-stats.ts";
-import type { PromiseScenario } from "./promise-scenario.ts";
 
 // As duas visões de um pedido, montadas a cada consulta a partir do `OrderRecord` guardado.
 // Campos listados um a um (nunca `...record`): campo novo no registro não vaza para o cliente
@@ -70,17 +69,11 @@ export function toCustomerOrder(record: OrderRecord): Order {
 export interface StaffViewContext {
   /** Números da carga (contexto da modalidade e da rota). */
   stats: OrderStats;
-  /** Prazo sugerido por modalidade (Promessa ajustada, da Gold). */
-  scenario: PromiseScenario;
 }
 
 /** Visão do colaborador: o registro inteiro (causas da base) mais o diagnóstico. */
-export function toStaffOrder(
-  record: OrderRecord,
-  { stats, scenario }: StaffViewContext,
-): StaffOrder {
+export function toStaffOrder(record: OrderRecord, { stats }: StaffViewContext): StaffOrder {
   const { dispatch, delivery } = record;
-  const suggestedDays = scenario.get(record.shippingMode) ?? null;
   const deliveryLate = delivery.delayDays !== null && delivery.delayDays > 0;
   return {
     ...toCustomerOrder(record),
@@ -105,11 +98,6 @@ export function toStaffOrder(
       promisedDays: dispatch.promisedDays,
       daysToDispatch: record.daysToDispatch,
       delayDays: dispatch.delayDays,
-      suggestedDays,
-      onTimeWithSuggested:
-        record.daysToDispatch === null || suggestedDays === null
-          ? null
-          : record.daysToDispatch <= suggestedDays,
     },
     transportDiagnosis: transportDiagnosis(record),
     stageDays: stageDays(record),

@@ -21,14 +21,12 @@ import {
 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { SUPPORT_HOURS } from "@/features/tracking/order-status.ts";
-import { formatOrderCount, MARKET_LABEL } from "./markets.ts";
+import { formatRoundedTotal, formatShare, MARKET_LABEL, roundedOrderTotal } from "./markets.ts";
 import { journeyOffset, marketShares } from "./motion.ts";
-import { useCountUp, useCycle, useInView } from "./use-motion.ts";
+import { useCountUp, useCycle, useInView, usePrefersReducedMotion } from "./use-motion.ts";
 
 // Seções do Início abaixo do herói, animadas ao aparecer na tela (paradas com
 // `prefers-reduced-motion`): números da plataforma, jornada do pedido, modalidades e central.
-
-const countFormatter = new Intl.NumberFormat("pt-BR");
 
 /** Atraso de entrada em cascata (`.reveal` em index.css). */
 const delay = (ms: number): CSSProperties => ({ transitionDelay: `${ms}ms` });
@@ -54,10 +52,12 @@ const MARKET_COLORS: Record<Market, string> = {
   Africa: "#cbd5e1",
 };
 
-/** Faixa azul com os números da TransLog (total real de pedidos) e a parte de cada mercado. */
+/** Faixa azul com os números da TransLog (total arredondado) e a parte de cada mercado. */
 export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefined }) {
   const [ref, inView] = useInView<HTMLElement>(0.3);
-  const total = useCountUp(summary?.totalOrders ?? 0, inView && summary !== undefined);
+  // Ordem de grandeza ("65.000+"), não o número exato de pedidos.
+  const rounded = roundedOrderTotal(summary?.totalOrders ?? 0);
+  const total = useCountUp(rounded.value, inView && summary !== undefined);
   const markets = useCountUp(5, inView, 900);
   const modes = useCountUp(4, inView, 900);
   const shares = summary ? marketShares(summary.markets) : [];
@@ -68,19 +68,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
       aria-labelledby="em-numeros"
       className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary-900 via-primary-800 to-primary text-white shadow-lg"
     >
-      {/* Rotas tracejadas que fluem ao fundo */}
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 960 300"
-        preserveAspectRatio="none"
-        className="absolute inset-0 w-full h-full opacity-25"
-      >
-        <g fill="none" stroke="#f59e0b" strokeWidth="1.6" className="route-flow">
-          <path d="M-20 250 C 240 250 320 60 980 70" />
-          <path d="M-20 270 C 300 270 420 170 980 190" />
-          <path d="M-20 230 C 200 220 260 20 980 20" />
-        </g>
-      </svg>
+      <BandRoutes />
       <div className="absolute inset-0 band-grid" aria-hidden="true" />
 
       <div className="relative px-7 py-7">
@@ -90,7 +78,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
         <dl className="mt-4 grid grid-cols-2 gap-6 min-[1180px]:grid-cols-4">
           <BigNumber
             icon={PackageCheck}
-            value={summary ? countFormatter.format(total) : "…"}
+            value={summary ? formatRoundedTotal(total, rounded.plus) : "…"}
             label="pedidos acompanhados no portal"
             inView={inView}
             order={0}
@@ -126,9 +114,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
           <div
             role="img"
             aria-label={shares
-              .map(
-                (share) => `${MARKET_LABEL[share.market]}: ${share.pct.toLocaleString("pt-BR")}%`,
-              )
+              .map((share) => `${MARKET_LABEL[share.market]}: ${formatShare(share.pct)}`)
               .join("; ")}
             className="mt-2.5 flex h-3.5 rounded-full bg-white/10 overflow-hidden"
           >
@@ -161,7 +147,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
                   {MARKET_LABEL[share.market]}
                 </span>
                 <span className="mt-0.5 block font-mono text-white/65">
-                  {share.pct.toLocaleString("pt-BR")}% · {formatOrderCount(share.orders)}
+                  {formatShare(share.pct)} dos pedidos
                 </span>
               </li>
             ))}
@@ -169,6 +155,149 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
         </div>
       </div>
     </section>
+  );
+}
+
+/** Hub de origem e destinos do desenho de fundo da faixa (coordenadas do viewBox 960 × 290). */
+const BAND_ORIGIN = { x: 36, y: 276 };
+const BAND_ROUTES = [
+  { to: { x: 640, y: 34 }, control: { x: 300, y: -40 }, dur: 6.5, begin: 0 },
+  { to: { x: 880, y: 52 }, control: { x: 420, y: -10 }, dur: 7, begin: 1.4 },
+  { to: { x: 930, y: 132 }, control: { x: 520, y: 40 }, dur: 6, begin: 2.6 },
+  { to: { x: 850, y: 196 }, control: { x: 480, y: 130 }, dur: 5.5, begin: 0.8 },
+  { to: { x: 920, y: 258 }, control: { x: 520, y: 250 }, dur: 6.8, begin: 3.2 },
+];
+/** Curvas de "latitude" e "meridiano" que sugerem um globo atrás das rotas. */
+const BAND_GLOBE = [
+  "M-40 280 Q480 80 1000 280",
+  "M-40 340 Q480 140 1000 340",
+  "M-40 220 Q480 20 1000 220",
+  "M330 -20 Q260 145 330 310",
+  "M640 -20 Q710 145 640 310",
+];
+
+/**
+ * Desenho de fundo da faixa de números: arcos de rota aérea do hub (EUA · Porto Rico) aos cinco
+ * destinos, sobre curvas de um globo, com tracejado que flui e "pacotes" percorrendo as rotas.
+ * Discreto de propósito (opacidade baixa), para não competir com os números por cima.
+ * Com movimento reduzido, fica o desenho parado (sem pacotes nem pulsos).
+ */
+function BandRoutes() {
+  const reduced = usePrefersReducedMotion();
+  const paths = BAND_ROUTES.map(
+    (route) =>
+      `M${BAND_ORIGIN.x} ${BAND_ORIGIN.y} Q${route.control.x} ${route.control.y} ${route.to.x} ${route.to.y}`,
+  );
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 960 290"
+      preserveAspectRatio="none"
+      className="absolute inset-0 w-full h-full opacity-55"
+    >
+      <defs>
+        <linearGradient
+          id="band-route"
+          gradientUnits="userSpaceOnUse"
+          x1="36"
+          y1="0"
+          x2="930"
+          y2="0"
+        >
+          <stop offset="0" stopColor="#93c5fd" />
+          <stop offset="1" stopColor="#f59e0b" />
+        </linearGradient>
+        <radialGradient id="band-parcel">
+          <stop offset="0" stopColor="#fde68a" stopOpacity="1" />
+          <stop offset="1" stopColor="#f59e0b" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <g fill="none" stroke="#ffffff" strokeOpacity="0.07" strokeWidth="1">
+        {BAND_GLOBE.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
+
+      {/* Rota base, discreta, e o tracejado que flui por cima */}
+      <g fill="none" stroke="#ffffff" strokeOpacity="0.07" strokeWidth="1.2">
+        {paths.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
+      <g
+        fill="none"
+        stroke="url(#band-route)"
+        strokeOpacity="0.32"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        className="route-flow"
+      >
+        {paths.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
+
+      {/* Destinos */}
+      {BAND_ROUTES.map((route, index) => (
+        <g key={`${route.to.x}-${route.to.y}`}>
+          <circle cx={route.to.x} cy={route.to.y} r="3.5" fill="#ffffff" fillOpacity="0.75" />
+          {!reduced && (
+            <circle
+              cx={route.to.x}
+              cy={route.to.y}
+              r="4"
+              fill="none"
+              stroke="#ffffff"
+              strokeOpacity="0.5"
+            >
+              <animate
+                attributeName="r"
+                values="4;14"
+                dur="2.4s"
+                begin={`${index * 0.5}s`}
+                repeatCount="indefinite"
+              />
+              <animate
+                attributeName="stroke-opacity"
+                values="0.5;0"
+                dur="2.4s"
+                begin={`${index * 0.5}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          )}
+        </g>
+      ))}
+
+      {/* Hub de origem */}
+      <circle cx={BAND_ORIGIN.x} cy={BAND_ORIGIN.y} r="22" fill="#f59e0b" fillOpacity="0.08" />
+      <circle cx={BAND_ORIGIN.x} cy={BAND_ORIGIN.y} r="12" fill="#f59e0b" fillOpacity="0.18" />
+      <circle cx={BAND_ORIGIN.x} cy={BAND_ORIGIN.y} r="5" fill="#f59e0b" />
+
+      {/* Pacotes percorrendo as rotas */}
+      {!reduced &&
+        BAND_ROUTES.map((route, index) => (
+          <g key={`pacote-${route.to.x}`}>
+            <circle r="9" fill="url(#band-parcel)" opacity="0.5">
+              <animateMotion
+                dur={`${route.dur}s`}
+                begin={`${route.begin}s`}
+                repeatCount="indefinite"
+                path={paths[index]}
+              />
+            </circle>
+            <circle r="2.6" fill="#fde68a">
+              <animateMotion
+                dur={`${route.dur}s`}
+                begin={`${route.begin}s`}
+                repeatCount="indefinite"
+                path={paths[index]}
+              />
+            </circle>
+          </g>
+        ))}
+    </svg>
   );
 }
 
@@ -235,7 +364,8 @@ const STEPS = [
 export function JourneySection() {
   const [ref, inView] = useInView<HTMLElement>(0.3);
   const last = JOURNEY.length - 1;
-  const step = useCycle(last, inView, 1500);
+  // Cada etapa fica ~3,2 s parada; o pacote leva 1,8 s para chegar à próxima.
+  const step = useCycle(last, inView, 3200);
   const offset = journeyOffset(step, JOURNEY.length);
   const current = JOURNEY[step] ?? JOURNEY[0];
   const CurrentIcon = current?.icon ?? Truck;
@@ -254,12 +384,12 @@ export function JourneySection() {
           <div className="absolute left-7 right-7 min-[1180px]:left-12 min-[1180px]:right-12 top-[19px] h-1">
             <div className="absolute inset-0 rounded-full bg-slate-100" />
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-accent motion-safe:transition-[width] motion-safe:duration-[1100ms] ease-in-out"
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-accent motion-safe:transition-[width] motion-safe:duration-[1800ms] ease-in-out"
               style={{ width: `${offset}%` }}
             />
             <div
               aria-hidden="true"
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 motion-safe:transition-[left] motion-safe:duration-[1100ms] ease-in-out z-10"
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 motion-safe:transition-[left] motion-safe:duration-[1800ms] ease-in-out z-10"
               style={{ left: `${offset}%` }}
             >
               <span className="relative grid place-items-center w-[50px] h-[50px] rounded-full bg-accent text-slate-900 shadow-lg ring-4 ring-surface">
@@ -279,7 +409,7 @@ export function JourneySection() {
                   className="w-14 min-[1180px]:w-24 flex flex-col items-center text-center"
                 >
                   <span
-                    style={{ transitionDelay: done ? "700ms" : "0ms" }}
+                    style={{ transitionDelay: done ? "1500ms" : "0ms" }}
                     className={`w-10 h-10 rounded-full grid place-items-center border-2 motion-safe:transition-colors motion-safe:duration-500 ${
                       done
                         ? "bg-primary border-primary text-white"

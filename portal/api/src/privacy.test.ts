@@ -11,7 +11,6 @@ import { type OrderRecord, orderRecordSchema } from "./orders/order-record.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
 import { createOrderSearch } from "./orders/order-search.ts";
 import { computeOrderStats } from "./orders/order-stats.ts";
-import { NO_PROMISE_SCENARIO } from "./orders/promise-scenario.ts";
 import { buildServer } from "./server.ts";
 import { startFakeDatabricks } from "./testing/fake-databricks.ts";
 import { tempDir } from "./testing/temp-dir.ts";
@@ -111,7 +110,6 @@ function leakyRepository(leak: (record: OrderRecord) => object): OrderRepository
     count: async () => fixtures.length,
     search: createOrderSearch(fixtures),
     stats: () => computeOrderStats(fixtures),
-    scenario: () => NO_PROMISE_SCENARIO,
   };
 }
 

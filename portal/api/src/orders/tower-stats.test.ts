@@ -6,7 +6,6 @@ import { loadFileRepository } from "./file-repository.ts";
 import { createFixturesRepository } from "./fixtures-repository.ts";
 import type { OrderRepository } from "./order-repository.ts";
 import { createOrderService } from "./order-service.ts";
-import { NO_PROMISE_SCENARIO } from "./promise-scenario.ts";
 
 function service(orders: OrderRepository, dashboardUrl: string | null = null) {
   return createOrderService({
@@ -55,7 +54,7 @@ describe("Torre de controle (fixtures)", () => {
     });
   });
 
-  it("compara promessa e realidade com o prazo sugerido da Gold", async () => {
+  it("mostra os atrasos por modalidade, sem prazo sugerido", async () => {
     const { promiseByMode } = service(await createFixturesRepository()).getTower();
 
     expect(promiseByMode.map((mode) => mode.shippingMode)).toEqual([
@@ -70,19 +69,12 @@ describe("Torre de controle (fixtures)", () => {
       lateDispatchPct: 100,
       evaluatedDeliveries: 2,
       lateDeliveryPct: 100,
-      suggestedDays: 2,
-      lateDispatchPctWithSuggested: 0,
     });
   });
 
-  it("sem cenário, não sugere prazo; com DASHBOARD_URL, devolve o link", async () => {
+  it("com DASHBOARD_URL, devolve o link", async () => {
     const orders = await createFixturesRepository();
-    const withoutScenario = createOrderService({
-      orders: { ...orders, scenario: () => NO_PROMISE_SCENARIO },
-      sampleOrderIds: [],
-    }).getTower();
-
-    expect(withoutScenario.promiseByMode.every((mode) => mode.suggestedDays === null)).toBe(true);
+    expect(service(orders).getTower().dashboardUrl).toBeNull();
     expect(service(orders, "https://painel.exemplo/1").getTower().dashboardUrl).toBe(
       "https://painel.exemplo/1",
     );

@@ -8,11 +8,10 @@ import type {
   TowerResponse,
 } from "@translog/contracts";
 import type { OrderRecord } from "./order-record.ts";
-import type { PromiseScenario } from "./promise-scenario.ts";
 
 // Números da Torre de controle e do resumo do Início, acumulados numa passada só quando os
-// pedidos são carregados (junto com `computeOrderStats`). O que depende do cenário da Gold
-// (prazo sugerido) e do `DASHBOARD_URL` entra só na montagem da resposta (`buildTower`).
+// pedidos são carregados (junto com `computeOrderStats`). O `DASHBOARD_URL` entra só na montagem
+// da resposta (`buildTower`).
 
 /** Ordem fixa das modalidades (da mais lenta para a mais rápida). */
 export const SHIPPING_MODE_ORDER: readonly ShippingMode[] = [
@@ -46,8 +45,6 @@ interface ModeStats {
   promisedDays: number;
   dispatch: Count;
   delivery: Count;
-  /** Quantos pedidos despachados levaram N dias até o despacho (para o prazo sugerido). */
-  daysToDispatch: Map<number, number>;
 }
 
 export interface TowerStats {
@@ -95,7 +92,6 @@ export function createTowerAccumulator() {
           promisedDays: record.dispatch.promisedDays,
           dispatch: { total: 0, late: 0 },
           delivery: { total: 0, late: 0 },
-          daysToDispatch: new Map(),
         };
         modes.set(record.shippingMode, mode);
       }
@@ -104,10 +100,6 @@ export function createTowerAccumulator() {
         const late = (record.dispatch.delayDays ?? 0) > 0;
         tally(dispatch, late);
         tally(mode.dispatch, late);
-        if (record.daysToDispatch !== null) {
-          const days = record.daysToDispatch;
-          mode.daysToDispatch.set(days, (mode.daysToDispatch.get(days) ?? 0) + 1);
-        }
       }
       if (record.delivery.delayDays !== null) {
         const late = record.delivery.delayDays > 0;
@@ -162,7 +154,6 @@ export function createTowerAccumulator() {
 }
 
 export interface BuildTowerOptions {
-  scenario: PromiseScenario;
   /** Entregas avaliadas e atrasadas por rota (`OrderStats.deliveryByRoute`). */
   deliveryByRoute: ReadonlyMap<string, Count>;
   dashboardUrl: string | null;
@@ -171,7 +162,7 @@ export interface BuildTowerOptions {
 /** Resposta de `GET /api/staff/tower`. */
 export function buildTower(
   stats: TowerStats,
-  { scenario, deliveryByRoute, dashboardUrl }: BuildTowerOptions,
+  { deliveryByRoute, dashboardUrl }: BuildTowerOptions,
 ): TowerResponse {
   const promiseByMode: PromiseByMode[] = [];
   for (const shippingMode of SHIPPING_MODE_ORDER) {
@@ -179,7 +170,6 @@ export function buildTower(
     if (!mode) {
       continue;
     }
-    const suggestedDays = scenario.get(shippingMode) ?? null;
     promiseByMode.push({
       shippingMode,
       promisedDays: mode.promisedDays,
@@ -187,9 +177,6 @@ export function buildTower(
       lateDispatchPct: percent(mode.dispatch),
       evaluatedDeliveries: mode.delivery.total,
       lateDeliveryPct: percent(mode.delivery),
-      suggestedDays,
-      lateDispatchPctWithSuggested:
-        suggestedDays === null ? null : lateWithLimit(mode.daysToDispatch, suggestedDays),
     });
   }
 
@@ -266,15 +253,4 @@ function onTime(count: Count) {
     total: count.total,
     pct: count.total === 0 ? null : Math.round((1000 * onTimeCount) / count.total) / 10,
   };
-}
-
-/** % dos despachos que passariam de `limit` dias. */
-function lateWithLimit(histogram: ReadonlyMap<number, number>, limit: number): number | null {
-  let total = 0;
-  let late = 0;
-  for (const [days, orders] of histogram) {
-    total += orders;
-    late += days > limit ? orders : 0;
-  }
-  return percent({ total, late });
 }

@@ -7,11 +7,10 @@ import { z } from "zod";
  * `order-views.ts`:
  *
  * - `Order` (cliente): campos do cliente, com o motivo em linguagem do cliente;
- * - `StaffOrder` (colaborador): tudo, mais o diagnóstico calculado (prazo sugerido, trânsito,
+ * - `StaffOrder` (colaborador): tudo, mais o diagnóstico calculado (despacho, trânsito,
  *   dias por etapa, contexto da modalidade e da rota, valor em risco).
  *
- * O diagnóstico não é guardado: sai barato de calcular por pedido e assim não ocupa memória nem
- * prende o cache do Databricks ao cenário da Gold. Fixtures e cache local guardam este formato.
+ * O diagnóstico não é guardado: sai barato de calcular por pedido e assim não ocupa memória. Fixtures e cache local guardam este formato.
  */
 export const orderRecordSchema = staffOrderSchema
   .omit({

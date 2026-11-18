@@ -1,24 +1,15 @@
 import { readFileSync } from "node:fs";
-import { orderSchema, type ShippingMode, staffOrderSchema } from "@translog/contracts";
+import { orderSchema, staffOrderSchema } from "@translog/contracts";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
 import { type OrderRecord, orderRecordSchema } from "./order-record.ts";
 import { computeOrderStats } from "./order-stats.ts";
 import { daysBetween, toCustomerOrder, toStaffOrder } from "./order-views.ts";
-import { NO_PROMISE_SCENARIO } from "./promise-scenario.ts";
 
 const fixtures = z.array(orderRecordSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
 
-/** Cenário "Promessa ajustada" da Gold (`param_cenario_prazo`, linhas ativas, 17/11). */
-const GOLD_SCENARIO = new Map<ShippingMode, number>([
-  ["First Class", 2],
-  ["Same Day", 1],
-  ["Second Class", 4],
-  ["Standard Class", 4],
-]);
-
-const context = { stats: computeOrderStats(fixtures), scenario: GOLD_SCENARIO };
+const context = { stats: computeOrderStats(fixtures) };
 
 function record(orderId: number): OrderRecord {
   const found = fixtures.find((candidate) => candidate.orderId === orderId);
@@ -31,15 +22,13 @@ function record(orderId: number): OrderRecord {
 const staff = (orderId: number) => toStaffOrder(record(orderId), context);
 
 describe("toStaffOrder: diagnóstico", () => {
-  it("76902: First Class em trânsito; com 2 dias (Promessa ajustada) o despacho estaria no prazo", () => {
+  it("76902: First Class em trânsito, despacho 1 dia além do prometido", () => {
     const order = staff(76902);
 
     expect(order.dispatchDiagnosis).toStrictEqual({
       promisedDays: 1,
       daysToDispatch: 2,
       delayDays: 1,
-      suggestedDays: 2,
-      onTimeWithSuggested: true,
     });
     // Trânsito padrão: 28/01 → 01/02. Ainda não entregue: sem trânsito real.
     expect(order.transportDiagnosis).toStrictEqual({
@@ -59,15 +48,13 @@ describe("toStaffOrder: diagnóstico", () => {
     expect(order.delivery.probableCause).toBe("Volume sem atualização de rastreio");
   });
 
-  it("375: Second Class; 6 dias para despachar estouram até os 4 sugeridos; transporte no padrão", () => {
+  it("375: Second Class, 6 dias para despachar contra 2 prometidos; transporte no padrão", () => {
     const order = staff(375);
 
     expect(order.dispatchDiagnosis).toStrictEqual({
       promisedDays: 2,
       daysToDispatch: 6,
       delayDays: 4,
-      suggestedDays: 4,
-      onTimeWithSuggested: false,
     });
     // Padrão 08/01 → 13/01; real 12/01 → 17/01: o transporte não recuperou nada.
     expect(order.transportDiagnosis).toStrictEqual({
@@ -93,8 +80,6 @@ describe("toStaffOrder: diagnóstico", () => {
 
     expect(order.dispatchDiagnosis).toMatchObject({
       daysToDispatch: 2,
-      suggestedDays: 2,
-      onTimeWithSuggested: true,
     });
     expect(order.transportDiagnosis).toStrictEqual({
       standardTransitDays: 3,
@@ -119,7 +104,6 @@ describe("toStaffOrder: diagnóstico", () => {
   it("222: First Class entregue 1 dia atrasado, transporte no padrão (3 dias)", () => {
     const order = staff(222);
 
-    expect(order.dispatchDiagnosis.onTimeWithSuggested).toBe(true);
     expect(order.transportDiagnosis).toStrictEqual({
       standardTransitDays: 3,
       actualTransitDays: 3,
@@ -143,8 +127,6 @@ describe("toStaffOrder: diagnóstico", () => {
       promisedDays: 2,
       daysToDispatch: 4,
       delayDays: 2,
-      suggestedDays: 4,
-      onTimeWithSuggested: true,
     });
     expect(order.transportDiagnosis).toStrictEqual({
       standardTransitDays: 3,
@@ -168,8 +150,6 @@ describe("toStaffOrder: diagnóstico", () => {
       promisedDays: 4,
       daysToDispatch: null,
       delayDays: null,
-      suggestedDays: 4,
-      onTimeWithSuggested: null,
     });
     expect(order.transportDiagnosis).toStrictEqual({
       standardTransitDays: null,
@@ -188,15 +168,6 @@ describe("toStaffOrder: diagnóstico", () => {
     expect(staff(34).context).toStrictEqual({
       shippingMode: { dispatchedOrders: 3, lateDispatchPct: 100 },
       route: { evaluatedDeliveries: 1, lateDeliveryPct: 100 },
-    });
-  });
-
-  it("sem cenário carregado: prazo sugerido e comparação ficam null", () => {
-    const order = toStaffOrder(record(76902), { ...context, scenario: NO_PROMISE_SCENARIO });
-
-    expect(order.dispatchDiagnosis).toMatchObject({
-      suggestedDays: null,
-      onTimeWithSuggested: null,
     });
   });
 

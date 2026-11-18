@@ -1,8 +1,10 @@
 import type { Market, OrdersSummaryResponse } from "@translog/contracts";
-import { formatOrderCount, MARKET_LABEL } from "./markets.ts";
+import { formatShare, MARKET_LABEL } from "./markets.ts";
+import { marketShares } from "./motion.ts";
 
 // Mapa de rotas do Início (animação do protótipo 01, nas cores do tema claro): a origem
-// "EUA · Porto Rico" ligada aos 5 mercados por rotas tracejadas que fluem (azul → âmbar).
+// "EUA · Porto Rico" ligada aos 5 mercados por rotas tracejadas que fluem (azul → âmbar), com a
+// parte dos pedidos de cada mercado.
 // A animação para com `prefers-reduced-motion` (CSS `.route-flow` em index.css).
 
 const MAP_MARKETS: readonly Market[] = ["USCA", "LATAM", "Europe", "Pacific Asia", "Africa"];
@@ -11,10 +13,13 @@ const TARGET_X = 352;
 const ROWS = [50, 120, 190, 260, 330];
 
 export function RouteMap({ summary }: { summary: OrdersSummaryResponse | undefined }) {
-  const counts = new Map(summary?.markets.map((item) => [item.market, item.orders]));
+  // Só a parte de cada mercado (%): o Início não mostra a quantidade exata de pedidos.
+  const shares = new Map(
+    marketShares(summary?.markets ?? []).map((item) => [item.market, item.pct]),
+  );
   const description = MAP_MARKETS.map((market) => {
-    const count = counts.get(market);
-    return `${MARKET_LABEL[market]}${count === undefined ? "" : `: ${formatOrderCount(count)}`}`;
+    const pct = shares.get(market);
+    return `${MARKET_LABEL[market]}${pct === undefined ? "" : `: ${formatShare(pct)} dos pedidos`}`;
   }).join("; ");
 
   return (
@@ -92,7 +97,7 @@ export function RouteMap({ summary }: { summary: OrdersSummaryResponse | undefin
 
       {MAP_MARKETS.map((market, index) => {
         const y = ROWS[index] ?? 0;
-        const count = counts.get(market);
+        const pct = shares.get(market);
         return (
           <g key={market}>
             <circle
@@ -113,7 +118,7 @@ export function RouteMap({ summary }: { summary: OrdersSummaryResponse | undefin
               {MARKET_LABEL[market]}
             </text>
             <text x={TARGET_X + 26} y={y + 16} className="fill-slate-500 font-mono" fontSize="12.5">
-              {count === undefined ? "…" : formatOrderCount(count)}
+              {pct === undefined ? "…" : `${formatShare(pct)} dos pedidos`}
             </text>
           </g>
         );

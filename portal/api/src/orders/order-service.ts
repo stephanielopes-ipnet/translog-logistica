@@ -70,10 +70,7 @@ export function createOrderService({
     },
 
     getStaffOrder: async (orderId) =>
-      toStaffOrder(await getRecord(orderId), {
-        stats: orders.stats(),
-        scenario: orders.scenario(),
-      }),
+      toStaffOrder(await getRecord(orderId), { stats: orders.stats() }),
 
     async sampleOrderIds() {
       const found = await Promise.all(sampleOrderIds.map((id) => orders.findById(id)));
@@ -85,7 +82,6 @@ export function createOrderService({
     getTower() {
       const stats = orders.stats();
       return buildTower(stats.tower, {
-        scenario: orders.scenario(),
         deliveryByRoute: stats.deliveryByRoute,
         dashboardUrl,
       });

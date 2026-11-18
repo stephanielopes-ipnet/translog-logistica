@@ -23,7 +23,7 @@ const percent = z
   .nullable()
   .describe("Percentual com 1 casa decimal (0 a 100); null = sem pedidos para calcular");
 
-/** Diagnóstico do despacho: prometido × realizado × prazo sugerido (Promessa ajustada). */
+/** Diagnóstico do despacho: prometido × realizado. */
 export const dispatchDiagnosisSchema = z.object({
   promisedDays: days.nonnegative().describe("Prazo de despacho prometido pela modalidade, em dias"),
   daysToDispatch: days
@@ -31,19 +31,6 @@ export const dispatchDiagnosisSchema = z.object({
     .nullable()
     .describe("Dias do pedido até o despacho (`dias_ate_despacho`); null = não despachado"),
   delayDays: days.nullable().describe("Dias além do prometido; negativo = adiantado"),
-  suggestedDays: days
-    .nonnegative()
-    .nullable()
-    .describe(
-      'Prazo de despacho sugerido para a modalidade (cenário "Promessa ajustada" da Gold, ' +
-        "`param_cenario_prazo`); null = sem cenário para a modalidade",
-    ),
-  onTimeWithSuggested: z
-    .boolean()
-    .nullable()
-    .describe(
-      "O despacho estaria no prazo com o prazo sugerido; null = não despachado ou sem cenário",
-    ),
 });
 export type DispatchDiagnosis = z.infer<typeof dispatchDiagnosisSchema>;
 

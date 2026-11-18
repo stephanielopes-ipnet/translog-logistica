@@ -150,12 +150,10 @@ portal/
 │           ├── order-stats.ts         # números da carga (contexto do colaborador)
 │           ├── tower-stats.ts         # Torre e resumo por mercado (mesma passada da carga)
 │           ├── order-search.ts        # busca do colaborador (filtros, ordem, páginas) sobre os registros em memória
-│           ├── promise-scenario.ts    # "Promessa ajustada" da Gold: leitura do CSV, do JSON dos fixtures e do cache
-│           ├── databricks-cache.ts    # cache local do adapter databricks (pedidos + cenário, um pedido por linha)
+│           ├── databricks-cache.ts    # cache local do adapter databricks (um pedido por linha)
 │           └── fixtures/
 │               ├── orders.json        # 9 pedidos da demo (vão para a imagem)
-│               ├── promise-scenario.json # cenário "Promessa ajustada" gerado da Gold, com a data (vai para a imagem)
-│               └── consumo/           # amostra das 3 tabelas + gold_param_cenario_prazo.csv para testes (não vai para a imagem)
+│               └── consumo/           # amostra das 3 tabelas para testes (não vai para a imagem)
 └── web/                     # @translog/web (React 19 + Vite 8 + Tailwind v4)
     ├── index.html           # ponto de entrada HTML (pt-BR, título e fontes IBM Plex Mono)
     ├── public/ipnet.svg     # logo do rodapé ("Desenvolvido por")
@@ -470,7 +468,7 @@ O OpenAPI de `/docs` traz um exemplo de corpo e as respostas `200`, `400`, `409`
 - `POST` de `/api/auth/*` só com `Content-Type: application/json` (com `SameSite=Lax`, cobre CSRF neste escopo); sem JSON, o hook lança `JsonRequiredError` e `http/errors.ts` responde `415 UNSUPPORTED_MEDIA_TYPE`;
 - log do login só com o resultado (`ok`, `rejected`, `demo`): sem e-mail, senha ou cookie.
 
-**Torre e resumo (`orders/tower-stats.ts`).** Acumulados na mesma passada da carga que já calcula o contexto do colaborador (`computeOrderStats`), nos 3 modos. Definições: despacho avaliado = tem data real, no prazo = `dispatch.delayDays <= 0`; entrega avaliada = tem atraso calculado (entregues e em trânsito; extraviados fora); fila de atenção = todos os em trânsito, mais atrasados primeiro; rotas com mais atraso = `rota_servico` com 300+ entregas avaliadas (8 primeiras). Conferido com os CSVs reais (17/11): 42,7% (15.739/36.866), 74,7% (22.130/29.644), 197 em trânsito (43 atrasados, 23 com 3+ dias), 8.337 na central, 7.222 extravios. A "Promessa ajustada" (prazo sugerido) vem da Gold, lida pelo próprio adapter de cada modo (seção 8, "Cenário da Gold"): em 18/11, First Class 2, Same Day 1, Second Class 4, Standard 4. Conferido nos modos `file` e `databricks` (18/11): Torre, `GET /api/staff/orders/76902` e `GET /api/orders/76902` idênticos entre os dois.
+**Torre e resumo (`orders/tower-stats.ts`).** Acumulados na mesma passada da carga que já calcula o contexto do colaborador (`computeOrderStats`), nos 3 modos. Definições: despacho avaliado = tem data real, no prazo = `dispatch.delayDays <= 0`; entrega avaliada = tem atraso calculado (entregues e em trânsito; extraviados fora); fila de atenção = todos os em trânsito, mais atrasados primeiro; rotas com mais atraso = `rota_servico` com 300+ entregas avaliadas (8 primeiras). Conferido com os CSVs reais (17/11): 42,7% (15.739/36.866), 74,7% (22.130/29.644), 197 em trânsito (43 atrasados, 23 com 3+ dias), 8.337 na central, 7.222 extravios. Sem prazo sugerido desde 18/11 à noite (a "Promessa ajustada" da Gold saiu; ver seção 8). Conferido nos modos `file` e `databricks` (18/11): Torre, `GET /api/staff/orders/76902` e `GET /api/orders/76902` idênticos entre os dois.
 
 **Busca do colaborador (`orders/order-search.ts`, 18/11).** `GET /api/staff/orders` varre os registros em memória (`OrderRepository.records()`). Filtros, que se somam: `q` (só dígitos = número do pedido que começa com eles; texto = cidade, estado ou país de origem ou destino, sem acentos nem maiúsculas, até 60 caracteres), `status`, `shippingMode`, `market`, `stage` (etapa atual, 1 a 5; nos extraviados é a etapa do extravio), `cause` (termo da base, no despacho ou na entrega), `minDelayDays` (atraso de entrega) e `escalated` (`true`/`false`). `sort` (`contracts/src/staff-search.ts`): `delay` (maior atraso de entrega primeiro), `order` (número crescente) ou `date` (mais recentes primeiro); padrão `delay` com `minDelayDays` e `order` nos demais casos. Listas vão separadas por vírgula (`status=Extraviado,Cancelado`). `page` e `pageSize` (1 a 50, padrão 20). Cada linha traz só número, data, situação, modalidade, mercado, rota, origem, destino, etapa e local, atrasos, central e causa da base (campos listados um a um). O texto pesquisável de cada pedido é montado na primeira busca (`WeakMap`): ~160 ms na primeira com os 65.752 pedidos, alguns ms depois.
 
@@ -590,13 +588,12 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 |---|---|---|
 | `API_PORT` | `3333` | Porta da API (1 a 65535) |
 | `DATA_SOURCE` | `fixtures` | `fixtures`, `file` ou `databricks` |
-| `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv` e `gold_param_cenario_prazo.csv` (`file` e `pnpm export:dados`) e o cache do `databricks`. Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
+| `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv` (`file` e `pnpm export:dados`) e o cache do `databricks`. Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
 | `SAMPLE_ORDER_IDS` | `76902,375,34,8` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
 | `DATABRICKS_HOST` | vazio | Host do workspace (sem ou com `https://`); obrigatório com `databricks`. `http://` só para `localhost`/`127.0.0.1` (testes) |
 | `DATABRICKS_WAREHOUSE_ID` | vazio | Id do SQL warehouse (letras, números, `_`, `-`); obrigatório com `databricks` |
 | `DATABRICKS_TOKEN` | vazio | Token de acesso; obrigatório com `databricks`. Só no `portal/.env`; a mensagem de erro de configuração nunca mostra o valor |
 | `DATABRICKS_CATALOG_SCHEMA` | `workspace.silver` | `catalogo.schema` das tabelas `consumo_*` (vai no SQL: só letras, números e `_`) |
-| `DATABRICKS_GOLD_SCHEMA` | `workspace.gold` | `catalogo.schema` da Gold, com a `param_cenario_prazo` ("Promessa ajustada"); usado pelo adapter `databricks` e pelo `pnpm export:dados` |
 | `AGENT` | `mock` | Assistente do chat: `mock` ou `adk` |
 | `AGENT_URL` | vazio | Endereço http(s) do agente; obrigatório com `adk` (dev: `http://127.0.0.1:8001`). Barra final removida |
 | `AGENT_APP_NAME` | `translog_agent` | Nome do app no ADK; só letras, números, `_` e `-` (vai no caminho da URL) |
@@ -633,24 +630,15 @@ interface OrderRepository {
   count(): Promise<number>;
   records(): Iterable<OrderRecord>; // busca do colaborador
   stats(): OrderStats;              // contexto, Torre e resumo, calculados na carga
-  scenario(): PromiseScenario;      // "Promessa ajustada" da Gold, da mesma fonte
   close?(): void;
 }
 ```
 
-Os três adapters montam um `Map<orderId, OrderRecord>` e o entregam, com o cenário, a `createInMemoryRepository`, que calcula os números da carga uma vez. O cenário fica na porta porque vem da mesma fonte dos pedidos em cada modo e é trocado junto com eles quando o `databricks` recarrega.
+Os três adapters montam um `Map<orderId, OrderRecord>` e o entregam a `createInMemoryRepository`, que calcula os números da carga uma vez.
 
-### Cenário da Gold ("Promessa ajustada", 18/11)
+### "Promessa ajustada" da Gold: removida (18/11, noite)
 
-Prazo de despacho sugerido por modalidade, das linhas ativas (`ativo = true`) do cenário "Promessa ajustada" de `workspace.gold.param_cenario_prazo` (colunas lidas: `cenario`, `classe_servico`, `prazo_despacho_dias`, `criterio`, `ativo`, `dt_atualizacao`; nenhuma é dado do cliente). Usado no diagnóstico do colaborador (`dispatchDiagnosis.suggestedDays`) e na Torre (promessa × realidade).
-
-| Modo | De onde vem | Sem ele |
-|---|---|---|
-| `databricks` | Consulta em paralelo com as 3 tabelas (`goldScenarioStatement` em `consumo-sql.ts`; schema de `DATABRICKS_GOLD_SCHEMA`), guardada no cache local; a versão da tabela entra na conferência de mudanças | A API não sobe ("Não foi possível carregar workspace.gold.param_cenario_prazo do Databricks ... use DATA_SOURCE=file") |
-| `file` | `DATA_DIR/gold_param_cenario_prazo.csv`, gravado pelo `pnpm export:dados` (lido antes dos CSVs grandes) | A API não sobe ("... não encontrado em DATA_DIR: rode pnpm export:dados") |
-| `fixtures` | `orders/fixtures/promise-scenario.json`, gerado pelo `pnpm --filter @translog/api fixtures` com a fonte e a data de geração | — |
-
-O leitor (`parseScenarioCsv`) confere de novo `ativo` e o nome do cenário e recusa modalidade desconhecida, prazo inválido, modalidade repetida ou nenhuma linha ativa: a API não sobe com cenário errado.
+A API leu por um dia o cenário "Promessa ajustada" (`workspace.gold.param_cenario_prazo`) para mostrar o prazo de despacho sugerido na Torre e na visão do colaborador. Por decisão do Matheus, a simulação de prazos novos fica só no dashboard do Marcelo: a tela deixou de mostrar o prazo sugerido e a API deixou de ler a Gold nos 3 modos (sem consulta no `databricks`, sem `gold_param_cenario_prazo.csv` no `file` e no `pnpm export:dados`, sem `promise-scenario.json` nos fixtures, sem `DATABRICKS_GOLD_SCHEMA`). Os campos `suggestedDays`, `onTimeWithSuggested` e `lateDispatchPctWithSuggested` saíram dos contratos. O cache do `databricks` passou ao formato 5 (o de formato 4, com o cenário, é descartado e baixado de novo na primeira subida).
 
 ### Tabelas oficiais (16/11)
 
@@ -667,12 +655,11 @@ Os três adapters carregam tudo uma vez, ao subir, e servem da memória. Não h�
 ### `fixtures`
 
 - `orders/fixtures/orders.json`: os 9 pedidos da demo (76902, 375, 34, 222, 8, 9, 50, 31298, 76385), gerados das tabelas por `pnpm --filter @translog/api fixtures` (`api/scripts/generate-fixtures.ts`), que também gera a amostra de teste `orders/fixtures/consumo/`.
-- `orders/fixtures/promise-scenario.json`: o cenário "Promessa ajustada", gerado no mesmo comando a partir de `DATA_DIR/gold_param_cenario_prazo.csv`.
 - Validados contra `z.array(orderRecordSchema)` ao carregar. Arquivo inválido impede a API de subir, com a mensagem do Zod apontando o campo. Campos fora do contrato são descartados na leitura.
 
 ### `file` (CSVs das tabelas `consumo_*`, plano B)
 
-`loadFileRepository(dir, log)` lê `DATA_DIR/gold_param_cenario_prazo.csv` (primeiro: sem ele a API não sobe, antes dos ~10 s de leitura) e depois `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv`. A carga é a de `loadConsumoRepository(sources, log)`, feita para ser reaproveitada pelo adapter `databricks` (os pedaços em CSV do Databricks entram pelo mesmo caminho):
+`loadFileRepository(dir, log)` lê `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv`. A carga é a de `loadConsumoRepository(sources, log)`, feita para ser reaproveitada pelo adapter `databricks` (os pedaços em CSV do Databricks entram pelo mesmo caminho):
 
 1. Cada tabela é lida numa passada, em streaming (`pipeline(stream, parse(...), consumidor)`), com registros como arrays.
 2. O cabeçalho define a posição de cada coluna de `READ_COLUMNS` da tabela. Se faltar alguma, a carga é interrompida com erro.
@@ -721,7 +708,7 @@ O tempo de carga é quase todo da `csv-parse`. Alternativa medida em 14/11 e nã
 
 ### `pnpm export:dados` (Databricks → CSV)
 
-`api/scripts/export-dados.ts` baixa as 3 tabelas e o cenário "Promessa ajustada" da Gold (`gold_param_cenario_prazo.csv`, conferido antes de gravar) para `DATA_DIR` (padrão `portal/dados/`), lendo `DATABRICKS_HOST`, `DATABRICKS_WAREHOUSE_ID` e `DATABRICKS_TOKEN` do ambiente ou do `portal/.env` (nunca impressos). Usa `orders/databricks-client.ts`:
+`api/scripts/export-dados.ts` baixa as 3 tabelas para `DATA_DIR` (padrão `portal/dados/`), lendo `DATABRICKS_HOST`, `DATABRICKS_WAREHOUSE_ID` e `DATABRICKS_TOKEN` do ambiente ou do `portal/.env` (nunca impressos). Usa `orders/databricks-client.ts`:
 
 1. `POST https://<host>/api/2.0/sql/statements` com `disposition: "EXTERNAL_LINKS"`, `format: "CSV"`, `wait_timeout: "30s"` e `on_wait_timeout: "CONTINUE"` (o resultado não cabe na resposta direta). O token vai só no header `Authorization` dessas chamadas.
 2. Enquanto `PENDING`/`RUNNING`, consulta `GET /api/2.0/sql/statements/{id}` a cada 2 s, com limite de 3 min (o warehouse da edição gratuita dorme); no limite, cancela a consulta e explica o que fazer. `401`/`403`, `FAILED` (ex.: tabela ausente) e host inacessível viram mensagens em pt-BR que sugerem `DATA_SOURCE=file`.
@@ -773,9 +760,9 @@ Antes do download em paralelo, a carga levava ~100 s: cada link pré-assinado sa
 
 #### Cache local (`orders/databricks-cache.ts`)
 
-`loadCachedDatabricksRepository` sobe pelo cache `DATA_DIR/cache-databricks.json.gz` quando ele é do mesmo código, workspace e schemas (chave com o conteúdo dos arquivos da conversão, `catalogSchema` e `goldSchema`), e confere em segundo plano a versão das 4 tabelas (3 `consumo_*` + `param_cenario_prazo`) no Unity Catalog (`DATABRICKS_REFRESH_MINUTES`, padrão 10). Mudou alguma: baixa de novo, troca pedidos e cenário em memória e regrava o cache. Sem cache (ou de outra chave): baixa antes de abrir a porta.
+`loadCachedDatabricksRepository` sobe pelo cache `DATA_DIR/cache-databricks.json.gz` quando ele é do mesmo código, workspace e schema (chave com o conteúdo dos arquivos da conversão e o `catalogSchema`), e confere em segundo plano a versão das 3 tabelas `consumo_*` no Unity Catalog (`DATABRICKS_REFRESH_MINUTES`, padrão 10). Mudou alguma: baixa de novo, troca pedidos e cenário em memória e regrava o cache. Sem cache (ou de outra chave): baixa antes de abrir a porta.
 
-Formato 4 (18/11): gzip com uma linha de cabeçalho (`format`, `key`, `version`, `savedAt`, `scenario`, `orders` = quantos pedidos vêm) e um `OrderRecord` por linha, lido em streaming (`readline`). O formato anterior era um JSON único: com `resumo_pedido` e `linha_do_tempo` ele passou de 189 MB descompactado, e o `JSON.parse` levava o RSS a ~1,3 GB. Arquivo cortado (menos pedidos que o cabeçalho), linha inválida, pedido fora do contrato ou cenário vazio: o cache é ignorado e a API baixa do Databricks. Gravação num temporário (`0600`) trocado pelo definitivo.
+Formato 5 (18/11, noite; o 4 tinha também o cenário da Gold): gzip com uma linha de cabeçalho (`format`, `key`, `version`, `savedAt`, `orders` = quantos pedidos vêm) e um `OrderRecord` por linha, lido em streaming (`readline`). O formato anterior era um JSON único: com `resumo_pedido` e `linha_do_tempo` ele passou de 189 MB descompactado, e o `JSON.parse` levava o RSS a ~1,3 GB. Arquivo cortado (menos pedidos que o cabeçalho), linha inválida, pedido fora do contrato ou cenário vazio: o cache é ignorado e a API baixa do Databricks. Gravação num temporário (`0600`) trocado pelo definitivo.
 
 **Medido em 18/11** (warehouse lento): primeira subida, sem cache, 303 s (o export do mesmo dia levou ~90 s por tabela); subida pelo cache, 3,8 s, com "Tabelas sem mudança no Databricks" logo depois; heap retido após a leitura do cache 146 MB (igual ao `file`). O RSS com o formato 4 ainda não foi medido com a base real.
 
@@ -1047,8 +1034,8 @@ De cima para baixo: número, situação e prazo (sem o código de manifesto `TL-
 ### 13.9. Área do colaborador (`features/staff/`)
 
 - **Login (`staff-login-page.tsx`):** e-mail e senha; erro genérico ("E-mail ou senha inválidos."), aviso de `429`, aviso de sessão expirada; "Entrar como demonstração" só com `demoAvailable`.
-- **Torre (`tower-page.tsx`):** cabeçalho com a data de referência e o total; 5 indicadores; "Pedidos que precisam de atenção" (12 primeiros + "Mostrar todos"; filtro por etapa com `aria-pressed`; o número do pedido é um link, então Tab + Enter abre, e a linha toda é clicável); promessa × realidade por modalidade com o prazo sugerido; em trânsito e extravios por etapa (selo "rastreio simulado"); rotas com mais atraso; "Painel completo de performance" (`dashboardUrl`) ou "link a definir", desabilitado.
-- **Rastreio do colaborador (`staff-order-page.tsx`):** faixa escura "Visão do colaborador" (voltar à Torre, abrir outro pedido, "Ver como o cliente vê" em outra aba, para quem atende a central conferir a tela do cliente); blocos de diagnóstico (despacho prometido × real × sugerido, transporte padrão × real e dias recuperados, dias em cada etapa, contexto da modalidade e da rota, origem do dado com selos real/simulado, valor em risco, causas da base com a explicação completa, resumo para a IA e linha do tempo bruta recolhíveis); depois o cartão do pedido e os itens, sem o chat.
+- **Torre (`tower-page.tsx`):** cabeçalho com a data de referência, o total e a busca rápida; 3 indicadores (em trânsito, encaminhados à central, extravios; os de despacho e entrega no prazo ficam no dashboard); "Pedidos que precisam de atenção" (12 primeiros + "Mostrar todos"; filtro por etapa com `aria-pressed`; o número do pedido é um link, então Tab + Enter abre, e a linha toda é clicável); atrasos por modalidade (prazo prometido, despachos e entregas atrasados; a simulação de prazos novos fica no dashboard); em trânsito e extravios por etapa (selo "rastreio simulado"); rotas com mais atraso; "Painel completo de performance" (`dashboardUrl`) ou "link a definir", desabilitado.
+- **Rastreio do colaborador (`staff-order-page.tsx`):** faixa escura "Visão do colaborador" (voltar à Torre, abrir outro pedido, "Ver como o cliente vê" em outra aba, para quem atende a central conferir a tela do cliente); blocos de diagnóstico (despacho prometido × real, transporte padrão × real e dias recuperados, dias em cada etapa, contexto da modalidade e da rota, origem do dado com selos real/simulado, valor em risco, causas da base com a explicação completa, resumo para a IA e linha do tempo bruta recolhíveis); depois o cartão do pedido e os itens, sem o chat.
 - **Busca de pedidos (`staff-search-page.tsx`, 18/11):** `/colaborador/pedidos`, dentro do cabeçalho da área (item "Pedidos", ao lado de "Torre de controle"; o pedido também marca "Pedidos").
   - **Filtros na URL** (`search-filters.ts`, lógica pura com testes): mesmos nomes da API (`?q=769&status=Extraviado&minDelayDays=3&sort=delay&page=2`); `readFilters` valida cada valor com os esquemas do contrato e ignora o inválido; `writeFilters` tira os padrões (página 1, sem ordenação, `escalated=false`) e põe as escolhas múltiplas sem repetir e na ordem das opções (mesma busca = mesma URL); `updateFilters` volta à página 1 quando um filtro muda; `searchApiPath` monta `GET /api/staff/orders` com `pageSize=20`. A busca pode ser compartilhada, recarregada e volta igual pelo "voltar" do navegador; mudanças de filtro substituem a entrada do histórico (`replace`), abrir um pedido cria uma nova.
   - **Consulta** `useStaffSearch` (`api/session.ts`): `keepPreviousData` (a página anterior fica na tela, esmaecida, enquanto a próxima carrega), sem retry em 4xx, `401` → login com aviso e volta à mesma busca.
@@ -1089,14 +1076,13 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 | `orders/fixtures-repository.test.ts` | Carga, situações e central dos 9 pedidos da demo, arquivo inválido, campos extras descartados |
 | `orders/consumo-mapper.test.ts` | 375 completo e datas iguais à `linha_do_tempo`; 76902, 34, 9, 31298; linhas x unidades (8); fuso; formato do export; ordem de itens e eventos (10 depois de 9); centavos; "Sem atraso"; casos inválidos; colunas proibidas fora das lidas |
 | `orders/escalation.test.ts` | ≥ 3 dias, 2 dias, extraviado, não pago, cancelado, adiantado |
-| `orders/tower-stats.test.ts` | Torre com os fixtures (indicadores, fila de atenção, promessa × realidade, sem cenário, `DASHBOARD_URL`), resumo por mercado; **integração com os CSVs reais** (42,7%, 74,7%, 197/43/23, 8.337, 7.222) |
+| `orders/tower-stats.test.ts` | Torre com os fixtures (indicadores, fila de atenção, atrasos por modalidade, `DASHBOARD_URL`), resumo por mercado; **integração com os CSVs reais** (42,7%, 74,7%, 197/43/23, 8.337, 7.222) |
 | `auth/auth-units.test.ts` | Hash scrypt (sal novo, formato), token HMAC (vencido, adulterado, outro segredo, malformado), limite de tentativas (janela, janelas vencidas esquecidas, teto de IPs) |
-| `orders/promise-scenario.test.ts` | Leitura do cenário (só ativas da Promessa ajustada; modalidade desconhecida, prazo inválido, repetida, sem linha ativa, colunas faltando, BOM), JSON dos fixtures com fonte e data, `goldScenarioStatement` (SQL e schema inválido) |
 | `orders/order-search.test.ts` | Busca: sem filtro, número por prefixo, texto sem acentos, situação/modalidade/mercado/etapa, causa, atraso mínimo, central, as 3 ordens, páginas, linha resumida; validação da query string |
 | `auth/routes.test.ts` | Login certo e errado (mesma resposta), atributos do cookie (`Secure` em produção), `429`, POST sem JSON, sem `STAFF_USERS`, sessão, `401` em `/api/staff/*`, Torre, pedido e busca com sessão (e `400` com `pageSize` inválido), cookie adulterado e vencido, logout, demonstração ligada e desligada |
 | `orders/consumo-sql.test.ts` | SELECT explícito com `coalesce`/`date_format`, nenhuma coluna proibida (leitura e export), export ⊇ leitura, recusa de coluna proibida, schema e nome inválidos |
 | `orders/databricks-client.test.ts` | Contra um servidor HTTP falso: corpo da consulta, token só na API e nunca no link pré-assinado, `PENDING` → `RUNNING` → `SUCCEEDED`, 3 pedaços com cabeçalho uma vez só, download em paralelo entregue em ordem, `401`/`403`, `FAILED` (tabela ausente), timeout com cancelamento, `404`, host inacessível, falha no download |
-| `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 4 consultas (3 tabelas + cenário da Gold) sem colunas proibidas, só as linhas ativas do cenário, Gold sem a tabela, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
+| `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 3 consultas (uma por tabela) sem colunas proibidas, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
 | `orders/file-repository.test.ts` | Amostra igual aos fixtures, log, descarte de colunas nas 3 tabelas, linhas inválidas (id, repetido, curta, fora do contrato, sem pedido) sem conteúdo no log, limite de avisos, fora de ordem, BOM e CRLF, erros fatais; **integração com os CSVs reais** |
 | `privacy.test.ts` | Seção 11 (pedidos e chat, nas três fontes; `databricks` com o falso) |
 
@@ -1154,7 +1140,7 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 |---|---|
 | `docker-compose.yml` | Serviço `api` com `DATA_SOURCE=fixtures`, `AGENT=mock`, porta `${API_PORT:-3333}`, healthcheck em `/api/health` (`start_period: 60s`, `start_interval: 1s`) |
 | `docker-compose.dados.yml` | Sobreposição: `DATA_SOURCE=file`, `DATA_DIR=/data`, volume `./dados:/data:ro` (substitui o `docker-compose.silver.yml`) |
-| `docker-compose.databricks.yml` | Sobreposição: `DATA_SOURCE=databricks`, `DATABRICKS_GOLD_SCHEMA` (padrão `workspace.gold`) e as `DATABRICKS_*` interpoladas do `portal/.env` (ou do ambiente) **na hora de subir**, com `${VAR:?mensagem}` para as obrigatórias; `start_period: 240s` (warehouse dormindo) |
+| `docker-compose.databricks.yml` | Sobreposição: `DATA_SOURCE=databricks` e as `DATABRICKS_*` interpoladas do `portal/.env` (ou do ambiente) **na hora de subir**, com `${VAR:?mensagem}` para as obrigatórias; `start_period: 240s` (warehouse dormindo) |
 
 **Credenciais fora da imagem:** a imagem não recebe nenhuma `DATABRICKS_*` no build; elas entram só como variáveis de ambiente do container. Conferido em 16/11: `docker image inspect` sem nenhuma `DATABRICKS_*` e o token ausente do log do container. Para validar o compose sem imprimir o token, use `docker compose -f docker-compose.yml -f docker-compose.databricks.yml config --quiet` (sem `--quiet`, o `config` mostra os valores).
 

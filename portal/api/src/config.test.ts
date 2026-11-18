@@ -204,7 +204,6 @@ describe("loadConfig", () => {
         warehouseId: "abc123",
         token: "dapi-segredo-de-teste",
         catalogSchema: "workspace.silver",
-        goldSchema: "workspace.gold",
         cacheFile: join(defaults.dataDir, "cache-databricks.json.gz"),
         refreshIntervalMs: 600_000,
       },
@@ -278,16 +277,6 @@ describe("loadConfig", () => {
       );
     },
   );
-
-  it("DATABRICKS_GOLD_SCHEMA troca o schema da Gold e recusa formato inválido", () => {
-    expect(
-      loadConfig({ ...DATABRICKS_ENV, DATABRICKS_GOLD_SCHEMA: "outro.gold" }).databricks
-        ?.goldSchema,
-    ).toBe("outro.gold");
-    expect(configError({ ...DATABRICKS_ENV, DATABRICKS_GOLD_SCHEMA: "gold" })).toMatch(
-      /DATABRICKS_GOLD_SCHEMA deve ser catalogo\.schema da Gold/,
-    );
-  });
 
   it("credenciais do Databricks sem DATA_SOURCE=databricks ficam sem uso no adapter", () => {
     const { DATA_SOURCE: _source, ...credentials } = DATABRICKS_ENV;

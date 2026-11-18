@@ -1,6 +1,6 @@
 import { Readable } from "node:stream";
 import { CONSUMO_TABLES, type ConsumoTable } from "./consumo-mapper.ts";
-import { GOLD_SCENARIO_TABLE, goldScenarioStatement, selectStatement } from "./consumo-sql.ts";
+import { selectStatement } from "./consumo-sql.ts";
 import { cacheKey, readOrderCache, writeOrderCache } from "./databricks-cache.ts";
 import {
   type CsvResult,
@@ -15,19 +15,15 @@ import {
 } from "./file-repository.ts";
 import type { OrderRecord } from "./order-record.ts";
 import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
-import { type PromiseScenario, parseScenarioCsv } from "./promise-scenario.ts";
 
 export interface DatabricksRepositoryOptions extends DatabricksClientOptions {
   /** `catalogo.schema` das tabelas consumo_* (`DATABRICKS_CATALOG_SCHEMA`). */
   catalogSchema: string;
-  /** `catalogo.schema` da Gold, com a `param_cenario_prazo` (`DATABRICKS_GOLD_SCHEMA`). */
-  goldSchema: string;
 }
 
-/** O que o adapter carrega do Databricks: pedidos e o cenário "Promessa ajustada". */
+/** O que o adapter carrega do Databricks: os pedidos. */
 export interface DatabricksData {
   orders: Map<number, OrderRecord>;
-  scenario: PromiseScenario;
 }
 
 export interface CachedDatabricksOptions extends DatabricksRepositoryOptions {
@@ -79,7 +75,7 @@ export async function loadCachedDatabricksRepository(
   let orders: OrderRepository;
   let version: SourceVersion | null;
   if (cached.ok) {
-    orders = createInMemoryRepository(cached.cache.orders, cached.cache.scenario);
+    orders = createInMemoryRepository(cached.cache.orders);
     version = cached.cache.version;
     log.info(
       {
@@ -98,7 +94,7 @@ export async function loadCachedDatabricksRepository(
       return null;
     });
     const loaded = await loadDatabricksData(source, log);
-    orders = createInMemoryRepository(loaded.orders, loaded.scenario);
+    orders = createInMemoryRepository(loaded.orders);
     await save(loaded, version);
   }
 
@@ -123,7 +119,6 @@ export async function loadCachedDatabricksRepository(
     // Sempre o repositório atual: depois de uma recarga, a busca usa o índice novo.
     search: (query) => orders.search(query),
     stats: () => orders.stats(),
-    scenario: () => orders.scenario(),
     refresh,
     close() {
       closed = true;
@@ -157,17 +152,14 @@ export async function loadCachedDatabricksRepository(
     if (closed) {
       return;
     }
-    orders = createInMemoryRepository(loaded.orders, loaded.scenario);
+    orders = createInMemoryRepository(loaded.orders);
     version = latest;
     log.info({ catalogSchema, orders: loaded.orders.size }, "Pedidos trocados pela versão nova");
     await save(loaded, latest);
   }
 
   async function sourceVersion(): Promise<SourceVersion> {
-    const tables = [
-      ...Object.values(CONSUMO_TABLES).map((table) => `${catalogSchema}.${table}`),
-      `${source.goldSchema}.${GOLD_SCENARIO_TABLE}`,
-    ];
+    const tables = [...Object.values(CONSUMO_TABLES).map((table) => `${catalogSchema}.${table}`)];
     const versions = await Promise.all(tables.map((table) => databricks.tableVersion(table)));
     return versions.join("|");
   }
@@ -197,46 +189,21 @@ export async function loadCachedDatabricksRepository(
   }
 }
 
-/** Adapter `databricks` sem cache: baixa as três tabelas e o cenário e serve da memória. */
+/** Adapter `databricks` sem cache: baixa as três tabelas e serve da memória. */
 export async function loadDatabricksRepository(
   options: DatabricksRepositoryOptions,
   log: LoadLogger,
 ): Promise<OrderRepository> {
-  const { orders, scenario } = await loadDatabricksData(options, log);
-  return createInMemoryRepository(orders, scenario);
+  const { orders } = await loadDatabricksData(options, log);
+  return createInMemoryRepository(orders);
 }
 
-/** Pedidos e cenário em paralelo (o cenário é uma consulta pequena, de 4 linhas). */
+/** Pedidos das três tabelas `consumo_*`. */
 export async function loadDatabricksData(
   options: DatabricksRepositoryOptions,
   log: LoadLogger,
 ): Promise<DatabricksData> {
-  const [orders, scenario] = await Promise.all([
-    loadDatabricksOrders(options, log),
-    loadDatabricksScenario(options),
-  ]);
-  return { orders, scenario };
-}
-
-/**
- * Cenário "Promessa ajustada" da Gold (`<goldSchema>.param_cenario_prazo`, linhas ativas).
- * Tabela ausente, vazia ou com valor inválido impede a API de subir (com o que fazer).
- */
-export async function loadDatabricksScenario({
-  goldSchema,
-  catalogSchema: _catalogSchema,
-  ...client
-}: DatabricksRepositoryOptions): Promise<PromiseScenario> {
-  const name = `${goldSchema}.${GOLD_SCENARIO_TABLE}`;
-  try {
-    const result = await createDatabricksClient(client).queryCsv(goldScenarioStatement(goldSchema));
-    const chunks = await collect(result);
-    return parseScenarioCsv(Buffer.concat(chunks).toString("utf8"));
-  } catch (error) {
-    throw new Error(
-      `Não foi possível carregar ${name} do Databricks: ${message(error)} ${USE_FILE}`,
-    );
-  }
+  return { orders: await loadDatabricksOrders(options, log) };
 }
 
 /**
@@ -250,7 +217,7 @@ export async function loadDatabricksScenario({
  * lançam erro com a mensagem do que fazer (inclusive "use DATA_SOURCE=file").
  */
 export async function loadDatabricksOrders(
-  { catalogSchema, goldSchema: _goldSchema, ...client }: DatabricksRepositoryOptions,
+  { catalogSchema, ...client }: DatabricksRepositoryOptions,
   log: LoadLogger,
 ): Promise<Map<number, OrderRecord>> {
   const databricks = createDatabricksClient(client);

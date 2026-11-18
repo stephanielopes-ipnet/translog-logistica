@@ -53,10 +53,8 @@ export function AppHeader(props: AppHeaderProps) {
     <header className="shrink-0 sticky top-0 bg-surface border-b border-slate-200 z-30">
       <div className="mx-auto max-w-[1440px] px-6 h-16 flex items-center gap-8">
         <Link
-          href={staff ? STAFF_HOME_PATH : "/"}
-          aria-label={
-            staff ? "TransLog: ir para a Torre de controle" : "TransLog: ir para o Início"
-          }
+          href="/"
+          aria-label="TransLog: ir para o Início"
           className="flex items-center gap-3.5 rounded-md shrink-0"
         >
           <BrandMark />

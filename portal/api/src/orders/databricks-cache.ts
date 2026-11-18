@@ -8,21 +8,14 @@ import { pipeline } from "node:stream/promises";
 import { createGunzip, createGzip } from "node:zlib";
 import { z } from "zod";
 import { type OrderRecord, orderRecordSchema } from "./order-record.ts";
-import {
-  type PromiseScenario,
-  scenarioFromJson,
-  scenarioJsonSchema,
-  scenarioToJson,
-} from "./promise-scenario.ts";
 
 // Cache local do adapter `databricks`: os pedidos já convertidos (o `OrderRecord` que a API
-// guarda, sem nenhuma coluna proibida) e o cenário "Promessa ajustada" da Gold, com gzip dentro
-// de `DATA_DIR` (fora do Git e da imagem Docker). Formato: uma linha de cabeçalho em JSON e um
+// guarda, sem nenhuma coluna proibida), com gzip dentro de `DATA_DIR` (fora do Git e da imagem Docker). Formato: uma linha de cabeçalho em JSON e um
 // pedido por linha, lido em streaming. Medido em 18/11 com os 65.752 pedidos: ~11 MB no disco,
 // leitura em ~3 s, contra 25 s a 5 min de consulta e download no Databricks.
 
 /** Muda quando o formato do arquivo muda (o cache antigo é descartado). */
-const FORMAT = 4;
+const FORMAT = 5;
 
 /**
  * Código que define como as tabelas viram `OrderRecord`. Mudou um deles, os pedidos do cache podem
@@ -34,7 +27,6 @@ const CONVERSION_FILES = [
   new URL("./escalation.ts", import.meta.url),
   new URL("./file-repository.ts", import.meta.url),
   new URL("./order-record.ts", import.meta.url),
-  new URL("./promise-scenario.ts", import.meta.url),
   new URL("../../../contracts/src/orders.ts", import.meta.url),
   new URL("../../../contracts/src/staff-orders.ts", import.meta.url),
 ];
@@ -45,8 +37,6 @@ export interface OrderCache {
   /** Quando o cache foi gravado (ISO 8601, UTC). */
   savedAt: string;
   orders: Map<number, OrderRecord>;
-  /** Cenário "Promessa ajustada" da Gold, baixado junto com os pedidos. */
-  scenario: PromiseScenario;
 }
 
 export type CacheReadResult =
@@ -59,22 +49,17 @@ const cacheHeaderSchema = z.object({
   key: z.string(),
   version: z.string().nullable(),
   savedAt: z.string(),
-  scenario: scenarioJsonSchema,
   /** Quantos pedidos vêm depois: arquivo cortado no meio não passa como cache válido. */
   orders: z.number().int().nonnegative(),
 });
 
 /**
  * Identifica de onde e com que código os pedidos vieram: formato do arquivo, workspace,
- * `catalogo.schema` dos pedidos e da Gold e o conteúdo dos arquivos da conversão.
+ * `catalogo.schema` dos pedidos e o conteúdo dos arquivos da conversão.
  */
-export async function cacheKey(source: {
-  baseUrl: string;
-  catalogSchema: string;
-  goldSchema: string;
-}) {
+export async function cacheKey(source: { baseUrl: string; catalogSchema: string }) {
   const hash = createHash("sha256").update(
-    `${FORMAT}\n${source.baseUrl}\n${source.catalogSchema}\n${source.goldSchema}\n`,
+    `${FORMAT}\n${source.baseUrl}\n${source.catalogSchema}\n`,
   );
   for (const file of CONVERSION_FILES) {
     hash.update(await readFile(file));
@@ -85,7 +70,7 @@ export async function cacheKey(source: {
 /**
  * Lê o cache em streaming, um pedido por linha (sem montar um texto de ~190 MB na memória, o
  * que levava o RSS a ~1,3 GB). Arquivo ausente, de outra chave ou ilegível (corrompido, formato
- * antigo, pedido fora do contrato, sem cenário) não é erro: devolve o motivo, e quem chama baixa
+ * antigo, pedido fora do contrato) não é erro: devolve o motivo, e quem chama baixa
  * do Databricks.
  */
 export async function readOrderCache(file: string, key: string): Promise<CacheReadResult> {
@@ -111,13 +96,12 @@ export async function readOrderCache(file: string, key: string): Promise<CacheRe
       const order = orderRecordSchema.parse(intern(JSON.parse(line)));
       orders.set(order.orderId, order);
     }
-    const scenario = header ? scenarioFromJson(header.scenario) : new Map();
-    if (header === undefined || scenario.size === 0 || orders.size !== header.orders) {
+    if (header === undefined || orders.size !== header.orders) {
       return { ok: false, reason: "ilegível" };
     }
     return {
       ok: true,
-      cache: { version: header.version, savedAt: header.savedAt, orders, scenario },
+      cache: { version: header.version, savedAt: header.savedAt, orders },
     };
   } catch {
     return { ok: false, reason: "ilegível" };
@@ -135,14 +119,13 @@ export async function writeOrderCache(
   file: string,
   key: string,
   version: string | null,
-  { orders, scenario }: { orders: ReadonlyMap<number, OrderRecord>; scenario: PromiseScenario },
+  { orders }: { orders: ReadonlyMap<number, OrderRecord> },
 ): Promise<void> {
   const header = {
     format: FORMAT,
     key,
     version,
     savedAt: new Date().toISOString(),
-    scenario: scenarioToJson(scenario),
     orders: orders.size,
   } satisfies z.infer<typeof cacheHeaderSchema>;
   function* lines() {

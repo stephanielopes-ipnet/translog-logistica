@@ -5,12 +5,11 @@
 //    Colunas que o portal lê com os valores reais; as proibidas (sempre presentes, mesmo se o
 //    CSV de origem já vier sem elas) com valores FICTICIO-*; as demais com SEM-USO. Os testes
 //    usam esta amostra para provar que só as colunas lidas chegam às respostas.
-//    Junto, gold_param_cenario_prazo.csv (cenário "Promessa ajustada" da Gold, do export).
 // 2. api/src/orders/fixtures/orders.json: os mesmos pedidos convertidos pelo adapter `file`
 //    (o caminho real de leitura), na ordem da demo. É a fonte DATA_SOURCE=fixtures.
 
 import { createReadStream } from "node:fs";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
@@ -21,12 +20,6 @@ import {
   READ_COLUMNS,
 } from "../src/orders/consumo-mapper.ts";
 import { consumoFiles, loadFileRepository } from "../src/orders/file-repository.ts";
-import {
-  FIXTURE_SCENARIO_FILE,
-  fixtureScenarioContent,
-  GOLD_SCENARIO_FILE,
-  loadScenarioFile,
-} from "../src/orders/promise-scenario.ts";
 
 /** Pedidos da demo (escolhidos na base em 16/11), na ordem em que aparecem nos fixtures. */
 export const DEMO_ORDER_IDS = [76902, 375, 34, 222, 8, 9, 50, 31298, 76385];
@@ -96,17 +89,6 @@ await mkdir(SAMPLE_DIR, { recursive: true });
 for (const table of ["orders", "items", "events"] as const) {
   await writeSample(table, sources[table], samples[table]);
 }
-
-// Cenário "Promessa ajustada" da Gold: o CSV do export vai para a amostra (adapter `file` e
-// Databricks falso dos testes) e vira o JSON do adapter `fixtures`, com a data de geração.
-const scenario = await loadScenarioFile(sourceDir);
-await copyFile(resolve(sourceDir, GOLD_SCENARIO_FILE), resolve(SAMPLE_DIR, GOLD_SCENARIO_FILE));
-const scenarioTarget = fileURLToPath(FIXTURE_SCENARIO_FILE);
-await writeFile(
-  scenarioTarget,
-  `${JSON.stringify(fixtureScenarioContent(scenario, new Date()), null, 2)}\n`,
-);
-console.log(`${scenarioTarget}: ${scenario.size} modalidades`);
 
 const repository = await loadFileRepository(SAMPLE_DIR, { info: () => {}, warn: console.warn });
 const orders = await Promise.all(DEMO_ORDER_IDS.map((id) => repository.findById(id)));

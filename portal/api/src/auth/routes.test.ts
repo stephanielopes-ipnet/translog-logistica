@@ -169,7 +169,7 @@ describe("sessão, rotas do colaborador e logout", () => {
       orderId: 76902,
       market: "Pacific Asia",
       dispatch: { probableCause: "Promessa irreal" },
-      dispatchDiagnosis: { suggestedDays: 2, onTimeWithSuggested: true },
+      dispatchDiagnosis: { promisedDays: 1, daysToDispatch: 2, delayDays: 1 },
     });
     expect(missing.statusCode).toBe(404);
 

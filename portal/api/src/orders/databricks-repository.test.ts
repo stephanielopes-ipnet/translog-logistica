@@ -34,7 +34,6 @@ async function load(options: FakeDatabricksOptions = {}, timeoutMs = 5000) {
       warehouseId: "wh-teste",
       token: TOKEN,
       catalogSchema: "workspace.silver",
-      goldSchema: "workspace.gold",
       pollIntervalMs: 5,
       timeoutMs,
     },
@@ -63,57 +62,12 @@ describe("loadDatabricksRepository (Databricks falso)", () => {
     for (const order of fixtures) {
       expect(await orders.findById(order.orderId), `pedido ${order.orderId}`).toStrictEqual(order);
     }
-    // As 3 tabelas e o cenário da Gold, em paralelo (a ordem de chegada varia).
+    // As 3 tabelas, em paralelo (a ordem de chegada varia); nenhuma consulta à Gold.
     expect(fake.statements.map((sql) => sql.match(/ FROM (\S+)/)?.[1]).sort()).toEqual([
-      "workspace.gold.param_cenario_prazo",
       "workspace.silver.consumo_eventos_logisticos",
       "workspace.silver.consumo_itens_pedido",
       "workspace.silver.consumo_pedidos",
     ]);
-    expect(Object.fromEntries(orders.scenario())).toStrictEqual({
-      "First Class": 2,
-      "Same Day": 1,
-      "Second Class": 4,
-      "Standard Class": 4,
-    });
-  });
-
-  it("cenário: só as linhas ativas da Promessa ajustada, na Gold configurada", async () => {
-    const { fake, repository } = await load({
-      extraRows: {
-        param_cenario_prazo: [
-          {
-            cenario: "Promessa ajustada",
-            classe_servico: "Same Day",
-            prazo_despacho_dias: "9",
-            criterio: "antigo",
-            ativo: "false",
-            dt_atualizacao: "2026-11-01",
-          },
-          {
-            cenario: "Promessa atual",
-            classe_servico: "First Class",
-            prazo_despacho_dias: "1",
-            criterio: "atual",
-            ativo: "true",
-            dt_atualizacao: "2026-11-01",
-          },
-        ],
-      },
-    });
-
-    expect((await repository).scenario().get("Same Day")).toBe(1);
-    expect((await repository).scenario().get("First Class")).toBe(2);
-    const gold = fake.statements.find((sql) => sql.includes("param_cenario_prazo")) ?? "";
-    expect(gold).toContain("WHERE ativo = true AND cenario = 'Promessa ajustada'");
-  });
-
-  it("Gold sem a tabela do cenário: não sobe e diz qual tabela falta", async () => {
-    const { repository } = await load({ missingTable: "param_cenario_prazo" });
-
-    expect(await failure(repository)).toMatch(
-      /Não foi possível carregar workspace\.gold\.param_cenario_prazo do Databricks.*DATA_SOURCE=file/,
-    );
   });
 
   it("as consultas listam colunas explícitas e nunca as proibidas", async () => {
@@ -135,7 +89,7 @@ describe("loadDatabricksRepository (Databricks falso)", () => {
     const api = fake.requests.filter((r) => r.path.startsWith("/api/"));
     const storage = fake.requests.filter((r) => r.path.startsWith("/storage/"));
     expect(api.length).toBeGreaterThan(0);
-    expect(storage).toHaveLength(12); // (3 tabelas + cenário) × 3 pedaços
+    expect(storage).toHaveLength(9); // 3 tabelas × 3 pedaços
     expect(api.every((r) => r.authorization === `Bearer ${TOKEN}`)).toBe(true);
     expect(storage.every((r) => r.authorization === undefined)).toBe(true);
   });
@@ -147,7 +101,7 @@ describe("loadDatabricksRepository (Databricks falso)", () => {
     const polls = fake.requests.filter((r) =>
       /^\/api\/2\.0\/sql\/statements\/st-\d+$/.test(r.path),
     );
-    expect(polls).toHaveLength(8); // 2 por consulta (3 tabelas + cenário)
+    expect(polls).toHaveLength(6); // 2 por consulta (3 tabelas)
   });
 
   it("vários pedaços (com e sem cabeçalho repetido) dão o mesmo resultado", async () => {
@@ -244,7 +198,6 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
       warehouseId: "wh-teste",
       token: TOKEN,
       catalogSchema: "workspace.silver",
-      goldSchema: "workspace.gold",
       pollIntervalMs: 5,
       timeoutMs: 5000,
       cacheFile,
@@ -270,7 +223,7 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
     const { repository, log } = await boot();
 
     expect(await repository.count()).toBe(9);
-    expect(fake.statements).toHaveLength(4);
+    expect(fake.statements).toHaveLength(3);
     expect(log.info).toHaveBeenCalledWith(
       { cacheFile, reason: "ausente" },
       "Sem cache local; carregando do Databricks",
@@ -292,7 +245,7 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
       expect(await repository.findById(order.orderId)).toStrictEqual(order);
     }
     expect(fake.statements).toHaveLength(0);
-    expect(catalogCalls()).toBe(8); // 4 tabelas (3 + cenário) na primeira subida + 4 na conferência
+    expect(catalogCalls()).toBe(6); // 3 tabelas na primeira subida + 3 na conferência
     expect(messages(log)).toEqual([
       "Pedidos carregados do cache local; conferindo o Databricks em segundo plano",
       "Tabelas sem mudança no Databricks",
@@ -308,7 +261,6 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
     if (!first) throw new Error("fixtures vazios");
     await writeOrderCache(cacheFile, key, "versao-antiga", {
       orders: new Map([[first.orderId, first]]),
-      scenario: new Map([["First Class", 9]]),
     });
 
     const { repository, log } = await boot();
@@ -316,7 +268,7 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
     await repository.refresh();
 
     expect(await repository.count()).toBe(9);
-    expect(fake.statements).toHaveLength(4);
+    expect(fake.statements).toHaveLength(3);
     expect(messages(log)).toContain("Pedidos trocados pela versão nova");
     const saved = await readOrderCache(cacheFile, key);
     expect(saved.ok && saved.cache.orders.size).toBe(9);
@@ -331,7 +283,7 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
     await repository.refresh();
     await repository.refresh(); // sem mudança desde a última: não baixa de novo
 
-    expect(fake.statements).toHaveLength(8);
+    expect(fake.statements).toHaveLength(6);
   });
 
   it("Unity Catalog fora do ar ao subir com cache: serve o cache e avisa no log", async () => {
@@ -388,13 +340,12 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
     const { fake, cacheFile, boot } = await setup();
     await writeOrderCache(cacheFile, "chave-de-outro-codigo", "v1", {
       orders: new Map(),
-      scenario: new Map([["First Class", 2]]),
     });
 
     const { repository, log } = await boot();
 
     expect(await repository.count()).toBe(9);
-    expect(fake.statements).toHaveLength(4);
+    expect(fake.statements).toHaveLength(3);
     expect(log.info).toHaveBeenCalledWith(
       { cacheFile, reason: "de outra versão do código ou da fonte" },
       "Sem cache local; carregando do Databricks",

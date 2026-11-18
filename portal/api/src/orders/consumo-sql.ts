@@ -138,36 +138,3 @@ export function selectStatement(
   const select = columns.map((column) => `coalesce(${asText(column)}, '') AS ${column}`).join(", ");
   return `SELECT ${select} FROM ${catalogSchema}.${CONSUMO_TABLES[table]} ORDER BY ${ORDER_BY[table]}`;
 }
-
-/** Tabela da Gold com os cenários de prazo de despacho (só a "Promessa ajustada" é usada). */
-export const GOLD_SCENARIO_TABLE = "param_cenario_prazo";
-
-/** Colunas lidas da `param_cenario_prazo` (nenhuma é dado do cliente ou financeiro). */
-export const GOLD_SCENARIO_COLUMNS = [
-  "cenario",
-  "classe_servico",
-  "prazo_despacho_dias",
-  "criterio",
-  "ativo",
-  "dt_atualizacao",
-] as const;
-
-/** Nome do cenário usado como "prazo sugerido" no diagnóstico e na Torre. */
-export const ADJUSTED_SCENARIO_NAME = "Promessa ajustada";
-
-/**
- * `SELECT` das linhas ativas do cenário "Promessa ajustada" (uma por modalidade). Usado na carga
- * do adapter `databricks` e no `pnpm export:dados` (o leitor confere `ativo` e o cenário de novo).
- */
-export function goldScenarioStatement(goldSchema: string): string {
-  if (!CATALOG_SCHEMA.test(goldSchema)) {
-    throw new Error(`Schema inválido: "${goldSchema}" (esperado catalogo.schema).`);
-  }
-  const select = GOLD_SCENARIO_COLUMNS.map(
-    (column) => `coalesce(CAST(${column} AS STRING), '') AS ${column}`,
-  ).join(", ");
-  return (
-    `SELECT ${select} FROM ${goldSchema}.${GOLD_SCENARIO_TABLE} ` +
-    `WHERE ativo = true AND cenario = '${ADJUSTED_SCENARIO_NAME}' ORDER BY classe_servico`
-  );
-}

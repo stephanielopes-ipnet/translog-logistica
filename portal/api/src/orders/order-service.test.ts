@@ -1,12 +1,10 @@
-import type { ShippingMode } from "@translog/contracts";
 import { describe, expect, it } from "vitest";
 import { createFixturesRepository } from "./fixtures-repository.ts";
 import { createOrderService, OrderNotFoundError } from "./order-service.ts";
 
 const fixtures = await createFixturesRepository();
 const service = createOrderService({
-  // Cenário trocado pelo teste: só First Class tem prazo sugerido (3 dias).
-  orders: { ...fixtures, scenario: () => new Map<ShippingMode, number>([["First Class", 3]]) },
+  orders: fixtures,
   sampleOrderIds: [76902, 1, 375],
 });
 
@@ -19,13 +17,13 @@ describe("createOrderService", () => {
     expect(order).not.toHaveProperty("market");
   });
 
-  it("getStaffOrder: visão do colaborador, com causas da base e o cenário configurado", async () => {
+  it("getStaffOrder: visão do colaborador, com causas da base e o diagnóstico", async () => {
     const order = await service.getStaffOrder(76902);
 
     expect(order.dispatch.probableCause).toBe("Promessa irreal");
     expect(order.market).toBe("Pacific Asia");
-    expect(order.dispatchDiagnosis.suggestedDays).toBe(3);
-    expect((await service.getStaffOrder(375)).dispatchDiagnosis.suggestedDays).toBeNull();
+    expect(order.dispatchDiagnosis).toEqual({ promisedDays: 1, daysToDispatch: 2, delayDays: 1 });
+    expect(order.dispatchDiagnosis).not.toHaveProperty("suggestedDays");
     expect(order.context.shippingMode.dispatchedOrders).toBe(3);
   });
 

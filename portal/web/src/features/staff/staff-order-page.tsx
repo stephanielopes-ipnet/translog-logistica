@@ -191,27 +191,6 @@ function StaffOrderContent({ order }: { order: StaffOrder }) {
               value={formatSignedDays(dispatch.delayDays)}
               tone={(dispatch.delayDays ?? 0) > 0 ? "bad" : undefined}
             />
-            <Pair
-              label="Prazo sugerido"
-              value={dispatch.suggestedDays === null ? "—" : days(dispatch.suggestedDays)}
-            />
-            <Pair
-              label="Com o sugerido"
-              value={
-                dispatch.onTimeWithSuggested === null
-                  ? "—"
-                  : dispatch.onTimeWithSuggested
-                    ? "estaria no prazo"
-                    : "atrasaria"
-              }
-              tone={
-                dispatch.onTimeWithSuggested === null
-                  ? undefined
-                  : dispatch.onTimeWithSuggested
-                    ? "good"
-                    : "bad"
-              }
-            />
           </Diag>
 
           <Diag title="Transporte" origin={order.dataOrigin.transport}>

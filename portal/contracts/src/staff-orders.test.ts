@@ -46,8 +46,6 @@ const lost: StaffOrder = {
     promisedDays: 1,
     daysToDispatch: 2,
     delayDays: 1,
-    suggestedDays: 2,
-    onTimeWithSuggested: true,
   },
   transportDiagnosis: { standardTransitDays: 3, actualTransitDays: null, recoveredDays: null },
   stageDays: [

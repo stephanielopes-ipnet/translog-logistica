@@ -32,7 +32,6 @@ Das tabelas oficiais do time de dados (Mateus), no Databricks:
 | `workspace.silver.consumo_pedidos` | 1 linha por pedido (65.752): situação, prazos, causa, local atual |
 | `workspace.silver.consumo_itens_pedido` | os itens de cada pedido, com o valor |
 | `workspace.silver.consumo_eventos_logisticos` | os eventos da viagem (coleta, voo, alfândega…) |
-| `workspace.gold.param_cenario_prazo` | a "Promessa ajustada": o prazo de despacho que a operação consegue cumprir em cada modalidade (First Class 2 dias, Same Day 1, Second Class 4, Standard 4). A Área do colaborador compara a promessa atual com ela |
 
 O portal carrega tudo **uma vez, ao ligar**, e depois responde da memória. O "hoje" dos dados é **06/02/2018** (a data mais recente da base): a situação mostrada é a dessa data.
 
@@ -134,7 +133,7 @@ pnpm dev
 
 ### Com os CSVs (plano B)
 
-1. Os arquivos `consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv` e `gold_param_cenario_prazo.csv` (a "Promessa ajustada") precisam estar em `portal/dados/`. Se faltar o último, o servidor não liga e pede para rodar o export. Eles não vêm no GitHub: baixe com **`pnpm export:dados`** (~1 min; precisa das credenciais do Databricks, veja os "Primeiros passos").
+1. Os arquivos `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` precisam estar em `portal/dados/`. Eles não vêm no GitHub: baixe com **`pnpm export:dados`** (~1 min; precisa das credenciais do Databricks, veja os "Primeiros passos").
 2. No `portal/.env`: `DATA_SOURCE=file`.
 3. `pnpm dev`. O servidor leva ~15 s para carregar os 65.752 pedidos.
 
@@ -202,9 +201,9 @@ Com `DATA_SOURCE=file` (ou `databricks`) e `AUTH_DEMO=true`:
 1. **Início** (`http://localhost:5173`): o mapa animado mostra as rotas dos EUA e de Porto Rico para os 5 mercados, com o número de pedidos de cada um. O LogBot está aberto à direita; mostrar que ele minimiza (desliza para a direita) e reabre pela aba.
 2. Digitar **76902** na busca e clicar em **Rastrear**: pedido **em trânsito**, First Class, de San Jose (EUA) para Jacarta (Indonésia), parado na **Alfândega Jacarta**, com **5 dias de atraso**. "O envio saiu com 1 dia de atraso." Motivo provável em linguagem do cliente. Aviso da central.
 3. Clicar em **"Perguntar ao assistente"**: o LogBot (a mesma conversa do Início) explica o motivo provável e avisa que o caso é acompanhado pela central. Mostrar a sugestão "Quero falar com a central".
-4. Clicar em **"Acesso colaborador"** → **"Entrar como demonstração"** → **Torre de controle**: 42,7% dos despachos no prazo, 74,7% das entregas, 197 em trânsito, 8.337 na central, 7.222 extravios. Filtrar a tabela por **Alfândega**.
+4. Clicar em **"Acesso colaborador"** → **"Entrar como demonstração"** → **Torre de controle**: 197 em trânsito, 8.337 na central, 7.222 extravios (os percentuais de despacho e entrega no prazo e a simulação de prazos ficam no painel do Marcelo). Filtrar a tabela por **Alfândega**.
 5. Em **"Pedidos"**, mostrar a busca: digitar `769` (vários pedidos) e depois `76902` (uma linha); clicar em "Extravios" na Torre para ver a lista já filtrada (7.222).
-6. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho de 2 dias contra 1 prometido; com a "Promessa ajustada" de 2 dias estaria no prazo), as causas nos termos da base e de onde vem cada dado (real ou simulado). Comparar com "Ver como o cliente vê".
+6. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho em 2 dias contra 1 prometido, entrega 5 dias atrasada), as causas nos termos da base e de onde vem cada dado (real ou simulado). Comparar com "Ver como o cliente vê".
 7. **Sair**.
 8. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
 

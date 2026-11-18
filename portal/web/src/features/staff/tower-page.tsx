@@ -81,19 +81,7 @@ function TowerContent({ data }: { data: TowerResponse }) {
         </div>
       </header>
 
-      <section aria-label="Indicadores" className="grid grid-cols-5 gap-3">
-        <Indicator
-          tone="danger"
-          label="Despachos no prazo"
-          value={formatPercent(indicators.dispatchOnTime.pct)}
-          detail={`${formatInt(indicators.dispatchOnTime.onTime)} de ${formatInt(indicators.dispatchOnTime.total)} despachados`}
-        />
-        <Indicator
-          tone="accent"
-          label="Entregas no prazo"
-          value={formatPercent(indicators.deliveryOnTime.pct)}
-          detail={`${formatInt(indicators.deliveryOnTime.onTime)} de ${formatInt(indicators.deliveryOnTime.total)} avaliadas`}
-        />
+      <section aria-label="Indicadores" className="grid grid-cols-3 gap-3">
         <Indicator
           tone="primary"
           label="Em trânsito agora"
@@ -462,8 +450,8 @@ function DelayBadge({ days }: { days: number | null }) {
 function PromiseTable({ data }: { data: TowerResponse }) {
   return (
     <Block
-      title="Promessa × realidade por modalidade"
-      subtitle='Prazo prometido, quanto atrasou e o prazo sugerido pela "Promessa ajustada" (cenário da Gold, param_cenario_prazo).'
+      title="Atrasos por modalidade"
+      subtitle="Prazo de despacho prometido e quanto atrasou no despacho e na entrega. A simulação de prazos novos fica no painel completo de performance."
     >
       <table className="w-full text-sm">
         <thead>
@@ -473,8 +461,6 @@ function PromiseTable({ data }: { data: TowerResponse }) {
             <Th className="text-right">Despachos</Th>
             <Th className="text-right">Despachos atrasados</Th>
             <Th className="text-right">Entregas atrasadas</Th>
-            <Th className="text-right">Prazo sugerido</Th>
-            <Th className="text-right">Atrasados com o sugerido</Th>
           </tr>
         </thead>
         <tbody>
@@ -487,8 +473,6 @@ function PromiseTable({ data }: { data: TowerResponse }) {
                 {formatPercent(mode.lateDispatchPct)}
               </Num>
               <Num>{formatPercent(mode.lateDeliveryPct)}</Num>
-              <Num>{mode.suggestedDays === null ? "—" : days(mode.suggestedDays)}</Num>
-              <Num good>{formatPercent(mode.lateDispatchPctWithSuggested)}</Num>
             </tr>
           ))}
         </tbody>
