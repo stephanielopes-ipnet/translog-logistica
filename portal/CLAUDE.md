@@ -44,17 +44,17 @@ DATABRICKS_IT=1 pnpm --filter @translog/api test databricks-repository        # 
 pnpm export:dados                # baixa as tabelas consumo_* do Databricks para portal/dados/ (1 a 5 min)
 pnpm staff:add <email>           # pede a senha (sem eco) e imprime a linha STAFF_USERS para o .env
 pnpm --filter @translog/api fixtures  # regenera os fixtures e a amostra de teste a partir de portal/dados/
-docker compose up --build        # forma oficial de rodar a API (fixtures, chat simulado)
+docker compose up --build        # forma oficial de rodar: tela + API em localhost:3333 (9 pedidos de exemplo, chat simulado)
 docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build       # com os CSVs consumo_*
 docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build  # direto do Databricks (credenciais do .env, nunca na imagem)
 docker compose down
 ```
 
-Pacotes: `@translog/api` (`api/`), `@translog/contracts` (`contracts/`, com testes do contrato) e `@translog/web` (`web/`). Tela em `http://localhost:5173`; documentação da API em `http://localhost:3333/docs`.
+Pacotes: `@translog/api` (`api/`), `@translog/contracts` (`contracts/`, com testes do contrato) e `@translog/web` (`web/`). Tela em `http://localhost:5173` (`pnpm dev`) ou, no Docker, em `http://localhost:3333`; documentação da API em `http://localhost:3333/docs`.
 
-Área do colaborador: `STAFF_USERS` (de `pnpm staff:add`) e `SESSION_SECRET` (32+ caracteres) no `portal/.env`; `AUTH_DEMO=true` liga "Entrar como demonstração" (dev e banca). `DASHBOARD_URL` = link do painel na Torre (vazio = "link a definir").
+Área do colaborador: `STAFF_USERS` (de `pnpm staff:add`) e `SESSION_SECRET` (32+ caracteres) no `portal/.env`; `AUTH_DEMO=true` liga "Entrar como demonstração" (dev e banca).
 
-Chat: `AGENT=mock` (padrão, simulado na própria API) ou `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001` (agente do Marco) no `portal/.env`, que fica fora do Git. Reinicie o `pnpm dev` depois de mudar o `.env`. No Docker, sempre `mock`.
+Chat: `AGENT=mock` (padrão, simulado na própria API) ou `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001` (agente do Marco) no `portal/.env`, que fica fora do Git. Reinicie o `pnpm dev` depois de mudar o `.env`. No Docker, `mock`, a não ser com `docker-compose.agente.yml` (ou `pnpm agent:up`), que liga o agente. A imagem do Docker inclui a tela (a API serve `web/dist`, via `WEB_DIR`, na mesma porta): com o Docker ligado, abra `http://localhost:3333`; não rode `pnpm dev` junto (disputam a porta 3333).
 
 ## Arquitetura
 

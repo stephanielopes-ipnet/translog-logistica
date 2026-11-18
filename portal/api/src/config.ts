@@ -99,6 +99,7 @@ const envSchema = z
     API_PORT: port.default(3333),
     DATA_SOURCE: dataSourceSchema.default("fixtures"),
     DATA_DIR: z.string().default("dados"),
+    WEB_DIR: z.string().optional(),
     SAMPLE_ORDER_IDS: orderIdList.prefault("76902,375,34,8"),
     AGENT: agentModeSchema.default("mock"),
     AGENT_URL: agentUrl.optional(),
@@ -112,7 +113,6 @@ const envSchema = z
     STAFF_USERS: staffUsers.optional(),
     SESSION_SECRET: z.string().min(32).optional(),
     AUTH_DEMO: booleanFlag.default(false),
-    DASHBOARD_URL: z.url({ protocol: /^https?$/ }).optional(),
     NODE_ENV: z.string().optional(),
   })
   .refine(
@@ -158,6 +158,7 @@ const expectations: Record<EnvName, string> = {
   API_PORT: "deve ser um número inteiro entre 1 e 65535",
   DATA_SOURCE: oneOf(dataSourceSchema.options),
   DATA_DIR: "deve ser o caminho da pasta com os CSVs das tabelas consumo_*",
+  WEB_DIR: "deve ser o caminho da pasta com o build da tela (web/dist)",
   SAMPLE_ORDER_IDS:
     "deve ser uma lista de números de pedido separados por vírgula (inteiros positivos de até 10 dígitos)",
   AGENT: oneOf(agentModeSchema.options),
@@ -177,7 +178,6 @@ const expectations: Record<EnvName, string> = {
   SESSION_SECRET:
     "deve ter pelo menos 32 caracteres e é obrigatória com STAFF_USERS ou AUTH_DEMO=true (gere com: openssl rand -base64 48)",
   AUTH_DEMO: oneOf(["true", "false"]),
-  DASHBOARD_URL: "deve ser o endereço http(s) do painel de performance",
   NODE_ENV: "deve ser um texto",
 };
 
@@ -189,6 +189,8 @@ const configSchema = envSchema.transform((env) => {
     dataSource: env.DATA_SOURCE,
     /** Relativo no ambiente = relativo a `portal/`. */
     dataDir,
+    /** Pasta com a tela já compilada (`web/dist`); `undefined` = a API não serve a tela. */
+    webDir: env.WEB_DIR === undefined ? undefined : resolve(PORTAL_DIR, env.WEB_DIR),
     /** Pedidos de exemplo da tela, na ordem configurada. */
     sampleOrderIds: env.SAMPLE_ORDER_IDS,
     /** Assistente do chat. */
@@ -218,8 +220,6 @@ const configSchema = envSchema.transform((env) => {
       sessionSecret: env.SESSION_SECRET,
       demo: env.AUTH_DEMO,
     },
-    /** Painel completo de performance (link da Torre); `null` = a definir. */
-    dashboardUrl: env.DASHBOARD_URL ?? null,
     nodeEnv: env.NODE_ENV,
   };
 });

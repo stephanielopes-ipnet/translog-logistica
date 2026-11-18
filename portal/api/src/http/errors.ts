@@ -1,5 +1,10 @@
 import type { ErrorResponse } from "@translog/contracts";
-import type { FastifyInstance, FastifyReply, FastifySchemaValidationError } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  FastifySchemaValidationError,
+} from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 import {
   InvalidCredentialsError,
@@ -44,7 +49,10 @@ const clientErrorMessages: Record<number, string> = {
  * - qualquer outro erro: `500 INTERNAL_ERROR` genérico, com o detalhe só no log;
  * - rota inexistente: `404 NOT_FOUND`.
  */
-export function registerErrorHandler(app: FastifyInstance): void {
+export function registerErrorHandler(
+  app: FastifyInstance,
+  options: ErrorHandlerOptions = {},
+): void {
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof OrderNotFoundError) {
       return sendError(reply, 404, "ORDER_NOT_FOUND", ORDER_NOT_FOUND_MESSAGE);
@@ -92,9 +100,36 @@ export function registerErrorHandler(app: FastifyInstance): void {
     return sendError(reply, 500, "INTERNAL_ERROR", "Ocorreu um erro inesperado. Tente novamente.");
   });
 
-  app.setNotFoundHandler((_request, reply) =>
-    sendError(reply, 404, "NOT_FOUND", "Recurso não encontrado."),
-  );
+  app.setNotFoundHandler((request, reply) => {
+    // Com a tela servida pela API, os endereços da própria tela (`/rastreio`,
+    // `/colaborador/pedidos/76902`…) devolvem o `index.html`, que o roteador da tela resolve.
+    if (options.serveWeb && isWebPageRequest(request)) {
+      return reply.header("cache-control", "no-cache").sendFile("index.html");
+    }
+    return sendError(reply, 404, "NOT_FOUND", "Recurso não encontrado.");
+  });
+}
+
+export interface ErrorHandlerOptions {
+  /** A API serve a tela (`WEB_DIR`): endereços de página caem no `index.html`. */
+  serveWeb?: boolean;
+}
+
+/** Endereço de página da tela: GET/HEAD fora de `/api` e `/docs`, sem extensão de arquivo. */
+function isWebPageRequest(request: FastifyRequest): boolean {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return false;
+  }
+  const path = request.url.split("?")[0] ?? "";
+  if (
+    path === "/api" ||
+    path.startsWith("/api/") ||
+    path === "/docs" ||
+    path.startsWith("/docs/")
+  ) {
+    return false;
+  }
+  return !/\.[A-Za-z0-9]+$/.test(path);
 }
 
 /** Status HTTP de erros do Fastify (ex.: JSON malformado = 400); 500 nos demais. */

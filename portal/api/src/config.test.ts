@@ -13,7 +13,7 @@ const defaults = {
   agentTimeoutMs: 90000,
   databricks: undefined,
   auth: { users: new Map(), sessionSecret: undefined, demo: false },
-  dashboardUrl: null,
+  webDir: undefined,
   nodeEnv: undefined,
 };
 
@@ -83,7 +83,7 @@ describe("loadConfig", () => {
       agentTimeoutMs: 60000,
       databricks: undefined,
       auth: { users: new Map(), sessionSecret: undefined, demo: false },
-      dashboardUrl: null,
+      webDir: undefined,
       nodeEnv: "production",
     });
   });
@@ -294,18 +294,25 @@ describe("loadConfig", () => {
     const HASH = `scrypt.${"a".repeat(22)}.${"b".repeat(43)}`;
     const SECRET = "s".repeat(32);
 
-    it("lê STAFF_USERS (e-mail em minúsculas), SESSION_SECRET, AUTH_DEMO e DASHBOARD_URL", () => {
+    it("lê STAFF_USERS (e-mail em minúsculas), SESSION_SECRET e AUTH_DEMO", () => {
       const config = loadConfig({
         STAFF_USERS: ` Ana@TransLog.com:${HASH} , bia@translog.com:${HASH}`,
         SESSION_SECRET: SECRET,
         AUTH_DEMO: "true",
-        DASHBOARD_URL: "https://exemplo.cloud.databricks.com/dashboards/1",
       });
 
       expect([...config.auth.users.keys()]).toEqual(["ana@translog.com", "bia@translog.com"]);
       expect(config.auth.demo).toBe(true);
       expect(config.auth.sessionSecret).toBe(SECRET);
-      expect(config.dashboardUrl).toBe("https://exemplo.cloud.databricks.com/dashboards/1");
+    });
+
+    it("WEB_DIR: relativo parte de portal/, absoluto fica como está, vazio = não serve a tela", () => {
+      expect(loadConfig({}).webDir).toBeUndefined();
+      expect(loadConfig({ WEB_DIR: "" }).webDir).toBeUndefined();
+      expect(loadConfig({ WEB_DIR: "web/dist" }).webDir).toBe(
+        join(import.meta.dirname, "..", "..", "web", "dist"),
+      );
+      expect(loadConfig({ WEB_DIR: "/srv/tela" }).webDir).toBe("/srv/tela");
     });
 
     it("exige SESSION_SECRET com usuários ou demonstração, sem mostrar o valor", () => {

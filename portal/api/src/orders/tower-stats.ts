@@ -10,8 +10,7 @@ import type {
 import type { OrderRecord } from "./order-record.ts";
 
 // Números da Torre de controle e do resumo do Início, acumulados numa passada só quando os
-// pedidos são carregados (junto com `computeOrderStats`). O `DASHBOARD_URL` entra só na montagem
-// da resposta (`buildTower`).
+// pedidos são carregados (junto com `computeOrderStats`).
 
 /** Ordem fixa das modalidades (da mais lenta para a mais rápida). */
 export const SHIPPING_MODE_ORDER: readonly ShippingMode[] = [
@@ -156,13 +155,12 @@ export function createTowerAccumulator() {
 export interface BuildTowerOptions {
   /** Entregas avaliadas e atrasadas por rota (`OrderStats.deliveryByRoute`). */
   deliveryByRoute: ReadonlyMap<string, Count>;
-  dashboardUrl: string | null;
 }
 
 /** Resposta de `GET /api/staff/tower`. */
 export function buildTower(
   stats: TowerStats,
-  { deliveryByRoute, dashboardUrl }: BuildTowerOptions,
+  { deliveryByRoute }: BuildTowerOptions,
 ): TowerResponse {
   const promiseByMode: PromiseByMode[] = [];
   for (const shippingMode of SHIPPING_MODE_ORDER) {
@@ -205,7 +203,6 @@ export function buildTower(
     inTransitByStage: stats.inTransitByStage,
     lostByStage: stats.lostByStage,
     lateRoutes,
-    dashboardUrl,
   };
 }
 

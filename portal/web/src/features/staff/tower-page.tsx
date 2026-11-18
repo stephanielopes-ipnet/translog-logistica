@@ -1,13 +1,5 @@
 import type { StageCount, TowerResponse } from "@translog/contracts";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  ChartNoAxesColumn,
-  FlaskConical,
-  Loader2,
-  RotateCcw,
-  Search,
-} from "lucide-react";
+import { ArrowRight, FlaskConical, Loader2, RotateCcw, Search } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useTower } from "@/api/session.ts";
 import { formatDate } from "@/lib/format.ts";
@@ -77,7 +69,6 @@ function TowerContent({ data }: { data: TowerResponse }) {
         </div>
         <div className="ml-auto flex items-center gap-3">
           <TowerQuickSearch />
-          <DashboardLink url={data.dashboardUrl} />
         </div>
       </header>
 
@@ -152,34 +143,6 @@ function TowerContent({ data }: { data: TowerResponse }) {
         </Block>
       </div>
     </StaffShell>
-  );
-}
-
-/** "Painel completo de performance": link do `DASHBOARD_URL`, ou "link a definir" desabilitado. */
-function DashboardLink({ url }: { url: string | null }) {
-  if (url === null) {
-    return (
-      <span
-        aria-disabled="true"
-        title="O link do painel ainda não foi definido"
-        className="h-9 px-3.5 rounded-md border border-dashed border-slate-300 text-sm text-slate-400 inline-flex items-center gap-2 cursor-not-allowed"
-      >
-        <ChartNoAxesColumn aria-hidden="true" className="w-4 h-4" />
-        Painel completo de performance · link a definir
-      </span>
-    );
-  }
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="h-9 px-3.5 rounded-md border border-slate-300 bg-surface text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary inline-flex items-center gap-2 transition"
-    >
-      <ChartNoAxesColumn aria-hidden="true" className="w-4 h-4" />
-      Painel completo de performance
-      <ArrowUpRight aria-hidden="true" className="w-3.5 h-3.5" />
-    </a>
   );
 }
 
@@ -451,7 +414,7 @@ function PromiseTable({ data }: { data: TowerResponse }) {
   return (
     <Block
       title="Atrasos por modalidade"
-      subtitle="Prazo de despacho prometido e quanto atrasou no despacho e na entrega. A simulação de prazos novos fica no painel completo de performance."
+      subtitle="Prazo de despacho prometido e quanto atrasou no despacho e na entrega."
     >
       <table className="w-full text-sm">
         <thead>

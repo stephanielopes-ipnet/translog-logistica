@@ -86,10 +86,6 @@ export const towerResponseSchema = z.object({
   lateRoutes: z
     .array(lateRouteSchema)
     .describe("Rotas com mais atraso na entrega (mínimo de 300 entregas avaliadas)"),
-  dashboardUrl: z
-    .url()
-    .nullable()
-    .describe("Painel completo de performance (DASHBOARD_URL); null = link a definir"),
 });
 export type TowerResponse = z.infer<typeof towerResponseSchema>;
 

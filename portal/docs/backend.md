@@ -397,7 +397,7 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 | `staffOrderSchema` / `StaffOrder` | Resposta de `GET /api/staff/orders/:orderId`: o `Order` com causas da base, `explanation`, `market`, `routeService` e o diagnóstico |
 | `loginRequestSchema`, `sessionResponseSchema`, `DEMO_STAFF_EMAIL` | Login do colaborador (`contracts/src/auth.ts`): `{ email, password }` e `{ authenticated, email, demoAvailable }` |
 | `staffSearchQuerySchema`, `staffSearchResponseSchema` / `StaffSearchRow` | Busca do colaborador (`contracts/src/staff-search.ts`): filtros da query string e `{ total, page, pageSize, results }` com linhas resumidas |
-| `towerResponseSchema` / `TowerResponse` | Torre de controle (`contracts/src/tower.ts`): indicadores, fila de atenção, promessa × realidade, etapas, rotas, `dashboardUrl` |
+| `towerResponseSchema` / `TowerResponse` | Torre de controle (`contracts/src/tower.ts`): indicadores, fila de atenção, promessa × realidade, etapas, rotas |
 | `ordersSummaryResponseSchema` | `{ totalOrders, markets: [{ market, orders }] }` (mapa do Início, público) |
 
 ### `Order`
@@ -588,6 +588,7 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 |---|---|---|
 | `API_PORT` | `3333` | Porta da API (1 a 65535) |
 | `DATA_SOURCE` | `fixtures` | `fixtures`, `file` ou `databricks` |
+| `WEB_DIR` | vazio | Pasta com a tela compilada (`web/dist`). Quando definida, a API serve a tela na mesma porta (a imagem do Docker já define `WEB_DIR=web/dist`); vazia no `pnpm dev`, onde o Vite serve a tela. Sem `index.html` na pasta, a API não sobe e diz para rodar `pnpm build` |
 | `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv` (`file` e `pnpm export:dados`) e o cache do `databricks`. Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
 | `SAMPLE_ORDER_IDS` | `76902,375,34,8` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
 | `DATABRICKS_HOST` | vazio | Host do workspace (sem ou com `https://`); obrigatório com `databricks`. `http://` só para `localhost`/`127.0.0.1` (testes) |
@@ -601,7 +602,6 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 | `STAFF_USERS` | vazio | Usuários do colaborador: `email:hash` separados por vírgula (`pnpm staff:add <email>`). Nunca aparece na mensagem de erro |
 | `SESSION_SECRET` | vazio | Segredo do cookie de sessão (32+ caracteres); obrigatório com `STAFF_USERS` ou `AUTH_DEMO=true`. Nunca aparece na mensagem de erro |
 | `AUTH_DEMO` | `false` | `true` liga "Entrar como demonstração" (`POST /api/auth/demo`); só para o desenvolvimento e a banca |
-| `DASHBOARD_URL` | vazio | Link "Painel completo de performance" da Torre; vazio = "link a definir" |
 | `NODE_ENV` | vazio | `production` = log em JSON e cookie `Secure`; ausente = legível (pino-pretty) |
 | `WEB_PORT` | `5173` | Porta do Vite dev server (só o frontend em dev); o proxy `/api` usa `API_PORT` |
 
@@ -617,7 +617,7 @@ Regras (`api/src/config.ts`):
     - AGENT_URL deve ser o endereço http(s) do agente, obrigatório com AGENT=adk (ex.: http://127.0.0.1:8001) (não definida)
   ```
 
-- No Docker, `DATA_SOURCE` e `DATA_DIR` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 15). `AGENT` fica fixo em `mock` no compose.
+- No Docker, `DATA_SOURCE` e `DATA_DIR` do `.env` não valem: a fonte é escolhida pelos arquivos de compose (seção 15). `AGENT` fica em `mock` no compose base; `docker-compose.agente.yml` o troca por `adk` e liga o agente. A tela vai dentro da imagem da API (seção 15) e é servida na mesma porta.
 - A chave do Gemini nunca entra no `.env` do portal: fica só no `.env` do agente.
 
 ## 8. Fontes de dados
@@ -1034,7 +1034,7 @@ De cima para baixo: número, situação e prazo (sem o código de manifesto `TL-
 ### 13.9. Área do colaborador (`features/staff/`)
 
 - **Login (`staff-login-page.tsx`):** e-mail e senha; erro genérico ("E-mail ou senha inválidos."), aviso de `429`, aviso de sessão expirada; "Entrar como demonstração" só com `demoAvailable`.
-- **Torre (`tower-page.tsx`):** cabeçalho com a data de referência, o total e a busca rápida; 3 indicadores (em trânsito, encaminhados à central, extravios; os de despacho e entrega no prazo ficam no dashboard); "Pedidos que precisam de atenção" (12 primeiros + "Mostrar todos"; filtro por etapa com `aria-pressed`; o número do pedido é um link, então Tab + Enter abre, e a linha toda é clicável); atrasos por modalidade (prazo prometido, despachos e entregas atrasados; a simulação de prazos novos fica no dashboard); em trânsito e extravios por etapa (selo "rastreio simulado"); rotas com mais atraso; "Painel completo de performance" (`dashboardUrl`) ou "link a definir", desabilitado.
+- **Torre (`tower-page.tsx`):** cabeçalho com a data de referência, o total e a busca rápida; 3 indicadores (em trânsito, encaminhados à central, extravios); "Pedidos que precisam de atenção" (12 primeiros + "Mostrar todos"; filtro por etapa com `aria-pressed`; o número do pedido é um link, então Tab + Enter abre, e a linha toda é clicável); atrasos por modalidade (prazo prometido, despachos e entregas atrasados); em trânsito e extravios por etapa (selo "rastreio simulado"); rotas com mais atraso. Não há link para o dashboard do Marcelo (removido em 18/11: a Torre não aponta para fora do portal).
 - **Rastreio do colaborador (`staff-order-page.tsx`):** faixa escura "Visão do colaborador" (voltar à Torre, abrir outro pedido, "Ver como o cliente vê" em outra aba, para quem atende a central conferir a tela do cliente); blocos de diagnóstico (despacho prometido × real, transporte padrão × real e dias recuperados, dias em cada etapa, contexto da modalidade e da rota, origem do dado com selos real/simulado, valor em risco, causas da base com a explicação completa, resumo para a IA e linha do tempo bruta recolhíveis); depois o cartão do pedido e os itens, sem o chat.
 - **Busca de pedidos (`staff-search-page.tsx`, 18/11):** `/colaborador/pedidos`, dentro do cabeçalho da área (item "Pedidos", ao lado de "Torre de controle"; o pedido também marca "Pedidos").
   - **Filtros na URL** (`search-filters.ts`, lógica pura com testes): mesmos nomes da API (`?q=769&status=Extraviado&minDelayDays=3&sort=delay&page=2`); `readFilters` valida cada valor com os esquemas do contrato e ignora o inválido; `writeFilters` tira os padrões (página 1, sem ordenação, `escalated=false`) e põe as escolhas múltiplas sem repetir e na ordem das opções (mesma busca = mesma URL); `updateFilters` volta à página 1 quando um filtro muda; `searchApiPath` monta `GET /api/staff/orders` com `pageSize=20`. A busca pode ser compartilhada, recarregada e volta igual pelo "voltar" do navegador; mudanças de filtro substituem a entrada do histórico (`replace`), abrir um pedido cria uma nova.
@@ -1076,7 +1076,7 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 | `orders/fixtures-repository.test.ts` | Carga, situações e central dos 9 pedidos da demo, arquivo inválido, campos extras descartados |
 | `orders/consumo-mapper.test.ts` | 375 completo e datas iguais à `linha_do_tempo`; 76902, 34, 9, 31298; linhas x unidades (8); fuso; formato do export; ordem de itens e eventos (10 depois de 9); centavos; "Sem atraso"; casos inválidos; colunas proibidas fora das lidas |
 | `orders/escalation.test.ts` | ≥ 3 dias, 2 dias, extraviado, não pago, cancelado, adiantado |
-| `orders/tower-stats.test.ts` | Torre com os fixtures (indicadores, fila de atenção, atrasos por modalidade, `DASHBOARD_URL`), resumo por mercado; **integração com os CSVs reais** (42,7%, 74,7%, 197/43/23, 8.337, 7.222) |
+| `orders/tower-stats.test.ts` | Torre com os fixtures (indicadores, fila de atenção, atrasos por modalidade, resumo por mercado; **integração com os CSVs reais** (42,7%, 74,7%, 197/43/23, 8.337, 7.222) |
 | `auth/auth-units.test.ts` | Hash scrypt (sal novo, formato), token HMAC (vencido, adulterado, outro segredo, malformado), limite de tentativas (janela, janelas vencidas esquecidas, teto de IPs) |
 | `orders/order-search.test.ts` | Busca: sem filtro, número por prefixo, texto sem acentos, situação/modalidade/mercado/etapa, causa, atraso mínimo, central, as 3 ordens, páginas, linha resumida; validação da query string |
 | `auth/routes.test.ts` | Login certo e errado (mesma resposta), atributos do cookie (`Secure` em produção), `429`, POST sem JSON, sem `STAFF_USERS`, sessão, `401` em `/api/staff/*`, Torre, pedido e busca com sessão (e `400` com `pageSize` inválido), cookie adulterado e vencido, logout, demonstração ligada e desligada |
@@ -1130,9 +1130,21 @@ Os testes da tela leem os pedidos de `api/src/orders/fixtures/orders.json` (`web
 |---|---|
 | `base` | `node:24.22.3-alpine3.24` + `corepack enable` |
 | `deps` | `pnpm install --frozen-lockfile --prod --filter "@translog/api..."`, com cache do store do pnpm |
-| `runtime` | Copia `node_modules`, `api/src` e `contracts/src`; `NODE_ENV=production`; usuário `node`; `CMD node api/src/main.ts` |
+| `web` | Instala as dependências da tela (com as de desenvolvimento) e roda `vite build` → `web/dist`. Só o `dist` segue para a imagem final |
+| `runtime` | Copia `node_modules`, `api/src`, `contracts/src` e o `web/dist`; `NODE_ENV=production`, `WEB_DIR=web/dist`; usuário `node`; `CMD node api/src/main.ts` |
 
 O layout do workspace é mantido na imagem de propósito: o Node não remove tipos de arquivos dentro de `node_modules`, e `@translog/contracts` é um symlink para `contracts/`. A imagem final tem 293 MB, sem testes, CSV, `.env` nem dependências de desenvolvimento. O `.dockerignore` tira também `_contexto/`, `dados/` e `prototipos/`, e o contexto de build fica em ~1 kB.
+
+### A tela dentro da imagem (`WEB_DIR`, 18/11)
+
+A API serve a tela na mesma porta (um container, uma URL, sem CORS), com `@fastify/static` 10.1.8 (`server.ts`, `registerWeb`):
+
+- Arquivos de `assets/` (nome com hash) saem com `cache-control: public, max-age=31536000, immutable`; o `index.html` e o resto, com `no-cache`.
+- Endereços da tela sem arquivo correspondente (`/rastreio`, `/colaborador/pedidos/76902`…) devolvem o `index.html`, para o roteador da tela resolver. Isso fica em `http/errors.ts` (`isWebPageRequest`): só `GET`/`HEAD`, fora de `/api` e `/docs`, e sem extensão de arquivo. Arquivo inexistente (`/assets/x.js`) e rota da API inexistente continuam `404` em JSON.
+- `wildcard: false`: o plugin registra uma rota por arquivo, sem rota curinga que conflite com a API ou com o `/docs`. Acesso fora da pasta (`/../`) não devolve nada.
+- Sem `WEB_DIR` (o `pnpm dev`), nada disso existe: a API só responde `/api` e `/docs`.
+- O cookie de sessão sai `Secure` com `NODE_ENV=production` (o Docker). O navegador o aceita em `http://localhost`, mas não em `http://<IP da máquina>`: abra o portal por `localhost`.
+- Verificado em 18/11 com o Chrome contra o container: Início, rastreio, login de demonstração, Torre, busca e visão do colaborador.
 
 ### Compose
 

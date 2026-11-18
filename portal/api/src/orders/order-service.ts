@@ -44,15 +44,9 @@ export interface OrderServiceDeps {
   orders: OrderRepository;
   /** `SAMPLE_ORDER_IDS`, na ordem de exibição. */
   sampleOrderIds: readonly number[];
-  /** Painel completo de performance (`DASHBOARD_URL`), ou `null`. */
-  dashboardUrl?: string | null;
 }
 
-export function createOrderService({
-  orders,
-  sampleOrderIds,
-  dashboardUrl = null,
-}: OrderServiceDeps): OrderService {
+export function createOrderService({ orders, sampleOrderIds }: OrderServiceDeps): OrderService {
   async function getRecord(orderId: number) {
     const record = await orders.findById(orderId);
     if (!record) {
@@ -81,10 +75,7 @@ export function createOrderService({
 
     getTower() {
       const stats = orders.stats();
-      return buildTower(stats.tower, {
-        deliveryByRoute: stats.deliveryByRoute,
-        dashboardUrl,
-      });
+      return buildTower(stats.tower, { deliveryByRoute: stats.deliveryByRoute });
     },
 
     getSummary: () => buildOrdersSummary(orders.stats().tower),

@@ -1,7 +1,10 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import fastifyStatic from "@fastify/static";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { type HealthResponse, healthResponseSchema } from "@translog/contracts";
-import Fastify, { type FastifyServerOptions } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import {
   type FastifyPluginAsyncZod,
   jsonSchemaTransform,
@@ -40,7 +43,7 @@ export async function buildServer(config: Config, options: ServerOptions = {}) {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
-  registerErrorHandler(app);
+  registerErrorHandler(app, { serveWeb: config.webDir !== undefined });
 
   await app.register(swagger, {
     openapi: {
@@ -76,7 +79,35 @@ export async function buildServer(config: Config, options: ServerOptions = {}) {
     orderService: container.orderService,
   });
 
+  if (config.webDir !== undefined) {
+    await registerWeb(app, config.webDir);
+  }
+
   return app;
+}
+
+/**
+ * Serve a tela compilada (`web/dist`) na mesma porta da API. Arquivos com hash no nome
+ * (`assets/`) ficam em cache por um ano; o `index.html` nunca. Os endereços da tela sem arquivo
+ * correspondente caem no `index.html` (ver `registerErrorHandler`).
+ */
+async function registerWeb(app: FastifyInstance, webDir: string) {
+  if (!existsSync(join(webDir, "index.html"))) {
+    throw new Error(
+      `WEB_DIR (${webDir}) não tem index.html. Compile a tela com "pnpm build" ou tire WEB_DIR do .env.`,
+    );
+  }
+  await app.register(fastifyStatic, {
+    root: webDir,
+    wildcard: false,
+    cacheControl: false,
+    setHeaders(res, path) {
+      res.header(
+        "cache-control",
+        path.includes("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
+      );
+    },
+  });
 }
 
 const healthRoutes: FastifyPluginAsyncZod<{ container: Container }> = async (
