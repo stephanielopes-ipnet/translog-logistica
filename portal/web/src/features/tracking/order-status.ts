@@ -103,3 +103,28 @@ export function supportReason(order: Order): string | null {
     ? "o pedido precisa de atendimento"
     : `a entrega está ${days(delay)} atrasada`;
 }
+
+/**
+ * Envio em linguagem simples para o cliente (sem o prazo de despacho em números): "o envio
+ * saiu com 1 dia de atraso", "no prazo", "antes do previsto", ou por que ainda não saiu.
+ */
+export function dispatchSentence(order: Pick<Order, "status" | "dispatch">): string {
+  const { dispatch } = order;
+  if (dispatch.actualDate === null) {
+    switch (order.status) {
+      case "Aguardando pagamento":
+        return "O envio sai depois da confirmação do pagamento.";
+      case "Cancelado":
+        return "O pedido foi cancelado antes do envio.";
+      case "Não pago (expirado)":
+        return "O pedido não foi enviado: o pagamento não foi confirmado.";
+      default:
+        return "O envio ainda não saiu.";
+    }
+  }
+  const delay = dispatch.delayDays ?? 0;
+  if (delay > 0) {
+    return `O envio saiu com ${days(delay)} de atraso.`;
+  }
+  return delay < 0 ? "O envio saiu antes do previsto." : "O envio saiu no prazo.";
+}

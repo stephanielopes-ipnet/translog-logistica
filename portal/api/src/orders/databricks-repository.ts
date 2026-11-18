@@ -1,5 +1,4 @@
 import { Readable } from "node:stream";
-import type { Order } from "@translog/contracts";
 import { CONSUMO_TABLES, type ConsumoTable } from "./consumo-mapper.ts";
 import { selectStatement } from "./consumo-sql.ts";
 import { cacheKey, readOrderCache, writeOrderCache } from "./databricks-cache.ts";
@@ -14,11 +13,17 @@ import {
   type LoadLogger,
   loadConsumoOrders,
 } from "./file-repository.ts";
+import type { OrderRecord } from "./order-record.ts";
 import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
 
 export interface DatabricksRepositoryOptions extends DatabricksClientOptions {
   /** `catalogo.schema` das tabelas consumo_* (`DATABRICKS_CATALOG_SCHEMA`). */
   catalogSchema: string;
+}
+
+/** O que o adapter carrega do Databricks: os pedidos. */
+export interface DatabricksData {
+  orders: Map<number, OrderRecord>;
 }
 
 export interface CachedDatabricksOptions extends DatabricksRepositoryOptions {
@@ -88,8 +93,8 @@ export async function loadCachedDatabricksRepository(
       warnVersion(error);
       return null;
     });
-    const loaded = await loadDatabricksOrders(source, log);
-    orders = createInMemoryRepository(loaded);
+    const loaded = await loadDatabricksData(source, log);
+    orders = createInMemoryRepository(loaded.orders);
     await save(loaded, version);
   }
 
@@ -111,6 +116,9 @@ export async function loadCachedDatabricksRepository(
   return {
     findById: (orderId) => orders.findById(orderId),
     count: () => orders.count(),
+    // Sempre o repositório atual: depois de uma recarga, a busca usa o índice novo.
+    search: (query) => orders.search(query),
+    stats: () => orders.stats(),
     refresh,
     close() {
       closed = true;
@@ -131,9 +139,9 @@ export async function loadCachedDatabricksRepository(
       return;
     }
     log.info({ catalogSchema }, "Tabelas mudaram no Databricks; recarregando em segundo plano");
-    let loaded: Map<number, Order>;
+    let loaded: DatabricksData;
     try {
-      loaded = await loadDatabricksOrders(source, log);
+      loaded = await loadDatabricksData(source, log);
     } catch (error) {
       log.warn(
         { catalogSchema, error: message(error) },
@@ -144,14 +152,14 @@ export async function loadCachedDatabricksRepository(
     if (closed) {
       return;
     }
-    orders = createInMemoryRepository(loaded);
+    orders = createInMemoryRepository(loaded.orders);
     version = latest;
-    log.info({ catalogSchema, orders: loaded.size }, "Pedidos trocados pela versão nova");
+    log.info({ catalogSchema, orders: loaded.orders.size }, "Pedidos trocados pela versão nova");
     await save(loaded, latest);
   }
 
   async function sourceVersion(): Promise<SourceVersion> {
-    const tables = Object.values(CONSUMO_TABLES).map((table) => `${catalogSchema}.${table}`);
+    const tables = [...Object.values(CONSUMO_TABLES).map((table) => `${catalogSchema}.${table}`)];
     const versions = await Promise.all(tables.map((table) => databricks.tableVersion(table)));
     return versions.join("|");
   }
@@ -164,7 +172,7 @@ export async function loadCachedDatabricksRepository(
   }
 
   /** Grava o cache; falha só avisa (a próxima subida baixa do Databricks de novo). */
-  async function save(loaded: ReadonlyMap<number, Order>, savedVersion: SourceVersion | null) {
+  async function save(loaded: DatabricksData, savedVersion: SourceVersion | null) {
     const savingAt = performance.now();
     try {
       await writeOrderCache(cacheFile, key, savedVersion, loaded);
@@ -186,7 +194,16 @@ export async function loadDatabricksRepository(
   options: DatabricksRepositoryOptions,
   log: LoadLogger,
 ): Promise<OrderRepository> {
-  return createInMemoryRepository(await loadDatabricksOrders(options, log));
+  const { orders } = await loadDatabricksData(options, log);
+  return createInMemoryRepository(orders);
+}
+
+/** Pedidos das três tabelas `consumo_*`. */
+export async function loadDatabricksData(
+  options: DatabricksRepositoryOptions,
+  log: LoadLogger,
+): Promise<DatabricksData> {
+  return { orders: await loadDatabricksOrders(options, log) };
 }
 
 /**
@@ -202,7 +219,7 @@ export async function loadDatabricksRepository(
 export async function loadDatabricksOrders(
   { catalogSchema, ...client }: DatabricksRepositoryOptions,
   log: LoadLogger,
-): Promise<Map<number, Order>> {
+): Promise<Map<number, OrderRecord>> {
   const databricks = createDatabricksClient(client);
   const name = (table: ConsumoTable) => `${catalogSchema}.${CONSUMO_TABLES[table]}`;
 

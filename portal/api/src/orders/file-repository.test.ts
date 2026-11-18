@@ -3,13 +3,13 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { orderSchema } from "@translog/contracts";
 import { parse } from "csv-parse/sync";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { z } from "zod";
 import { type ConsumoTable, FORBIDDEN_COLUMNS } from "./consumo-mapper.ts";
 import { consumoFiles, loadFileRepository } from "./file-repository.ts";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
+import { orderRecordSchema } from "./order-record.ts";
 
 /**
  * Amostra das 3 tabelas com os 9 pedidos da demo (gerada por `pnpm --filter @translog/api
@@ -21,7 +21,7 @@ const SAMPLE = consumoFiles(SAMPLE_DIR);
 /** Cópia local das tabelas (fora do Git). O teste de integração só roda se ela existir. */
 const DATA_DIR = fileURLToPath(new URL("../../../dados/", import.meta.url));
 
-const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
+const fixtures = z.array(orderRecordSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
 const DEMO_IDS = fixtures.map((order) => order.orderId);
 
 function fakeLog() {
@@ -192,10 +192,16 @@ describe("loadFileRepository (amostra das tabelas consumo_*)", () => {
     expect(await (await loadFileRepository(dir, fakeLog())).count()).toBe(9);
   });
 
-  it("pasta inexistente impede a carga com mensagem clara", async () => {
+  it("pasta inexistente impede a carga, citando a pasta", async () => {
     await expect(loadFileRepository("/nao/existe", fakeLog())).rejects.toThrow(
-      "Não foi possível ler DATA_DIR (/nao/existe): consumo_pedidos.csv não encontrado.",
+      /Não foi possível ler DATA_DIR \(\/nao\/existe\): consumo_pedidos\.csv não encontrado/,
     );
+  });
+
+  it("não precisa mais de arquivo da Gold (só as 3 tabelas consumo_*)", async () => {
+    const dir = await tempDir();
+
+    expect(await (await loadFileRepository(dir, fakeLog())).count()).toBe(9);
   });
 
   it("tabela faltando na pasta impede a carga, citando o arquivo", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Order, orderSchema, orderStatusSchema } from "./orders.ts";
 
-/** Pedido 9 (Não pago (expirado)) como a API devolve: sem prazos, etapa nem explicação. */
+/** Pedido 9 (Não pago (expirado)) como o cliente recebe: sem prazos nem etapa. */
 const unpaid: Order = {
   orderId: 9,
   orderDate: "2015-01-01",
@@ -13,7 +13,6 @@ const unpaid: Order = {
   origin: "Lakewood, Ohio, Estados Unidos",
   destination: "São Paulo, São Paulo, Brasil",
   region: "América do Sul",
-  market: "LATAM",
   dispatch: {
     promisedDays: 4,
     expectedDate: null,
@@ -23,7 +22,6 @@ const unpaid: Order = {
     probableCause: null,
   },
   delivery: { expectedDate: null, actualDate: null, delayDays: null, probableCause: null },
-  explanation: null,
   currentStage: null,
   currentLocation: null,
   lostAtStage: null,
@@ -62,10 +60,9 @@ const lost: Order = {
     actualDate: "2015-01-03",
     delayDays: 1,
     status: "Atrasado",
-    probableCause: "Promessa irreal",
+    probableCause: "o prazo de despacho prometido para esta modalidade costuma ser curto demais",
   },
   delivery: { expectedDate: "2015-01-05", actualDate: null, delayDays: null, probableCause: null },
-  explanation: "Volume extraviado na etapa 3 - Alfândega.",
   currentStage: { number: 3, label: "Alfândega" },
   currentLocation: "Volume não localizado após: Alfândega Tegucigalpa (Honduras)",
   lostAtStage: { number: 3, label: "Alfândega" },
@@ -111,6 +108,27 @@ describe("orderSchema", () => {
       "probableCause",
     ]) {
       expect(keys).not.toContain(old);
+    }
+  });
+
+  it("não tem o diagnóstico interno (só na visão do colaborador)", () => {
+    const keys = Object.keys(orderSchema.shape);
+
+    for (const internal of [
+      "explanation",
+      "market",
+      "routeService",
+      "dispatchDiagnosis",
+      "transportDiagnosis",
+      "stageDays",
+      "dataOrigin",
+      "context",
+      "valueAtRisk",
+      "aiSummary",
+      "rawTimeline",
+      "daysToDispatch",
+    ]) {
+      expect(keys).not.toContain(internal);
     }
   });
 

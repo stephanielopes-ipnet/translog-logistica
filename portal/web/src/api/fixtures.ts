@@ -9,7 +9,7 @@ export const SAMPLE_HINTS: Record<number, string> = {
   76902: "Em trânsito · Roteiro",
   375: "Entregue c/ atraso",
   34: "Extraviado",
-  222: "Promessa irreal",
+  222: "Prazo curto (First)",
   8: "No prazo",
   9: "Não pago",
   50: "Cancelado",

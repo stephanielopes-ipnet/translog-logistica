@@ -12,6 +12,8 @@ const defaults = {
   agentAppName: "translog_agent",
   agentTimeoutMs: 90000,
   databricks: undefined,
+  auth: { users: new Map(), sessionSecret: undefined, demo: false },
+  dashboardUrl: null,
   nodeEnv: undefined,
 };
 
@@ -80,6 +82,8 @@ describe("loadConfig", () => {
       agentAppName: "outro_agente",
       agentTimeoutMs: 60000,
       databricks: undefined,
+      auth: { users: new Map(), sessionSecret: undefined, demo: false },
+      dashboardUrl: null,
       nodeEnv: "production",
     });
   });
@@ -284,5 +288,42 @@ describe("loadConfig", () => {
     expect(configError({ DATA_SOURCE: "postgres" })).toBe(
       'Configuração inválida:\n  - DATA_SOURCE deve ser "fixtures" ou "file" ou "databricks" (recebido: "postgres")',
     );
+  });
+
+  describe("login do colaborador", () => {
+    const HASH = `scrypt.${"a".repeat(22)}.${"b".repeat(43)}`;
+    const SECRET = "s".repeat(32);
+
+    it("lê STAFF_USERS (e-mail em minúsculas), SESSION_SECRET, AUTH_DEMO e DASHBOARD_URL", () => {
+      const config = loadConfig({
+        STAFF_USERS: ` Ana@TransLog.com:${HASH} , bia@translog.com:${HASH}`,
+        SESSION_SECRET: SECRET,
+        AUTH_DEMO: "true",
+        DASHBOARD_URL: "https://exemplo.cloud.databricks.com/dashboards/1",
+      });
+
+      expect([...config.auth.users.keys()]).toEqual(["ana@translog.com", "bia@translog.com"]);
+      expect(config.auth.demo).toBe(true);
+      expect(config.auth.sessionSecret).toBe(SECRET);
+      expect(config.dashboardUrl).toBe("https://exemplo.cloud.databricks.com/dashboards/1");
+    });
+
+    it("exige SESSION_SECRET com usuários ou demonstração, sem mostrar o valor", () => {
+      expect(configError({ AUTH_DEMO: "true" })).toContain("SESSION_SECRET");
+      expect(configError({ STAFF_USERS: `a@b.com:${HASH}` })).toContain("SESSION_SECRET");
+      const short = configError({ AUTH_DEMO: "true", SESSION_SECRET: "curto-demais" });
+      expect(short).toContain("SESSION_SECRET");
+      expect(short).toContain("valor oculto");
+      expect(short).not.toContain("curto-demais");
+    });
+
+    it("recusa STAFF_USERS fora do formato, sem mostrar o valor", () => {
+      const message = configError({
+        STAFF_USERS: "ana@translog.com:senha123",
+        SESSION_SECRET: SECRET,
+      });
+      expect(message).toContain("STAFF_USERS");
+      expect(message).not.toContain("senha123");
+    });
   });
 });

@@ -2,23 +2,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   type ChatRequest,
   chatResponseSchema,
-  healthResponseSchema,
   type Order,
   orderSamplesResponseSchema,
   orderSchema,
+  ordersSummaryResponseSchema,
 } from "@translog/contracts";
 import { getJson, postJson, shouldRetry } from "./client.ts";
 import { DEFAULT_SAMPLE_IDS } from "./fixtures.ts";
-
-/** Verifica periodicamente `/api/health` para o indicador de conexão do cabeçalho. */
-export function useHealth() {
-  return useQuery({
-    queryKey: ["health"],
-    queryFn: () => getJson("/health", healthResponseSchema),
-    refetchInterval: 15_000,
-    retry: shouldRetry,
-  });
-}
 
 /** Busca os códigos de exemplo em `/api/orders/samples` (fallback para `DEFAULT_SAMPLE_IDS`). */
 export function useOrderSamples() {
@@ -33,6 +23,16 @@ export function useOrderSamples() {
     ...query,
     orderIds: query.data?.orderIds ?? [...DEFAULT_SAMPLE_IDS],
   };
+}
+
+/** Pedidos por mercado (`/api/orders/summary`), para o mapa do Início. */
+export function useOrdersSummary() {
+  return useQuery({
+    queryKey: ["orders", "summary"],
+    queryFn: () => getJson("/orders/summary", ordersSummaryResponseSchema),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: shouldRetry,
+  });
 }
 
 /** Busca um pedido em `/api/orders/:orderId` quando há um `orderId` selecionado. */

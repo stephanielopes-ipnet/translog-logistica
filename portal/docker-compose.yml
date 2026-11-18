@@ -17,6 +17,11 @@ services:
       # Chat sempre simulado no Docker: o agente do Marco ainda não tem imagem na main, e
       # AGENT_URL=http://127.0.0.1:8001 apontaria para o próprio container, não para a máquina.
       AGENT: mock
+      # Login do colaborador: valores do portal/.env na hora de subir (nunca neste arquivo nem na imagem).
+      STAFF_USERS: ${STAFF_USERS:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      AUTH_DEMO: ${AUTH_DEMO:-false}
+      DASHBOARD_URL: ${DASHBOARD_URL:-}
     ports:
       - "${API_PORT:-3333}:${API_PORT:-3333}"
     healthcheck:

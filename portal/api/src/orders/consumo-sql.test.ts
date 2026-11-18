@@ -44,12 +44,16 @@ describe("selectStatement", () => {
     expect(READ_COLUMNS[table].filter((column) => !exported.includes(column))).toEqual([]);
   });
 
-  it("formata as datas de pedido e de evento no próprio SQL", () => {
+  it("formata os horários de pedido e de evento como ISO 8601 com fuso, no próprio SQL", () => {
+    const iso = `"yyyy-MM-dd'T'HH:mm:ss.SSSXXX"`;
     expect(selectStatement("workspace.silver", "orders")).toContain(
-      "coalesce(date_format(data_pedido, 'yyyy-MM-dd'), '') AS data_pedido",
+      `coalesce(date_format(data_pedido, ${iso}), '') AS data_pedido`,
     );
     expect(selectStatement("workspace.silver", "orders", EXPORT_COLUMNS.orders)).toContain(
-      "coalesce(date_format(ts_ultimo_evento, 'yyyy-MM-dd'), '') AS ts_ultimo_evento",
+      `coalesce(date_format(ts_ultimo_evento, ${iso}), '') AS ts_ultimo_evento`,
+    );
+    expect(selectStatement("workspace.silver", "events", EXPORT_COLUMNS.events)).toContain(
+      `coalesce(date_format(ts_evento, ${iso}), '') AS ts_evento`,
     );
   });
 

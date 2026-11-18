@@ -88,7 +88,7 @@ describe("GET /api/health", () => {
       orders: 9,
       agent: "mock",
     });
-    expect(fake.statements).toHaveLength(3);
+    expect(fake.statements).toHaveLength(3); // as 3 tabelas consumo_*
   });
 
   it("com DATA_SOURCE=databricks e token recusado, o servidor não sobe", async () => {
@@ -112,7 +112,7 @@ describe("GET /api/health", () => {
         logger: false,
       }),
     ).rejects.toThrow(
-      "Não foi possível ler DATA_DIR (/nao/existe): consumo_pedidos.csv não encontrado.",
+      /Não foi possível ler DATA_DIR \(\/nao\/existe\): consumo_pedidos\.csv não encontrado/,
     );
   });
 });

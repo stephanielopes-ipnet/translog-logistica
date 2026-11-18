@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
+import { type AuthService, createAuthService } from "./auth/auth-service.ts";
 import { createAdkAgent } from "./chat/adk-agent.ts";
 import { type ChatLogger, type ChatService, createChatService } from "./chat/chat-service.ts";
 import { createMockAgent } from "./chat/mock-agent.ts";
@@ -17,6 +18,7 @@ export interface Container {
   config: Config;
   orderService: OrderService;
   chatService: ChatService;
+  authService: AuthService;
   /** Para as tarefas em segundo plano (chamado quando o Fastify encerra). */
   close(): void;
 }
@@ -40,13 +42,22 @@ export async function createContainer(
   { log, overrides = {} }: ContainerOptions,
 ): Promise<Container> {
   const orders = overrides.orderRepository ?? (await createOrderRepository(config, log));
-  const orderService = createOrderService({ orders, sampleOrderIds: config.sampleOrderIds });
+  const orderService = createOrderService({
+    orders,
+    sampleOrderIds: config.sampleOrderIds,
+    dashboardUrl: config.dashboardUrl,
+  });
   const chatLog = log.child({ agent: config.agent });
   const agent = overrides.supportAgent ?? createSupportAgent(config, orderService, chatLog);
   return {
     config,
     orderService,
     chatService: createChatService({ agent, orders: orderService, log: chatLog }),
+    authService: createAuthService({
+      users: config.auth.users,
+      secret: config.auth.sessionSecret,
+      demo: config.auth.demo,
+    }),
     close: () => orders.close?.(),
   };
 }

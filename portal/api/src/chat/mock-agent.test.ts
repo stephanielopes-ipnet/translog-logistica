@@ -13,7 +13,10 @@ import {
 
 const SESSION = "11111111-1111-4111-8111-111111111111";
 const repository = await createFixturesRepository();
-const orders = createOrderService({ orders: repository, sampleOrderIds: [] });
+const orders = createOrderService({
+  orders: repository,
+  sampleOrderIds: [],
+});
 const agent = createMockAgent({ orders });
 
 async function fixture(orderId: number): Promise<Order> {
@@ -35,10 +38,9 @@ describe("mock-agent: roteiro da banca (76902)", () => {
   it("'por que atrasou' traz o motivo provável de cada etapa e o aviso da central", async () => {
     expect(await ask("Por que meu pedido atrasou?", await fixture(76902))).toBe(
       "Sinto muito pelo atraso do pedido **#76902**. No despacho, que saiu 1 dia depois do " +
-        "prometido, o motivo provável é **Promessa irreal**: o prazo de despacho prometido pela " +
-        "modalidade provavelmente é curto demais para a nossa operação (First Class, 1 dia para " +
-        "despachar). Na entrega, o motivo provável é **Volume sem atualização de rastreio**: o " +
-        "volume está sem novas atualizações de rastreio desde o último registro. Como a entrega " +
+        "prometido, o motivo provável é que **o prazo de despacho prometido para esta modalidade " +
+        "costuma ser curto demais** (First Class: 1 dia para despachar). Na entrega, o motivo " +
+        "provável é que **seu pedido está sem novas atualizações de rastreio**. Como a entrega " +
         "já está 5 dias atrasada, este caso é acompanhado pela nossa **central de atendimento**, " +
         "que funciona de **segunda a sexta, das 9h às 18h**.",
     );
@@ -70,7 +72,7 @@ describe("mock-agent: roteiro da banca (76902)", () => {
 describe("mock-agent: sem pedido aberto", () => {
   it("cumprimento: apresenta o assistente e pede o número", async () => {
     expect(await ask("Bom dia!")).toBe(GREETING_REPLY);
-    expect(GREETING_REPLY).toContain("Assistente TransLog");
+    expect(GREETING_REPLY).toContain("LogBot");
   });
 
   it.each(["Quando meu pedido chega?", "Por que atrasou?", "Quero acompanhar meu pedido"])(
@@ -145,6 +147,23 @@ describe("mock-agent: regras gerais", () => {
   });
 });
 
+describe("mock-agent: linguagem do cliente", () => {
+  it("nunca usa os termos internos da base nem a estatística da frase técnica", async () => {
+    const replies: string[] = [];
+    for (const id of [76902, 375, 34, 222, 8, 9, 50, 31298, 76385]) {
+      for (const message of ["Por que atrasou?", "Qual a situação?", "Onde está?"]) {
+        replies.push(await ask(message, await fixture(id)));
+      }
+    }
+
+    for (const reply of replies) {
+      expect(reply).not.toMatch(
+        /Promessa irreal|Atraso operacional|não recuperado no transporte|Volume sem atualização|cumprido em apenas|\d[.,]\d%|Pacific Asia/,
+      );
+    }
+  });
+});
+
 describe("mock-agent: situações", () => {
   it.each([
     {
@@ -156,20 +175,18 @@ describe("mock-agent: situações", () => {
         "funciona de **segunda a sexta, das 9h às 18h**.",
       why:
         "Sinto muito pelo atraso do pedido **#375**. No despacho, que saiu 4 dias depois do " +
-        "prometido, o motivo provável é **Atraso operacional**: houve um atraso na expedição do " +
-        "pedido. Na entrega, o motivo provável é **Atraso no despacho não recuperado no " +
-        "transporte**: o atraso do despacho não foi compensado durante o transporte. Como a " +
-        "entrega atrasou 4 dias, este caso é acompanhado pela nossa **central de atendimento**, " +
+        "prometido, o motivo provável é que **houve demora na preparação do envio**. Na entrega, " +
+        "o motivo provável é que **a demora na saída não foi compensada durante a viagem**. Como " +
+        "a entrega atrasou 4 dias, este caso é acompanhado pela nossa **central de atendimento**, " +
         "que funciona de **segunda a sexta, das 9h às 18h**.",
     },
     {
       orderId: 222,
       why:
         "Sinto muito pelo atraso do pedido **#222**. No despacho, que saiu 1 dia depois do " +
-        "prometido, o motivo provável é **Promessa irreal**: o prazo de despacho prometido pela " +
-        "modalidade provavelmente é curto demais para a nossa operação (First Class, 1 dia para " +
-        "despachar). Na entrega, o motivo provável é **Atraso no despacho não recuperado no " +
-        "transporte**: o atraso do despacho não foi compensado durante o transporte.",
+        "prometido, o motivo provável é que **o prazo de despacho prometido para esta modalidade " +
+        "costuma ser curto demais** (First Class: 1 dia para despachar). Na entrega, o motivo " +
+        "provável é que **a demora na saída não foi compensada durante a viagem**.",
     },
     {
       orderId: 34,
@@ -182,9 +199,8 @@ describe("mock-agent: situações", () => {
         "Sinto muito: o volume do pedido **#34** foi **extraviado** na etapa **Alfândega**. " +
         "Último registro em 11/01/2015: Volume não localizado após: Alfândega Tegucigalpa " +
         "(Honduras). Antes disso, no despacho, que saiu 1 dia depois do prometido, o motivo " +
-        "provável é **Promessa irreal**: o prazo de despacho prometido pela modalidade " +
-        "provavelmente é curto demais para a nossa operação (First Class, 1 dia para despachar). " +
-        "Como houve extravio, este caso é acompanhado pela nossa **central de atendimento**, que " +
+        "provável é que **o prazo de despacho prometido para esta modalidade costuma ser curto " +
+        "demais** (First Class: 1 dia para despachar). Como houve extravio, este caso é acompanhado pela nossa **central de atendimento**, que " +
         "funciona de **segunda a sexta, das 9h às 18h**.",
     },
     {
@@ -197,8 +213,8 @@ describe("mock-agent: situações", () => {
       orderId: 31298,
       why:
         "Boa notícia: o pedido **#31298** não tem atraso na entrega. O despacho atrasou (motivo " +
-        "provável: **Atraso operacional**), mas o transporte recuperou o tempo. Ele foi entregue " +
-        "em **06/04/2016**, em Henderson - Kentucky (Estados Unidos).",
+        "provável: houve demora na preparação do envio), mas o transporte recuperou o tempo. Ele " +
+        "foi entregue em **06/04/2016**, em Henderson - Kentucky (Estados Unidos).",
     },
     {
       orderId: 9,

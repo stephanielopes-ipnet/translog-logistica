@@ -10,11 +10,13 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { authRoutes } from "./auth/routes.ts";
 import { chatRoutes } from "./chat/routes.ts";
 import type { Config } from "./config.ts";
 import { type Container, type ContainerOverrides, createContainer } from "./container.ts";
 import { registerErrorHandler } from "./http/errors.ts";
 import { orderRoutes } from "./orders/routes.ts";
+import { staffRoutes } from "./staff/routes.ts";
 
 // Mensagens de validação do Zod em pt-BR (aparecem nos erros VALIDATION_ERROR).
 z.config(z.locales.ptBR());
@@ -63,6 +65,16 @@ export async function buildServer(config: Config, options: ServerOptions = {}) {
   await app.register(healthRoutes, { prefix: "/api", container });
   await app.register(orderRoutes, { prefix: "/api", orderService: container.orderService });
   await app.register(chatRoutes, { prefix: "/api", chatService: container.chatService });
+  await app.register(authRoutes, {
+    prefix: "/api",
+    auth: container.authService,
+    secureCookie: config.nodeEnv === "production",
+  });
+  await app.register(staffRoutes, {
+    prefix: "/api",
+    auth: container.authService,
+    orderService: container.orderService,
+  });
 
   return app;
 }

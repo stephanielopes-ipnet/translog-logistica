@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { orderSchema } from "@translog/contracts";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { z } from "zod";
 import { loadConfig } from "../config.ts";
@@ -14,12 +13,13 @@ import {
   loadDatabricksRepository,
 } from "./databricks-repository.ts";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
+import { orderRecordSchema } from "./order-record.ts";
 
 // Contra um Databricks falso que serve a amostra dos 9 pedidos da demo. Nenhum teste chama o
 // Databricks real.
 
 const TOKEN = "token-de-teste-nao-real";
-const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
+const fixtures = z.array(orderRecordSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
 
 function fakeLog() {
   return { info: vi.fn(), warn: vi.fn() };
@@ -62,10 +62,11 @@ describe("loadDatabricksRepository (Databricks falso)", () => {
     for (const order of fixtures) {
       expect(await orders.findById(order.orderId), `pedido ${order.orderId}`).toStrictEqual(order);
     }
-    expect(fake.statements.map((sql) => sql.match(/ FROM (\S+)/)?.[1])).toEqual([
-      "workspace.silver.consumo_pedidos",
-      "workspace.silver.consumo_itens_pedido",
+    // As 3 tabelas, em paralelo (a ordem de chegada varia); nenhuma consulta à Gold.
+    expect(fake.statements.map((sql) => sql.match(/ FROM (\S+)/)?.[1]).sort()).toEqual([
       "workspace.silver.consumo_eventos_logisticos",
+      "workspace.silver.consumo_itens_pedido",
+      "workspace.silver.consumo_pedidos",
     ]);
   });
 
@@ -100,7 +101,7 @@ describe("loadDatabricksRepository (Databricks falso)", () => {
     const polls = fake.requests.filter((r) =>
       /^\/api\/2\.0\/sql\/statements\/st-\d+$/.test(r.path),
     );
-    expect(polls).toHaveLength(6); // 2 por consulta
+    expect(polls).toHaveLength(6); // 2 por consulta (3 tabelas)
   });
 
   it("vários pedaços (com e sem cabeçalho repetido) dão o mesmo resultado", async () => {
@@ -258,7 +259,9 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
     const key = await cacheKey(source);
     const [first] = fixtures;
     if (!first) throw new Error("fixtures vazios");
-    await writeOrderCache(cacheFile, key, "versao-antiga", new Map([[first.orderId, first]]));
+    await writeOrderCache(cacheFile, key, "versao-antiga", {
+      orders: new Map([[first.orderId, first]]),
+    });
 
     const { repository, log } = await boot();
     expect(await repository.count()).toBe(1); // já responde com o cache
@@ -335,7 +338,9 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
 
   it("cache de outro código ou workspace: ignora e baixa do Databricks", async () => {
     const { fake, cacheFile, boot } = await setup();
-    await writeOrderCache(cacheFile, "chave-de-outro-codigo", "v1", new Map());
+    await writeOrderCache(cacheFile, "chave-de-outro-codigo", "v1", {
+      orders: new Map(),
+    });
 
     const { repository, log } = await boot();
 
@@ -365,7 +370,7 @@ describe("loadCachedDatabricksRepository (cache local + Databricks falso)", () =
     const { boot, catalogCalls } = await setup();
     const { repository } = await boot({ refreshIntervalMs: 10 });
 
-    await vi.waitFor(() => expect(catalogCalls()).toBeGreaterThanOrEqual(9));
+    await vi.waitFor(() => expect(catalogCalls()).toBeGreaterThanOrEqual(12));
     repository.close();
     await repository.refresh(); // espera uma conferência que esteja em andamento
     const afterClose = catalogCalls();

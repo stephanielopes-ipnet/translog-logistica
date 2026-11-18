@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { type Order, orderSchema } from "@translog/contracts";
-import type { FastifyInstance } from "fastify";
+import { orderSchema } from "@translog/contracts";
+import Fastify, { type FastifyInstance } from "fastify";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 import { loadConfig } from "./config.ts";
-import type { ContainerOverrides } from "./container.ts";
+import { type ContainerOverrides, createContainer } from "./container.ts";
 import { FIXTURES_FILE } from "./orders/fixtures-repository.ts";
+import { type OrderRecord, orderRecordSchema } from "./orders/order-record.ts";
+import type { OrderRepository } from "./orders/order-repository.ts";
+import { createOrderSearch } from "./orders/order-search.ts";
+import { computeOrderStats } from "./orders/order-stats.ts";
 import { buildServer } from "./server.ts";
 import { startFakeDatabricks } from "./testing/fake-databricks.ts";
 import { tempDir } from "./testing/temp-dir.ts";
@@ -26,6 +30,40 @@ const FORBIDDEN_TEXT =
 const FORBIDDEN_KEY =
   /cliente|customer|client|segment|pagamento|payment|lucro|profit|margem|margin|desconto|discount|preco|price|bruto|gross|id_produto|productId|latitude|longitude|^lat$|^lng$|^lon$|resumo/i;
 
+/**
+ * Diagnóstico interno: só na visão do colaborador. O cliente recebe o motivo em linguagem dele,
+ * sem a frase técnica da base, sem as causas nos termos da base e sem o mercado logístico.
+ */
+const INTERNAL_KEYS = [
+  "explanation",
+  "market",
+  "routeService",
+  "daysToDispatch",
+  "dispatchDiagnosis",
+  "transportDiagnosis",
+  "stageDays",
+  "dataOrigin",
+  "context",
+  "valueAtRisk",
+  "aiSummary",
+  "rawTimeline",
+];
+
+/** Termos da base que o cliente nunca vê (causas, estatística interna, mercados). */
+const INTERNAL_TEXT =
+  /Promessa irreal|Atraso operacional|não recuperado no transporte|Volume sem atualização|cumprido em apenas|\d\.\d%|Pacific Asia|LATAM|USCA|"Europe"|"Africa"/;
+
+/** Todas as chaves de objetos, em qualquer nível. */
+function allKeys(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(allKeys);
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.entries(value).flatMap(([key, child]) => [key, ...allKeys(child)]);
+  }
+  return [];
+}
+
 /** Todas as chaves de objetos em qualquer nível de `value` que casam com `FORBIDDEN_KEY`. */
 function forbiddenKeys(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -40,7 +78,7 @@ function forbiddenKeys(value: unknown): string[] {
   return [];
 }
 
-const fixtures = z.array(orderSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
+const fixtures = z.array(orderRecordSchema).parse(JSON.parse(readFileSync(FIXTURES_FILE, "utf8")));
 
 /** Amostra das tabelas consumo_* com as colunas proibidas preenchidas com valores fictícios. */
 const SAMPLE_DIR = fileURLToPath(new URL("./orders/fixtures/consumo/", import.meta.url));
@@ -62,6 +100,19 @@ const SOURCES = [
   },
 ];
 
+/** Repositório sobre os fixtures que acrescenta campos (`leak`) a cada registro devolvido. */
+function leakyRepository(leak: (record: OrderRecord) => object): OrderRepository {
+  return {
+    async findById(orderId) {
+      const record = fixtures.find((candidate) => candidate.orderId === orderId);
+      return record ? (Object.assign({}, record, leak(record)) as OrderRecord) : null;
+    },
+    count: async () => fixtures.length,
+    search: createOrderSearch(fixtures),
+    stats: () => computeOrderStats(fixtures),
+  };
+}
+
 async function buildTestServer(env: NodeJS.ProcessEnv, overrides?: ContainerOverrides) {
   const app = await buildServer(loadConfig(env), { logger: false, overrides });
   onTestFinished(() => app.close());
@@ -73,6 +124,8 @@ function allUrls(orderIds: readonly number[]): string[] {
   return [
     "/api/health",
     "/api/orders/samples",
+    "/api/orders/summary",
+    "/api/auth/session",
     ...orderIds.map((id) => `/api/orders/${id}`),
     "/api/orders/1", // 404
     "/api/orders/abc", // 400
@@ -147,22 +200,19 @@ describe("varredura de chaves proibidas", () => {
   );
 
   it("campos fora do contrato são descartados na resposta, mesmo se a fonte os trouxer", async () => {
-    const leak = { id_cliente: 123, segmento_cliente: "Consumer", valor_desconto: 99.9 };
-    const leakyRepository: ContainerOverrides["orderRepository"] = {
-      async findById(orderId) {
-        const order = fixtures.find((candidate) => candidate.orderId === orderId);
-        if (!order) {
-          return null;
-        }
-        const items = order.items.map((item) =>
-          Object.assign({}, item, { preco_unitario: 1.5, id_produto: 565 }),
-        );
-        const leaky: Order = Object.assign({}, order, leak, { items });
-        return leaky;
+    const app = await buildTestServer(
+      {},
+      {
+        orderRepository: leakyRepository((record) => ({
+          id_cliente: 123,
+          segmento_cliente: "Consumer",
+          valor_desconto: 99.9,
+          items: record.items.map((item) =>
+            Object.assign({}, item, { preco_unitario: 1.5, id_produto: 565 }),
+          ),
+        })),
       },
-      count: async () => fixtures.length,
-    };
-    const app = await buildTestServer({}, { orderRepository: leakyRepository });
+    );
 
     const response = await app.inject({ method: "GET", url: "/api/orders/76902" });
 
@@ -186,27 +236,22 @@ describe("privacidade no chat (assistente simulado)", () => {
         expect(forbiddenKeys(body), where).toEqual([]);
         expect(JSON.stringify(body), where).not.toMatch(/FICTICIO|SEM-USO/);
         expect(body.reply ?? "", where).not.toMatch(FORBIDDEN_TEXT);
+        expect(body.reply ?? "", where).not.toMatch(INTERNAL_TEXT);
       }
     },
   );
 
   it("o chat não repassa campos fora do contrato, mesmo se a fonte os trouxer", async () => {
-    const leakyRepository: ContainerOverrides["orderRepository"] = {
-      async findById(orderId) {
-        const order = fixtures.find((candidate) => candidate.orderId === orderId);
-        if (!order) {
-          return null;
-        }
-        const leaky: Order = Object.assign({}, order, {
+    const app = await buildTestServer(
+      {},
+      {
+        orderRepository: leakyRepository(() => ({
           id_cliente: 987654,
           segmento_cliente: "Consumer",
           valor_bruto_venda: 31.415,
-        });
-        return leaky;
+        })),
       },
-      count: async () => fixtures.length,
-    };
-    const app = await buildTestServer({}, { orderRepository: leakyRepository });
+    );
 
     const bodies = await chatBodies(app, chatPayloads(ALL_IDS));
 
@@ -214,4 +259,81 @@ describe("privacidade no chat (assistente simulado)", () => {
       expect(JSON.stringify(body), JSON.stringify(payload)).not.toMatch(/987654|Consumer|31\.415/);
     }
   });
+});
+
+describe("visão do cliente × visão do colaborador", () => {
+  it.each([...SOURCES])(
+    "o cliente nunca recebe o diagnóstico nem os termos internos (fonte $source)",
+    async ({ env }) => {
+      const app = await buildTestServer(await env());
+
+      const bodies = await responseBodies(
+        app,
+        ALL_IDS.map((id) => `/api/orders/${id}`),
+      );
+
+      for (const { url, body } of bodies) {
+        const record = fixtures.find((candidate) => candidate.orderId === body.orderId);
+        expect(record, url).toBeDefined();
+        expect(
+          allKeys(body).filter((key) => INTERNAL_KEYS.includes(key)),
+          url,
+        ).toEqual([]);
+        const json = JSON.stringify(body);
+        expect(json, url).not.toMatch(INTERNAL_TEXT);
+        for (const text of [record?.explanation, record?.aiSummary, record?.rawTimeline]) {
+          if (text) expect(json, url).not.toContain(text);
+        }
+        expect(orderSchema.strict().safeParse(body).success, url).toBe(true);
+      }
+    },
+  );
+
+  it.each([...SOURCES])(
+    "a visão do colaborador tem o diagnóstico e nenhuma chave ou valor proibido (fonte $source)",
+    async ({ env }) => {
+      const config = loadConfig(await env());
+      const container = await createContainer(config, { log: Fastify({ logger: false }).log });
+      onTestFinished(() => container.close());
+
+      const staffOrders = await Promise.all(
+        ALL_IDS.map((id) => container.orderService.getStaffOrder(id)),
+      );
+
+      for (const staffOrder of staffOrders) {
+        const where = `pedido ${staffOrder.orderId}`;
+        expect(forbiddenKeys(staffOrder), where).toEqual([]);
+        expect(JSON.stringify(staffOrder), where).not.toMatch(/FICTICIO|SEM-USO/);
+        expect(Object.keys(staffOrder), where).toEqual(
+          expect.arrayContaining(INTERNAL_KEYS.filter((key) => key !== "daysToDispatch")),
+        );
+      }
+    },
+  );
+
+  it.each([...SOURCES])(
+    "a Torre, a busca e o pedido do colaborador (com sessão) não têm chave ou valor proibido (fonte $source)",
+    async ({ env }) => {
+      const app = await buildTestServer({
+        ...(await env()),
+        AUTH_DEMO: "true",
+        SESSION_SECRET: "segredo-de-teste-com-mais-de-32-caracteres",
+      });
+      const demo = await app.inject({ method: "POST", url: "/api/auth/demo", payload: {} });
+      const cookie = String(demo.headers["set-cookie"]).split(";")[0] ?? "";
+
+      const urls = [
+        "/api/staff/tower",
+        "/api/staff/orders?pageSize=50",
+        "/api/staff/orders?q=brasil&sort=date",
+        ...ALL_IDS.map((id) => `/api/staff/orders/${id}`),
+      ];
+      for (const url of urls) {
+        const response = await app.inject({ method: "GET", url, headers: { cookie } });
+        expect(response.statusCode, url).toBe(200);
+        expect(forbiddenKeys(response.json()), url).toEqual([]);
+        expect(response.body, url).not.toMatch(/FICTICIO|SEM-USO/);
+      }
+    },
+  );
 });

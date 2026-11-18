@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TransLog · Rastreamento de pedidos</title>
+    <title>TransLog</title>
+    <script>
+      // Tema antes de desenhar (mesma regra de src/lib/theme.ts), para a tela não "piscar".
+      (() => {
+        let tema = null;
+        try {
+          tema = localStorage.getItem("translog.tema");
+        } catch {}
+        if (tema !== "light" && tema !== "dark") {
+          tema = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.classList.toggle("dark", tema === "dark");
+        document.documentElement.style.colorScheme = tema;
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

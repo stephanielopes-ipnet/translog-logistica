@@ -2,10 +2,10 @@ import { z } from "zod";
 import { orderIdSchema } from "./orders.ts";
 
 /**
- * Nome do assistente, usado na tela e nas respostas do simulado. Ainda não confirmado pelo grupo
- * (a reunião de 16/11 citou "Login"): para trocar, mude só aqui.
+ * Nome do assistente, usado na tela e nas respostas do simulado. Confirmado pelo Matheus em
+ * 17/11 (os protótipos e a reunião de 16/11 usam LogBot): para trocar, mude só aqui.
  */
-export const ASSISTANT_NAME = "Assistente TransLog";
+export const ASSISTANT_NAME = "LogBot";
 
 /** Tamanho máximo da mensagem do cliente, sem contar os espaços das pontas. */
 export const CHAT_MESSAGE_MAX_LENGTH = 1000;

@@ -1,18 +1,6 @@
 import type { Order } from "@translog/contracts";
-import {
-  Ban,
-  Check,
-  Clock,
-  Copy,
-  Headset,
-  MapPin,
-  MapPinCheck,
-  PackageX,
-  Plane,
-  Truck,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { formatDate, formatManifestCode, splitPlace } from "@/lib/format.ts";
+import { Ban, Clock, Headset, MapPin, MapPinCheck, PackageX, Plane, Truck } from "lucide-react";
+import { formatDate, splitPlace } from "@/lib/format.ts";
 import { DeadlinesBlock } from "./deadlines-block.tsx";
 import {
   type DeadlineStatus,
@@ -30,7 +18,8 @@ import { StageTimelineView } from "./stage-timeline-view.tsx";
 
 interface OrderManifestCardProps {
   order: Order;
-  onAskAssistant: (question: string) => void;
+  /** "Perguntar ao assistente" no motivo provável; ausente na Área do colaborador (sem chat). */
+  onAskAssistant?: (question: string) => void;
 }
 
 const TONE_BADGE: Record<StatusTone, { cls: string; dot: string }> = {
@@ -56,25 +45,6 @@ function accentClass(order: Order): string {
 }
 
 export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardProps) {
-  const [copiedCode, setCopiedCode] = useState(false);
-
-  useEffect(() => {
-    if (!copiedCode) return;
-    const t = setTimeout(() => setCopiedCode(false), 1800);
-    return () => clearTimeout(t);
-  }, [copiedCode]);
-
-  const manifestCode = formatManifestCode(order);
-
-  async function handleCopyManifest() {
-    try {
-      await navigator.clipboard.writeText(manifestCode);
-      setCopiedCode(true);
-    } catch {
-      setCopiedCode(false);
-    }
-  }
-
   const badge = TONE_BADGE[STATUS_TONE[order.status]];
   const deadline = deliveryDeadline(order);
   const headline = statusHeadline(order);
@@ -84,7 +54,7 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
   const RouteIcon = order.transportMode === "Rodoviário" ? Truck : Plane;
 
   return (
-    <article className="bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
+    <article className="bg-surface border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
       <div className={`h-[3px] w-full ${accentClass(order)}`} />
       {/* Topo de Guia de Remessa */}
       <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between gap-4 flex-wrap">
@@ -112,19 +82,6 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
         </div>
         <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500">
           <span>Pedido em {formatDate(order.orderDate)}</span>
-          <button
-            type="button"
-            onClick={() => void handleCopyManifest()}
-            title="Copiar código da guia de remessa"
-            className="px-2.5 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900 inline-flex items-center gap-1.5 transition"
-          >
-            <span>{manifestCode}</span>
-            {copiedCode ? (
-              <Check className="w-3 h-3 text-emerald-600" />
-            ) : (
-              <Copy className="w-3 h-3 text-slate-400" />
-            )}
-          </button>
         </div>
       </div>
 
@@ -170,7 +127,7 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
             <div className="min-w-0">
               <p className="label-mono flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full border-2 border-primary bg-white shrink-0" />
+                <span className="w-2 h-2 rounded-full border-2 border-primary bg-surface shrink-0" />
                 De · Origem
               </p>
               <p className="mt-0.5 text-base font-bold text-slate-900 leading-tight truncate">
@@ -181,9 +138,6 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
 
             <div className="flex flex-col items-center justify-center px-2 min-w-[200px]">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="rounded bg-white border border-slate-200 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-slate-700">
-                  {order.market}
-                </span>
                 <span className="text-xs text-slate-500 whitespace-nowrap">{order.region}</span>
               </div>
               <div className="w-full flex items-center gap-2">

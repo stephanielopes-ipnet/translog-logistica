@@ -1,5 +1,3 @@
-import type { Order } from "@translog/contracts";
-
 /**
  * Formatação para a tela em pt-BR.
  * Datas de calendário (`AAAA-MM-DD`) nunca passam por `new Date(string)` para evitar
@@ -45,11 +43,4 @@ export function splitPlace(place: string): { city: string; rest: string } {
     city: parts[0] ?? place,
     rest: parts.slice(1).join(", "),
   };
-}
-
-/** Código técnico de guia de remessa: `TL-000375-LATAM`. */
-export function formatManifestCode(order: Pick<Order, "orderId" | "market">): string {
-  const paddedId = String(order.orderId).padStart(6, "0");
-  const marketCode = order.market.replace(/\s+/g, "").toUpperCase();
-  return `TL-${paddedId}-${marketCode}`;
 }

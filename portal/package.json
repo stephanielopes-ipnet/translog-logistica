@@ -14,6 +14,7 @@
     "format": "biome check --write .",
     "typecheck": "pnpm -r --if-present typecheck",
     "export:dados": "pnpm --filter @translog/api export:dados",
+    "staff:add": "pnpm --filter @translog/api staff:add",
     "agent:up": "docker compose -f docker-compose.yml -f docker-compose.agente.yml up -d --build --wait agent",
     "agent:down": "docker compose -f docker-compose.yml -f docker-compose.agente.yml rm --stop --force agent"
   },

@@ -83,9 +83,11 @@ export const EXPORT_COLUMNS = {
 } as const satisfies Record<ConsumoTable, readonly string[]>;
 
 /**
- * Colunas `timestamp` (UTC na base). Saem como texto `yyyy-MM-dd` já no SQL, para a data
- * nunca passar por conversão de fuso no Node. O warehouse usa UTC como fuso da sessão
- * (conferido em 16/11: as datas do export batem com as dos CSVs do Mateus em 100% das linhas).
+ * Colunas `timestamp` (UTC na base). Saem como texto ISO 8601 com fuso (`2015-01-15T14:20:00.000Z`)
+ * já no SQL, para o horário nunca passar por conversão de fuso no Node. O agente de IA (`csv_v2`)
+ * exige data, hora e fuso nesses campos; o portal só usa os 10 primeiros caracteres (a data).
+ * O warehouse usa UTC como fuso da sessão: o `XXX` sai como `Z` (conferido em 18/11).
+ * Até 17/11 saía só `yyyy-MM-dd`, e o agente recusava os CSVs ("Instante do evento inválido").
  */
 const TIMESTAMP_COLUMNS: ReadonlySet<string> = new Set([
   "data_pedido",
@@ -106,7 +108,7 @@ const ORDER_BY: Record<ConsumoTable, string> = {
  */
 function asText(column: string): string {
   return TIMESTAMP_COLUMNS.has(column)
-    ? `date_format(${column}, 'yyyy-MM-dd')`
+    ? `date_format(${column}, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")`
     : `CAST(${column} AS STRING)`;
 }
 

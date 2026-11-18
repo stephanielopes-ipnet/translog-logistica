@@ -63,10 +63,10 @@ A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento
 | @tanstack/react-query | 5.107.1 | `web` | Cache, estado assíncrono, retentativas e sincronização com a API |
 | lucide-react | 1.72.0 | `web` | Ícones consistentes com os protótipos |
 | @fontsource-variable/inter | 5.3.0 | `web` | Fonte `Inter Variable` empacotada localmente |
-| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (254 testes, mais 1 de integração com o agente real, desligado por padrão) |
+| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (588 testes em 18/11, mais 2 de integração com o agente e o Databricks reais, desligados por padrão) |
 | Biome | 2.6.7 | todos | Lint, formatação, acessibilidade e ordem dos imports |
 
-Tamanho aproximado: ~1.600 linhas de código na API + ~3.100 no frontend (das quais ~400 são os pedidos de exemplo dos testes), cobertos por **254 testes automatizados** (209 na API + 45 no frontend). O chat não trouxe dependência nova: o adapter do agente usa o `fetch` nativo do Node.
+Tamanho aproximado: ~1.600 linhas de código na API + ~3.100 no frontend (das quais ~400 são os pedidos de exemplo dos testes), cobertos por **588 testes automatizados** em 18/11 (458 na API + 98 no frontend + 32 do contrato). O chat não trouxe dependência nova: o adapter do agente usa o `fetch` nativo do Node.
 
 ## 2. Estrutura de pastas
 
@@ -96,6 +96,9 @@ portal/
 │       ├── orders.ts        # Order, enums, params e resposta de samples
 │       ├── orders.test.ts   # testes do contrato do pedido
 │       ├── chat.ts          # corpo e resposta de POST /api/chat, AgentMode
+│       ├── staff-orders.ts  # StaffOrder (visão do colaborador, com o diagnóstico)
+│       ├── auth.ts          # login e sessão do colaborador
+│       ├── tower.ts         # Torre de controle e resumo por mercado do Início
 │       ├── health.ts        # resposta do health, DataSource
 │       └── errors.ts        # formato padrão de erro
 ├── api/                     # @translog/api
@@ -103,7 +106,8 @@ portal/
 │   ├── vitest.config.ts     # isolate: false, TZ=America/Sao_Paulo
 │   ├── scripts/
 │   │   ├── export-dados.ts    # pnpm export:dados: Databricks → portal/dados/*.csv
-│   │   └── generate-fixtures.ts # pnpm --filter @translog/api fixtures: pedidos da demo
+│   │   ├── generate-fixtures.ts # pnpm --filter @translog/api fixtures: pedidos da demo
+│   │   └── staff-add.ts       # pnpm staff:add <email>: hash da senha para STAFF_USERS
 │   └── src/
 │       ├── main.ts          # bootstrap: .env → config → servidor → listen
 │       ├── server.ts        # Fastify, swagger, error handler, container, rotas (health inline)
@@ -114,6 +118,15 @@ portal/
 │       ├── testing/
 │       │   └── fake-databricks.ts # Databricks falso para os testes (fora da imagem Docker)
 │       ├── privacy.test.ts  # varredura de chaves e valores proibidos em todas as respostas (pedidos e chat)
+│       ├── auth/
+│       │   ├── routes.ts              # /api/auth/login, logout, session e demo (só com AUTH_DEMO)
+│       │   ├── auth-service.ts        # login, demonstração, sessão + erros de login
+│       │   ├── password.ts            # hash scrypt e comparação em tempo constante
+│       │   ├── session-signature.ts   # conteúdo do cookie assinado (HMAC); nome sem "token": o .gitignore da raiz ignora *token*
+│       │   ├── session-cookie.ts      # leitura e gravação do cookie HttpOnly
+│       │   └── login-limiter.ts       # 5 erros por minuto por IP (memória limitada: janelas vencidas saem, até 10 mil IPs)
+│       ├── staff/
+│       │   └── routes.ts              # /api/staff/orders (busca), /api/staff/orders/:id e /api/staff/tower, com o guarda de sessão
 │       ├── chat/
 │       │   ├── routes.ts              # POST /api/chat
 │       │   ├── chat-service.ts        # pedido de contexto, trava por conversa, log sem conteúdo, ChatBusyError
@@ -133,31 +146,46 @@ portal/
 │           ├── databricks-client.ts   # SQL Statement Execution API (fetch, EXTERNAL_LINKS, CSV)
 │           ├── databricks-repository.ts # adapter databricks (3 consultas no boot → mesma leitura do file)
 │           ├── escalation.ts          # regra única de encaminhamento à central
+│           ├── order-views.ts         # projeções Order (cliente) e StaffOrder (colaborador)
+│           ├── order-stats.ts         # números da carga (contexto do colaborador)
+│           ├── tower-stats.ts         # Torre e resumo por mercado (mesma passada da carga)
+│           ├── order-search.ts        # busca do colaborador (filtros, ordem, páginas) sobre os registros em memória
+│           ├── databricks-cache.ts    # cache local do adapter databricks (um pedido por linha)
 │           └── fixtures/
 │               ├── orders.json        # 9 pedidos da demo (vão para a imagem)
 │               └── consumo/           # amostra das 3 tabelas para testes (não vai para a imagem)
 └── web/                     # @translog/web (React 19 + Vite 8 + Tailwind v4)
     ├── index.html           # ponto de entrada HTML (pt-BR, título e fontes IBM Plex Mono)
+    ├── public/ipnet.svg     # logo do rodapé ("Desenvolvido por")
     ├── package.json
     ├── tsconfig.json        # bundler resolution, jsx: react-jsx, noEmit
     ├── vite.config.ts       # plugin React + Tailwind, proxy /api → http://127.0.0.1:3333
     └── src/
         ├── main.tsx         # QueryClientProvider + montagem do App
-        ├── app.tsx          # composição geral: URL state, queries, troca de pedido, atalhos e chat
+        ├── app.tsx          # rotas, guarda da Área do colaborador, conversa e painel do LogBot
         ├── index.css        # @theme inline, @custom-variant dark, classes .label-mono, .perf-t, .route-line
         ├── api/
         │   ├── client.ts    # getJson/postJson + validação Zod com @translog/contracts + classe ApiError
         │   ├── fixtures.ts  # pedidos de exemplo padrão e dicas dos atalhos
         │   ├── fixture-orders.ts # lê api/src/orders/fixtures/orders.json, só nos testes da tela
-        │   └── queries.ts   # useHealth, useOrderSamples, useOrderQuery, useSendChatMessage e shouldRetry
+        │   ├── queries.ts   # useOrderSamples, useOrdersSummary, useOrderQuery, useSendChatMessage
+        │   └── session.ts   # sessão, login, demonstração, logout, Torre e pedido do colaborador
         ├── lib/
-        │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD), formatManifestCode
-        │   ├── url-state.ts # leitura e escrita de ?pedido= e presets de apresentação (?t, ?c, ?s, ?n, ?bar)
+        │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD)
+        │   ├── router.ts    # rotas, guarda, links de acesso e títulos (lógica pura)
+        │   ├── use-location.tsx # URL ↔ React (navigate, Link)
+        │   ├── url-state.ts # parseOrderId
         │   └── utils.ts     # utilitário cn() para classes condicionais
         ├── components/
-        │   └── app-header.tsx # cabeçalho com marca TransLog, manifesto e badge de status da API
+        │   ├── app-header.tsx # cabeçalho público e da Área do colaborador
+        │   ├── app-footer.tsx # rodapé discreto
+        │   ├── brand-mark.tsx # marca TransLog
+        │   └── simple-page.tsx # 404 e "conferindo o acesso"
         └── features/
+            ├── home/                      # Início: herói, mapa animado (route-map.tsx), seções
+            ├── staff/                     # login, Torre, rastreio do colaborador e formatação
             ├── tracking/
+            │   ├── tracking-page.tsx      # rastreio do cliente (pedido vindo da URL)
             │   ├── order-status.ts        # regras puras: tom do badge, mensagem principal, prazo, motivo da central
             │   ├── stage-timeline.ts      # regras puras: etapas da rota e estado de cada uma (buildStageTimeline)
             │   ├── stage-timeline-view.tsx# linha do tempo por etapas, com os eventos de cada uma
@@ -173,7 +201,10 @@ portal/
             │   ├── rich-text.ts           # **negrito**, títulos e listas das respostas, sem HTML
             │   ├── chat-messages.tsx      # mensagens, divisor de troca, "digitando…" e falha com "Tentar novamente"
             │   ├── chat-input.tsx         # chips de sugestão contextual + textarea com Enter / Shift+Enter
-            │   └── chat-panel.tsx         # coluna direita fixa (400 px) com contexto do pedido ativo
+            │   ├── chat-panel.tsx         # conversa (cabeçalho com minimizar, contexto do pedido, mensagens)
+            │   ├── use-chat-conversation.ts # conversa acima das páginas (mesma no Início e no Rastreamento)
+            │   ├── logbot-panel.ts        # estado aberto/minimizado (localStorage)
+            │   └── logbot-dock.tsx        # painel lateral minimizável
 ```
 
 Testes ficam ao lado do arquivo testado (`*.test.ts`) tanto em `api/src/` quanto em `web/src/`.
@@ -363,6 +394,11 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 | `chatResponseSchema` / `ChatResponse` | Resposta de `POST /api/chat` |
 | `chatSessionIdSchema`, `CHAT_MESSAGE_MAX_LENGTH` | UUID da conversa; limite de 1000 caracteres da mensagem |
 | `errorResponseSchema` | `{ error: { code, message } }` |
+| `staffOrderSchema` / `StaffOrder` | Resposta de `GET /api/staff/orders/:orderId`: o `Order` com causas da base, `explanation`, `market`, `routeService` e o diagnóstico |
+| `loginRequestSchema`, `sessionResponseSchema`, `DEMO_STAFF_EMAIL` | Login do colaborador (`contracts/src/auth.ts`): `{ email, password }` e `{ authenticated, email, demoAvailable }` |
+| `staffSearchQuerySchema`, `staffSearchResponseSchema` / `StaffSearchRow` | Busca do colaborador (`contracts/src/staff-search.ts`): filtros da query string e `{ total, page, pageSize, results }` com linhas resumidas |
+| `towerResponseSchema` / `TowerResponse` | Torre de controle (`contracts/src/tower.ts`): indicadores, fila de atenção, promessa × realidade, etapas, rotas, `dashboardUrl` |
+| `ordersSummaryResponseSchema` | `{ totalOrders, markets: [{ market, orders }] }` (mapa do Início, público) |
 
 ### `Order`
 
@@ -413,7 +449,28 @@ O OpenAPI de `/docs` traz um exemplo de corpo e as respostas `200`, `400`, `409`
 | `GET /api/orders/samples` | `200 { orderIds }`: ids de `SAMPLE_ORDER_IDS` que existem na fonte, na ordem configurada | |
 | `GET /api/orders/:orderId` | `200 Order` | `400 VALIDATION_ERROR`, `404 ORDER_NOT_FOUND` |
 | `POST /api/chat` | `200 { sessionId, reply, mentionedOrderId }` | `400 VALIDATION_ERROR`, `409 CHAT_BUSY`, `502 AGENT_UNAVAILABLE`, `504 AGENT_TIMEOUT` |
+| `GET /api/orders/summary` | `200 { totalOrders, markets }`: pedidos por mercado (só números, calculados na carga) | |
+| `POST /api/auth/login` | `204` + cookie de sessão | `401 INVALID_CREDENTIALS` (mesma resposta para e-mail ou senha errados), `429 TOO_MANY_ATTEMPTS`, `415 UNSUPPORTED_MEDIA_TYPE` sem JSON |
+| `POST /api/auth/logout` | `204` (apaga o cookie) | |
+| `GET /api/auth/session` | `200 { authenticated, email, demoAvailable }` | |
+| `POST /api/auth/demo` | `204` + cookie de `demo@translog.local` | só existe com `AUTH_DEMO=true` (senão `404`) |
+| `GET /api/staff/orders` | `200 { total, page, pageSize, results }` (busca) | `401 UNAUTHENTICATED`, `400 VALIDATION_ERROR` |
+| `GET /api/staff/orders/:orderId` | `200 StaffOrder` | `401 UNAUTHENTICATED`, `400`, `404 ORDER_NOT_FOUND` |
+| `GET /api/staff/tower` | `200 TowerResponse` | `401 UNAUTHENTICATED` |
 | `GET /docs` | Swagger UI (`/docs/json` = OpenAPI) | |
+
+**Login do colaborador (`api/src/auth/`, 17/11).** A proteção é na API, não só na tela:
+
+- usuários em `STAFF_USERS` (`email:hash`, separados por vírgula; hash `scrypt.<sal>.<chave>` gerado por `pnpm staff:add <email>`, que pede a senha sem ecoar); comparação em tempo constante e o mesmo trabalho para e-mail inexistente;
+- sessão num cookie `translog_session` assinado com HMAC-SHA256 (`SESSION_SECRET`, mínimo de 32 caracteres), `HttpOnly`, `SameSite=Lax`, `Path=/`, 8 h, `Secure` com `NODE_ENV=production`. Sem banco de sessões; feito com `node:crypto` (sem `@fastify/cookie`);
+- `/api/staff/*` passa por um único hook (`staff/routes.ts`) que exige sessão válida;
+- 5 logins errados em 1 minuto do mesmo IP → `429` (em memória; zera ao reiniciar a API e após um login certo; as janelas vencidas saem a cada falha e no máximo 10 mil IPs são acompanhados, os mais antigos são esquecidos);
+- `POST` de `/api/auth/*` só com `Content-Type: application/json` (com `SameSite=Lax`, cobre CSRF neste escopo); sem JSON, o hook lança `JsonRequiredError` e `http/errors.ts` responde `415 UNSUPPORTED_MEDIA_TYPE`;
+- log do login só com o resultado (`ok`, `rejected`, `demo`): sem e-mail, senha ou cookie.
+
+**Torre e resumo (`orders/tower-stats.ts`).** Acumulados na mesma passada da carga que já calcula o contexto do colaborador (`computeOrderStats`), nos 3 modos. Definições: despacho avaliado = tem data real, no prazo = `dispatch.delayDays <= 0`; entrega avaliada = tem atraso calculado (entregues e em trânsito; extraviados fora); fila de atenção = todos os em trânsito, mais atrasados primeiro; rotas com mais atraso = `rota_servico` com 300+ entregas avaliadas (8 primeiras). Conferido com os CSVs reais (17/11): 42,7% (15.739/36.866), 74,7% (22.130/29.644), 197 em trânsito (43 atrasados, 23 com 3+ dias), 8.337 na central, 7.222 extravios. Sem prazo sugerido desde 18/11 à noite (a "Promessa ajustada" da Gold saiu; ver seção 8). Conferido nos modos `file` e `databricks` (18/11): Torre, `GET /api/staff/orders/76902` e `GET /api/orders/76902` idênticos entre os dois.
+
+**Busca do colaborador (`orders/order-search.ts`, 18/11).** `GET /api/staff/orders` varre os registros em memória (`OrderRepository.records()`). Filtros, que se somam: `q` (só dígitos = número do pedido que começa com eles; texto = cidade, estado ou país de origem ou destino, sem acentos nem maiúsculas, até 60 caracteres), `status`, `shippingMode`, `market`, `stage` (etapa atual, 1 a 5; nos extraviados é a etapa do extravio), `cause` (termo da base, no despacho ou na entrega), `minDelayDays` (atraso de entrega) e `escalated` (`true`/`false`). `sort` (`contracts/src/staff-search.ts`): `delay` (maior atraso de entrega primeiro), `order` (número crescente) ou `date` (mais recentes primeiro); padrão `delay` com `minDelayDays` e `order` nos demais casos. Listas vão separadas por vírgula (`status=Extraviado,Cancelado`). `page` e `pageSize` (1 a 50, padrão 20). Cada linha traz só número, data, situação, modalidade, mercado, rota, origem, destino, etapa e local, atrasos, central e causa da base (campos listados um a um). O texto pesquisável de cada pedido é montado na primeira busca (`WeakMap`): ~160 ms na primeira com os 65.752 pedidos, alguns ms depois.
 
 O `orderId` aceita só dígitos (1 a 10), maior que zero; zeros à esquerda passam (`00375` → 375). `1e3`, `0x1F`, `-1`, `1.5`, espaços e 11 dígitos são recusados.
 
@@ -531,7 +588,7 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 |---|---|---|
 | `API_PORT` | `3333` | Porta da API (1 a 65535) |
 | `DATA_SOURCE` | `fixtures` | `fixtures`, `file` ou `databricks` |
-| `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` (`file` e `pnpm export:dados`). Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
+| `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv` (`file` e `pnpm export:dados`) e o cache do `databricks`. Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
 | `SAMPLE_ORDER_IDS` | `76902,375,34,8` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
 | `DATABRICKS_HOST` | vazio | Host do workspace (sem ou com `https://`); obrigatório com `databricks`. `http://` só para `localhost`/`127.0.0.1` (testes) |
 | `DATABRICKS_WAREHOUSE_ID` | vazio | Id do SQL warehouse (letras, números, `_`, `-`); obrigatório com `databricks` |
@@ -541,7 +598,11 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 | `AGENT_URL` | vazio | Endereço http(s) do agente; obrigatório com `adk` (dev: `http://127.0.0.1:8001`). Barra final removida |
 | `AGENT_APP_NAME` | `translog_agent` | Nome do app no ADK; só letras, números, `_` e `-` (vai no caminho da URL) |
 | `AGENT_TIMEOUT_MS` | `90000` | Limite por resposta do agente, de 1000 a 600000 ms (o agente já levou 54 s) |
-| `NODE_ENV` | vazio | `production` = log em JSON; ausente = legível (pino-pretty) |
+| `STAFF_USERS` | vazio | Usuários do colaborador: `email:hash` separados por vírgula (`pnpm staff:add <email>`). Nunca aparece na mensagem de erro |
+| `SESSION_SECRET` | vazio | Segredo do cookie de sessão (32+ caracteres); obrigatório com `STAFF_USERS` ou `AUTH_DEMO=true`. Nunca aparece na mensagem de erro |
+| `AUTH_DEMO` | `false` | `true` liga "Entrar como demonstração" (`POST /api/auth/demo`); só para o desenvolvimento e a banca |
+| `DASHBOARD_URL` | vazio | Link "Painel completo de performance" da Torre; vazio = "link a definir" |
+| `NODE_ENV` | vazio | `production` = log em JSON e cookie `Secure`; ausente = legível (pino-pretty) |
 | `WEB_PORT` | `5173` | Porta do Vite dev server (só o frontend em dev); o proxy `/api` usa `API_PORT` |
 
 Regras (`api/src/config.ts`):
@@ -565,12 +626,19 @@ Regras (`api/src/config.ts`):
 
 ```ts
 interface OrderRepository {
-  findById(orderId: number): Promise<Order | null>;
+  findById(orderId: number): Promise<OrderRecord | null>;
   count(): Promise<number>;
+  records(): Iterable<OrderRecord>; // busca do colaborador
+  stats(): OrderStats;              // contexto, Torre e resumo, calculados na carga
+  close?(): void;
 }
 ```
 
-Os dois adapters montam um `Map<orderId, Order>` e o entregam a `createInMemoryRepository`. A porta é assíncrona para que uma fonte futura (banco ou Parquet) não exija mudar serviço nem rotas.
+Os três adapters montam um `Map<orderId, OrderRecord>` e o entregam a `createInMemoryRepository`, que calcula os números da carga uma vez.
+
+### "Promessa ajustada" da Gold: removida (18/11, noite)
+
+A API leu por um dia o cenário "Promessa ajustada" (`workspace.gold.param_cenario_prazo`) para mostrar o prazo de despacho sugerido na Torre e na visão do colaborador. Por decisão do Matheus, a simulação de prazos novos fica só no dashboard do Marcelo: a tela deixou de mostrar o prazo sugerido e a API deixou de ler a Gold nos 3 modos (sem consulta no `databricks`, sem `gold_param_cenario_prazo.csv` no `file` e no `pnpm export:dados`, sem `promise-scenario.json` nos fixtures, sem `DATABRICKS_GOLD_SCHEMA`). Os campos `suggestedDays`, `onTimeWithSuggested` e `lateDispatchPctWithSuggested` saíram dos contratos. O cache do `databricks` passou ao formato 5 (o de formato 4, com o cenário, é descartado e baixado de novo na primeira subida).
 
 ### Tabelas oficiais (16/11)
 
@@ -587,11 +655,11 @@ Os três adapters carregam tudo uma vez, ao subir, e servem da memória. Não h�
 ### `fixtures`
 
 - `orders/fixtures/orders.json`: os 9 pedidos da demo (76902, 375, 34, 222, 8, 9, 50, 31298, 76385), gerados das tabelas por `pnpm --filter @translog/api fixtures` (`api/scripts/generate-fixtures.ts`), que também gera a amostra de teste `orders/fixtures/consumo/`.
-- Validados contra `z.array(orderSchema)` ao carregar. Arquivo inválido impede a API de subir, com a mensagem do Zod apontando o campo. Campos fora do contrato são descartados na leitura.
+- Validados contra `z.array(orderRecordSchema)` ao carregar. Arquivo inválido impede a API de subir, com a mensagem do Zod apontando o campo. Campos fora do contrato são descartados na leitura.
 
 ### `file` (CSVs das tabelas `consumo_*`, plano B)
 
-`loadFileRepository(dir, log)` lê `DATA_DIR/consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv`. A carga é a de `loadConsumoRepository(sources, log)`, feita para ser reaproveitada pelo adapter `databricks` (os pedaços em CSV do Databricks entram pelo mesmo caminho):
+`loadFileRepository(dir, log)` lê `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv`. A carga é a de `loadConsumoRepository(sources, log)`, feita para ser reaproveitada pelo adapter `databricks` (os pedaços em CSV do Databricks entram pelo mesmo caminho):
 
 1. Cada tabela é lida numa passada, em streaming (`pipeline(stream, parse(...), consumidor)`), com registros como arrays.
 2. O cabeçalho define a posição de cada coluna de `READ_COLUMNS` da tabela. Se faltar alguma, a carga é interrompida com erro.
@@ -647,7 +715,7 @@ O tempo de carga é quase todo da `csv-parse`. Alternativa medida em 14/11 e nã
 3. Baixa os pedaços pelos links pré-assinados **sem** o header `Authorization`, seguindo `next_chunk_internal_link`. O cabeçalho do CSV sai uma vez só.
 4. Cada arquivo vai para um `.parcial` e só substitui o anterior quando o download termina.
 
-O `SELECT` vem de `orders/consumo-sql.ts`: colunas explícitas (`EXPORT_COLUMNS` = todas menos as proibidas), cada uma como `coalesce(CAST(col AS STRING), '')` (o CSV do Databricks escreve NULL como `null`; assim sai vazio, igual aos CSVs do Mateus), timestamps como `date_format(col, 'yyyy-MM-dd')` (a sessão do warehouse é UTC) e `ORDER BY` estável. Schema e nomes de coluna são conferidos antes de entrar no SQL.
+O `SELECT` vem de `orders/consumo-sql.ts`: colunas explícitas (`EXPORT_COLUMNS` = todas menos as proibidas), cada uma como `coalesce(CAST(col AS STRING), '')` (o CSV do Databricks escreve NULL como `null`; assim sai vazio, igual aos CSVs do Mateus), timestamps como ISO 8601 com fuso, `date_format(col, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")` (a sessão do warehouse é UTC; o agente de IA `csv_v2` exige hora e fuso; o portal usa só a data) e `ORDER BY` estável. Schema e nomes de coluna são conferidos antes de entrar no SQL.
 
 **Medido em 16/11** (antes do download dos pedaços em paralelo, hoje até 4 por tabela): 58 a 72 s no total (a primeira tabela leva mais quando o warehouse está acordando); `consumo_pedidos` 79,6 MB (40 colunas), `consumo_itens_pedido` 13,5 MB (7), `consumo_eventos_logisticos` 61,1 MB (14). Comparado célula a célula com os CSVs do Mateus: mesmas chaves e mesmos valores nas 596.687 linhas (fora o espaço no fim do `resumo_pedido`, que o CSV do Mateus apara).
 
@@ -689,6 +757,14 @@ Log (sem dados nem token):
 | Comparação com `file` | 18 pedidos (os 9 da demo, 8 variados e 1 inexistente) idênticos |
 
 Antes do download em paralelo, a carga levava ~100 s: cada link pré-assinado sai a ~1,4 MB/s, e os pedaços eram baixados um por vez.
+
+#### Cache local (`orders/databricks-cache.ts`)
+
+`loadCachedDatabricksRepository` sobe pelo cache `DATA_DIR/cache-databricks.json.gz` quando ele é do mesmo código, workspace e schema (chave com o conteúdo dos arquivos da conversão e o `catalogSchema`), e confere em segundo plano a versão das 3 tabelas `consumo_*` no Unity Catalog (`DATABRICKS_REFRESH_MINUTES`, padrão 10). Mudou alguma: baixa de novo, troca pedidos e cenário em memória e regrava o cache. Sem cache (ou de outra chave): baixa antes de abrir a porta.
+
+Formato 5 (18/11, noite; o 4 tinha também o cenário da Gold): gzip com uma linha de cabeçalho (`format`, `key`, `version`, `savedAt`, `orders` = quantos pedidos vêm) e um `OrderRecord` por linha, lido em streaming (`readline`). O formato anterior era um JSON único: com `resumo_pedido` e `linha_do_tempo` ele passou de 189 MB descompactado, e o `JSON.parse` levava o RSS a ~1,3 GB. Arquivo cortado (menos pedidos que o cabeçalho), linha inválida, pedido fora do contrato ou cenário vazio: o cache é ignorado e a API baixa do Databricks. Gravação num temporário (`0600`) trocado pelo definitivo.
+
+**Medido em 18/11** (warehouse lento): primeira subida, sem cache, 303 s (o export do mesmo dia levou ~90 s por tabela); subida pelo cache, 3,8 s, com "Tabelas sem mudança no Databricks" logo depois; heap retido após a leitura do cache 146 MB (igual ao `file`). O RSS com o formato 4 ainda não foi medido com a base real.
 
 **Memória.** O RSS varia muito entre execuções iguais, nos dois modos (de ~210 a ~730 MB, conforme o momento em que o V8 coleta lixo); o heap retido depois da coleta fica em ~103 MB. Entregar ao `csv-parse` os pedaços inteiros (~20 MB) deixava os `Buffer` presos (RSS ~670 MB numa simulação com os CSVs locais); em fatias de 64 KB, ~425 MB.
 
@@ -856,6 +932,7 @@ Tudo em `http/errors.ts`. Rotas e serviços não têm `try/catch` para montar re
 | `AgentTimeoutError` (assistente) | 504 | `AGENT_TIMEOUT` | O assistente demorou demais para responder. Tente novamente. |
 | Validação Zod (params, corpo) | 400 | `VALIDATION_ERROR` | `Requisição inválida: <campo>: <motivo>.` |
 | JSON malformado | 400 | `VALIDATION_ERROR` | Requisição inválida. |
+| `POST /api/auth/*` sem `Content-Type: application/json` (`JsonRequiredError`) | `415` | `UNSUPPORTED_MEDIA_TYPE` | "Envie os dados em JSON (Content-Type: application/json)." |
 | Outros 4xx do Fastify | mesmo status | `BAD_REQUEST` | Mensagem genérica por status (ex.: 415 "Tipo de conteúdo não suportado.") |
 | Rota inexistente | 404 | `NOT_FOUND` | Recurso não encontrado. |
 | Qualquer outro erro | 500 | `INTERNAL_ERROR` | Ocorreu um erro inesperado. Tente novamente. (detalhe só no log) |
@@ -872,96 +949,100 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
 
 - **Tipografia técnica dupla:**
   - `Inter Variable` (`--font-sans`, via `@fontsource-variable/inter`) para leitura fluida de títulos, rótulos principais e mensagens do assistente;
-  - `IBM Plex Mono` (`--font-mono`) para códigos de manifesto (`TL-000375-LATAM`), datas, contagens de dias, preços em dólar e cabeçalhos rotulados (`.label-mono`).
+  - `IBM Plex Mono` (`--font-mono`) para números de pedido, datas, contagens de dias, preços em dólar e cabeçalhos rotulados (`.label-mono`).
   - Números tabulares forçados com `.tabular { font-variant-numeric: tabular-nums; }` para evitar deslocamento horizontal ao alternar pedidos.
 - **Paleta, contraste e interatividade (`@theme inline` + `@layer base`):**
   - Azul-petróleo `#0F4C81` (`--color-primary`) como cor primária de autoridade e foco;
   - Âmbar `#F59E0B` (`--color-accent`) reservado para atenção ("Motivo provável" e "Aguardando pagamento");
   - Vermelho (`red-600` / `red-700` / `red-50`) exclusivo para atraso de entrega e extravio: etiqueta de prazo, dias de atraso, fita superior do manifesto, "Onde está agora" atrasado e etapa atual ou do extravio na linha do tempo;
   - Verde (`emerald-700` / `emerald-50`) para pedidos entregues no prazo ou adiantados;
-  - Neutros `slate` (apenas tema claro);
+  - Neutros `slate`;
+  - **Tema claro e escuro (18/11):** as cores são variáveis CSS (`@theme` sem `inline`), e o tema escuro só as redefine em `.dark` no `<html>`: a escala `slate` é invertida, as escalas de cor ganham fundos escuros e textos claros, e `--text-link` clareia o azul de texto. Tokens próprios: `page` (fundo da página), `surface` (cartões; no lugar de `bg-white`), `ink`/`ink-fg` (botões escuros e etapas concluídas, que no escuro viram claros) e `band-*` (faixa "Visão do colaborador", escura nos dois temas). Botão sol/lua nos dois cabeçalhos; escolha em `localStorage` (`translog.tema`), sem escolha segue `prefers-color-scheme`; um script no `index.html` aplica o tema antes de desenhar (sem "piscar"). Lógica em `lib/theme.ts`, com testes;
   - Regras em `@layer base` corrigem o cursor padrão de botões do Tailwind v4 (`cursor: pointer` em botões ativos) e padronizam `:focus-visible`.
 - **Detalhes gráficos de manifesto internacional:**
   - `.perf-t`: divisor horizontal com serrilhado de manifesto logístico no rodapé de total da fatura;
   - `.route-line`: conector horizontal tracejado ligando origem e destino no cabeçalho da rota;
-  - Fita superior semântica de `3px` no `OrderManifestCard` e botão copiável no código de guia (`TL-000375-LATAM`).
+  - Fita superior semântica de `3px` no `OrderManifestCard`.
 
-### 13.2. Layout, estrutura de tela e ergonomia (`src/app.tsx`)
+### 13.2. Rotas e telas (`src/app.tsx`, `src/lib/router.ts`)
 
-- **Desktop-first (`min-w-[1280px]`):**
-  - **Cabeçalho (`AppHeader`, `h-16`):** marca TransLog (`International Logistics · Rastreamento de pedidos`), fita institucional e indicador de conexão que reflete `GET /api/health` (`Conectado` ou `Sem conexão`).
-  - **Coluna esquerda (`TrackingPanel`, `flex-1`):**
-    - `OrderSearchForm`: aceita apenas dígitos (1 a 10), oferece pílulas rápidas vindas de `GET /api/orders/samples`, atalho global de teclado `/` para focar a busca, botão `X` para limpar e retornar ao estado inicial, e indicador de carregamento (`Consultando`) no submit;
-    - Estados dedicados (`tracking-states.tsx`): tela inicial com resumo em 3 blocos (`01 · Situação e prazo`, `02 · Motivo provável`, `03 · Rota e manifesto`), skeleton animado, pedido não encontrado com botão *"Tentar outro número"* e erro de rede com retentativa;
-    - `OrderManifestCard`: grade de 4 colunas (`Previsão/Entrega`, `Cumprimento do prazo`, `Modalidade contratada`, `Pedido realizado em` com contagem de itens e total em `US$`), alerta de motivo provável com CTA *"Perguntar ao assistente"* e bloco integrado de rota (com truncamento seguro para cidades longas) + linha do tempo;
-    - `OrderItemsTable`: exibe itens, categorias, quantidades e soma distinta de itens e unidades totais no cabeçalho.
-  - **Coluna direita (`ChatPanel`, `w-[400px]` fixa na altura da viewport):** assistente TransLog com indicador de conexão no avatar, faixa de contexto do pedido ativo (`Falando sobre o pedido #375` ou `Nenhum pedido selecionado`), botão *"Nova conversa"* desabilitado quando o chat está vazio, sugestões contextuais e caixa de envio (`Enter` envia, `Shift+Enter` quebra linha).
+Roteador feito à mão com a History API (URLs limpas): são cinco rotas fixas, sem aninhamento nem carregamento por rota, e uma dependência (`react-router`) traria mais do que usamos. A lógica é pura e testada (`router.ts`); `use-location.tsx` liga a URL ao React (`useLocationHref`, `navigate`, `Link`). O Vite serve o `index.html` em qualquer caminho.
 
-### 13.3. Cliente HTTP, validação Zod e cache (`src/api/`)
+| Endereço | Tela |
+|---|---|
+| `/` | Início do cliente (herói com busca e mapa animado, números, como funciona, modalidades, central) |
+| `/rastreio?pedido=N` | Rastreio do cliente. `/?pedido=N` (endereço antigo) abre o rastreio e vira `/rastreio?pedido=N` |
+| `/colaborador/entrar` | Login do colaborador (`?voltar=` = página pedida, só caminhos de `/colaborador`; `?expirou=1` = aviso de sessão expirada) |
+| `/colaborador` | Torre de controle |
+| `/colaborador/pedidos` | Busca de pedidos do colaborador (filtros na query string, com os nomes da API) |
+| `/colaborador/pedidos/:id` | Rastreio do colaborador (visão do `StaffOrder`) |
 
-- **`client.ts`:**
-  - Toda chamada HTTP passa por `getJson(path, schema)` ou `postJson(path, body, schema)`, que usam a mesma função (`requestJson`).
-  - Se o `fetch` falhar na rede (`TypeError`), lança `ApiError` com `status: 0` e `code: "NETWORK_ERROR"`, ativando automaticamente o card de **Sem conexão com o servidor** na tela.
-  - Se a resposta não for `2xx`, tenta decodificar o envelope `errorResponseSchema` (`@translog/contracts`) para preservar `code` (`ORDER_NOT_FOUND`, `VALIDATION_ERROR`, etc.) e `message` vindos do Fastify.
-  - Se for `200 OK`, valida o corpo com `schema.safeParse(body)` usando o próprio esquema Zod de `@translog/contracts` (`orderSchema`, `orderSamplesResponseSchema`, `healthResponseSchema`, `chatResponseSchema`). Respostas fora do contrato lançam `INVALID_RESPONSE`.
-- **`queries.ts` (`@tanstack/react-query`):**
-  - `useHealth()`: consulta `/api/health` com `staleTime: 30_000`.
-  - `useOrderSamples()`: consulta `/api/orders/samples` e usa fallback `[76902, 375, 34, 8]` caso a API ainda não tenha respondido.
-  - `useOrderQuery(orderId)`: consulta `/api/orders/:orderId` apenas quando `orderId !== null`.
-  - `useSendChatMessage()`: `useMutation` de `POST /api/chat` com `retry: false` (o agente pode já ter processado a mensagem; reenvio só manual).
-  - `shouldRetry(failureCount, error)`: política testada unitariamente que **nunca repete erros 4xx** (`404 ORDER_NOT_FOUND` ou `400 VALIDATION_ERROR` falham na hora) e faz **1 retentativa rápida** em erros de rede (`status: 0`) ou `5xx`.
+- **Guarda (`guardRedirect`):** sem sessão, as páginas da área vão ao login lembrando a página; já com sessão, o login leva à página pedida ou à Torre. A tela pergunta `GET /api/auth/session` (nunca lê o cookie `HttpOnly`).
+- **Sessão expirada:** qualquer `401` em `/api/staff/*` volta ao login com `?expirou=1` (`useExpireOn401` em `api/session.ts`).
+- **Cabeçalho (`app-header.tsx`):** público = marca (Início), "Rastreamento", "Atendimento 24h" (ponto âmbar) e o link discreto "Acesso colaborador" (cadeado; abre o login, ou a Torre com sessão). Na área com sessão = marca + "Área do colaborador", "Torre de controle", e-mail, "Sair" e "Voltar ao site". A Área do colaborador não aparece no menu público. Sem indicador "Conectado" (a consulta a `/api/health` saiu da tela em 17/11).
+- **Rodapé (`app-footer.tsx`):** faixa baixa com o aviso de empresa fictícia, "Acesso colaborador" (páginas públicas) e "Desenvolvido por" + logo IPNET esmaecida (`public/ipnet.svg`).
 
-### 13.4. Formatação segura de datas e valores (`src/lib/format.ts`)
+### 13.3. Painel lateral do LogBot (`features/chat/logbot-dock.tsx`, `logbot-panel.ts`)
 
-- **`formatDate(isoDate)`:** converte `"2015-01-08"` em `"08/01/2015"` operando exclusivamente por regex e corte de string (`/^(\d{4})-(\d{2})-(\d{2})/`), **sem jamais instanciar `new Date()`**. Isso garante que o frontend preserve a mesma regra de calendário do backend em qualquer fuso horário do navegador.
-- **`formatCurrency(value)`:** usa `Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" })` para produzir `US$ 91,34`.
-- **`formatManifestCode(order)`:** gera o código de etiqueta internacional no formato `TL-<ORDER_ID_6_DIGITOS>-<MARKET>` (ex.: `TL-000375-LATAM`, `TL-020322-PACIFICASIA`).
+- Nas páginas do cliente (Início e Rastreamento), o LogBot fica à direita, ao lado do conteúdo (não por cima), com 400 px e a altura útil abaixo do cabeçalho (fixo ao rolar o Início). Não é botão flutuante. Minimizado, não ocupa espaço: o conteúdo fica centralizado na tela (margens iguais) e a aba fica fixa na borda direita da tela.
+- **Minimizar:** botão no cabeçalho do chat. O painel desliza para a direita (250 ms, largura + `transform`) e deixa uma aba fina vertical ("LogBot" + ícone) para reabrir; o conteúdo ocupa o espaço com a mesma transição. Sem animação com `prefers-reduced-motion` (`motion-safe:`).
+- **Estado:** aberto por padrão; a escolha vale entre Início e Rastreamento e fica no `localStorage` (`translog.logbot.aberto`, leitura e escrita com `try/catch`). `askLogBot` reabre o painel quando a página pergunta ("Perguntar ao assistente", sugestões); "Perguntar ao LogBot" do Início abre e foca o campo.
+- **Acessibilidade:** botões com `aria-expanded` e `aria-controls`; painel como região "Conversa com o LogBot"; o painel fechado fica `inert`; o foco vai para o campo ao reabrir e para a aba ao minimizar.
+- **Mesma conversa** em todas as páginas do cliente: `use-chat-conversation.ts` fica no `App`, acima das rotas. Sem chat na Área do colaborador.
 
-### 13.5. Pedido na tela (`order-manifest-card.tsx`, refeito em 16/11)
+### 13.4. Cliente HTTP e consultas (`src/api/`)
 
-De cima para baixo, só com campos do `Order` (nenhuma regra de negócio nova na tela):
+- `client.ts`: `getJson`, `postJson` e `postNoContent` (para `204`), todos com `credentials: "same-origin"`; erro vira `ApiError` (`status: 0` = rede; envelope `{ error }` preservado; resposta fora do contrato = `INVALID_RESPONSE`).
+- `queries.ts`: `useOrderSamples`, `useOrdersSummary` (mapa do Início), `useOrderQuery`, `useSendChatMessage` (sem retry).
+- `session.ts`: `useSession` (`404` = sem sessão), `useLogin`, `useDemoLogin`, `useLogout`, `useTower`, `useStaffOrder`.
 
-1. **Guia de remessa:** número, badge da situação (7 situações, cor por tom em `order-status.ts`), badge do prazo de entrega (`Atrasado`/`No Prazo`/`Adiantado`, só quando há `delivery.delayDays`), data do pedido e código.
-2. **Mensagem principal** (`statusHeadline`): ex.: "Em trânsito, com 5 dias de atraso / Entrega prevista para 01/02/2018"; "Volume extraviado na etapa Alfândega"; "Pagamento não confirmado".
-3. **Destaque ao lado:** "Onde está agora · <etapa>" com `currentLocation` (em trânsito; vermelho se a entrega atrasou), "Extraviado na etapa X" com o último local conhecido, ou o local da entrega. Pedidos sem despacho não têm destaque.
-4. **Aviso da central** quando `escalateToSupport` (regra calculada na API), com o motivo ("a entrega está 5 dias atrasada" / "o volume foi extraviado") e o horário (segunda a sexta, das 9h às 18h; texto em `SUPPORT_HOURS`). Telefone ou e-mail da central ainda não confirmados.
-5. **Despacho x entrega** (`deadlines-block.tsx`): previsto, realizado e atraso de cada um (prazo prometido da modalidade no despacho; em trânsito, "atraso contado até" a data de referência). Abaixo, a faixa âmbar **"Motivo provável"** com a causa de cada etapa ("No despacho: Promessa irreal · Na entrega: …"), a `explanation` da base e o botão "Perguntar ao assistente". Sem causa, só a explicação, discreta. Cancelado e não pago mostram "Sem despacho nem entrega".
-6. **Rota:** origem, destino, mercado, região, modalidade, modal (ícone de avião ou caminhão) e tipo de rota.
-7. **Linha do tempo por etapas** (`stage-timeline.ts` + `stage-timeline-view.tsx`).
+### 13.5. Formatação (`src/lib/format.ts`, `features/staff/tower-format.ts`)
 
-**Linha do tempo por etapas.** `plannedStages(order)` decide as etapas da rota: Pedido e Coleta sempre; Voo só se o modal for aéreo; Alfândega só em rota internacional; Transferência e Última milha sempre (conferido nos dados: rota internacional sempre tem voo e alfândega; doméstica nunca tem alfândega). Uma etapa com evento sempre aparece. Cancelado e não pago mostram só "Pedido". `buildStageTimeline(order)` marca cada etapa:
+- `formatDate` só corta o texto `AAAA-MM-DD` (nunca `new Date(texto)`); `formatCurrency` em `US$`.
+- Área do colaborador: `formatInt`, `formatPercent` (pt-BR, 1 casa), `formatSignedDays`, `routeLabel` e `filterByStage` (filtro da fila de atenção), com testes.
+
+### 13.6. Pedido na tela do cliente (`order-manifest-card.tsx`)
+
+De cima para baixo: número, situação e prazo (sem o código de manifesto `TL-…`, interno, removido em 17/11); mensagem principal (`statusHeadline`); "Onde está agora" / local da entrega / extravio; aviso da central quando `escalateToSupport`; **Entrega** (previsto, realizado, atraso) em destaque e **Envio** numa frase simples (`dispatchSentence`: "O envio saiu com 1 dia de atraso.", "no prazo", "antes do previsto" ou por que não saiu); faixa "Motivo provável" em linguagem do cliente (vem pronta da API) com "Perguntar ao assistente"; rota (país e região, sem o mercado interno); linha do tempo por etapas (`stage-timeline.ts`, tabela de estados abaixo); itens.
 
 | Estado | Quando | Visual |
 |---|---|---|
 | `done` | antes da etapa atual, ou pedido entregue | quadrado escuro, "Concluída" |
 | `current` | etapa atual, em trânsito no prazo | azul, "Agora", caixa destacada |
 | `delayed` | etapa atual, em trânsito com entrega atrasada | vermelho, "Agora · com atraso (+N dias)" |
-| `lost` | etapa do extravio | vermelho, ícone de pacote extraviado, "Extraviado aqui" |
+| `lost` | etapa do extravio | vermelho, "Extraviado aqui" |
 | `pending` | ainda não alcançada | tracejado, "Aguardando" |
 | `not_reached` | depois de um extravio | tracejado claro, "Não alcançada" |
 
-Cada etapa lista seus eventos (data `DD/MM/AAAA`, descrição e local), na ordem da base. O evento `EXTRAVIO_CONFIRMADO` aparece em vermelho.
+### 13.7. Chat (`src/features/chat/`)
 
-### 13.6. Chat ligado à API (`src/features/chat/`)
+- Respostas só da API (`POST /api/chat`); a regra do simulado vive em `api/src/chat/mock-agent.ts`. `sessionId` por conversa (UUID), pedido aberto como contexto, pedido citado abre o rastreio dele (a conversa continua, com o divisor `Alternado para o pedido #N`). Falha = "Tentar novamente" manual; `504` com texto próprio.
+- Sugestões (`chat-suggestions.ts`): sem pedido, "Quero acompanhar meu pedido", modalidades e central; com pedido, 3 perguntas pela situação, e **"Quero falar com a central"** nos atrasados e extraviados.
+- `rich-text.ts` mostra títulos, listas e negrito das respostas sem HTML.
 
-A tela não tem mais regra de respostas: tudo vem de `POST /api/chat` (a regra do simulado vive só em `api/src/chat/mock-agent.ts`).
+### 13.8. Início (`features/home/`)
 
-- **Envio (`app.tsx`):** a pergunta entra na conversa, o "digitando…" aparece (sem tempo artificial) e `useSendChatMessage` envia `{ sessionId, message, orderId }`, com o `orderId` do pedido exibido (o mesmo do chip "Falando sobre o pedido"). Enquanto espera, a caixa de texto fica bloqueada.
-- **`sessionId` por conversa (`chat-session.ts`):** criado na primeira mensagem (`createSessionId`, UUID v4). Volta a vazio (conversa nova) em "Nova conversa", na troca de pedido com "Zerar" (`startsNewConversation`) e ao aplicar uma conversa de exemplo da barra. A resposta que chega depois de a conversa mudar é descartada.
-- **Pedido citado:** `mentionedOrderId` diferente do pedido aberto abre esse pedido pela mesma função do formulário (`handleSelectOrder`), que insere o divisor de troca no chat.
-- **Falha:** a pergunta fica "Não enviada · Tentar novamente"; no `504`, "O assistente demorou demais · Tentar novamente" (`chatFailureLabel`). Reenvio só manual.
-- **Formatação (`rich-text.ts`):** `parseRichText` transforma o texto em linhas (texto, título `#`/`##`/`###`, item de lista `*`/`-`/`•` com até 2 níveis, linha em branco) com trechos em `**negrito**`; `chat-messages.tsx` monta os elementos React, sem `dangerouslySetInnerHTML`. Tabelas, links, `---`, `*itálico*` e crases aparecem como texto.
-- **Sem pedido aberto:** o estado vazio diz "Olá! <nome> por aqui." e convida a informar o número; o campo de texto mostra "Digite o número do pedido (ex.: 76902)"; as sugestões são "Quero acompanhar meu pedido" (o assistente pede o número), as modalidades e a central.
-- **Sugestões (`chat-suggestions.ts`):** com pedido aberto e a conversa vazia, 3 perguntas adaptadas à situação; sempre citam o número do pedido.
-- **Nome do assistente:** `ASSISTANT_NAME` em `contracts/src/chat.ts` (cabeçalho, mensagens e respostas do simulado). Ainda não confirmado pelo grupo.
-- **Limite:** a caixa de texto aceita até `CHAT_MESSAGE_MAX_LENGTH` (1000) caracteres. `Enter` envia, `Shift+Enter` quebra linha.
-- **Troca de pedido (decidido em 17/11):** a conversa continua, no mesmo `sessionId`, com um divisor `Alternado para o pedido #N` (`messagesAfterOrderSwitch`). "Nova conversa" limpa e começa outra no backend.
+- **Herói** em fundo claro com grade sutil (`.hero-grid`): sobretítulo, "Sua carga pelo mundo." + "Cada etapa visível." (âmbar), busca com a mesma validação do rastreio (vai para `/rastreio?pedido=N`) e os exemplos; à direita o **mapa animado** (`route-map.tsx`, animação do protótipo 01 em cores claras, com a contagem de pedidos de cada mercado vinda de `GET /api/orders/summary`).
+- **Seções animadas** (`home-sections.tsx`, revisão de 18/11), que entram ao aparecer na tela (`useInView` + `.reveal`):
+  - **A TransLog em números:** faixa azul com rotas tracejadas ao fundo; números que contam de zero (total real de pedidos, 5 mercados, 4 modalidades, LogBot 24h) e a barra "Para onde vão os pedidos", que cresce com a parte de cada mercado;
+  - **Jornada do pedido:** trilha com as 6 etapas; um pacote anda de uma à outra (a etapa acende quando ele chega), com a legenda "Agora · …"; abaixo, os 3 passos para acompanhar o pedido;
+  - **Modalidades:** medidor do prazo de despacho que se preenche (um bloco por dia; Same Day com um brilho que corre);
+  - **Central:** horário, a regra (atraso de 3 dias ou mais, extravio) e "Perguntar ao LogBot", ao lado de uma prévia de conversa que se monta sozinha (pergunta → digitando → resposta) e recomeça. O texto da prévia também fica disponível para leitores de tela.
+- Lógica pura em `motion.ts` (contagem com desaceleração, parte de cada mercado, posição na trilha, ciclo), com testes; hooks em `use-motion.ts` (`useInView`, `useCountUp`, `useCycle`, `usePrefersReducedMotion`).
+- Com `prefers-reduced-motion`: sem animação, tudo já no estado final (números no total, barras cheias, jornada na última etapa, conversa completa).
 
-### 13.7. Estado na URL (`src/lib/url-state.ts`)
+### 13.9. Área do colaborador (`features/staff/`)
 
-- **URL limpa por padrão:** ao abrir `http://localhost:5173`, a tela abre no estado inicial vazio. Ao buscar um pedido, `?pedido=<id>` é gravado via `window.history.replaceState` (e removido ao limpar a busca).
-- **Abrir um pedido pelo endereço:** `?pedido=76902` abre direto o pedido informado.
-- A barra de protótipo (presets `?t=`, `?c=`, `?s=`, `?n=`, `?bar=`) saiu em 17/11: o design foi fechado e a banca não deve ver a barra. Os estados de carregamento, não encontrado e erro aparecem naturalmente (número inexistente, API parada).
+- **Login (`staff-login-page.tsx`):** e-mail e senha; erro genérico ("E-mail ou senha inválidos."), aviso de `429`, aviso de sessão expirada; "Entrar como demonstração" só com `demoAvailable`.
+- **Torre (`tower-page.tsx`):** cabeçalho com a data de referência, o total e a busca rápida; 3 indicadores (em trânsito, encaminhados à central, extravios; os de despacho e entrega no prazo ficam no dashboard); "Pedidos que precisam de atenção" (12 primeiros + "Mostrar todos"; filtro por etapa com `aria-pressed`; o número do pedido é um link, então Tab + Enter abre, e a linha toda é clicável); atrasos por modalidade (prazo prometido, despachos e entregas atrasados; a simulação de prazos novos fica no dashboard); em trânsito e extravios por etapa (selo "rastreio simulado"); rotas com mais atraso; "Painel completo de performance" (`dashboardUrl`) ou "link a definir", desabilitado.
+- **Rastreio do colaborador (`staff-order-page.tsx`):** faixa escura "Visão do colaborador" (voltar à Torre, abrir outro pedido, "Ver como o cliente vê" em outra aba, para quem atende a central conferir a tela do cliente); blocos de diagnóstico (despacho prometido × real, transporte padrão × real e dias recuperados, dias em cada etapa, contexto da modalidade e da rota, origem do dado com selos real/simulado, valor em risco, causas da base com a explicação completa, resumo para a IA e linha do tempo bruta recolhíveis); depois o cartão do pedido e os itens, sem o chat.
+- **Busca de pedidos (`staff-search-page.tsx`, 18/11):** `/colaborador/pedidos`, dentro do cabeçalho da área (item "Pedidos", ao lado de "Torre de controle"; o pedido também marca "Pedidos").
+  - **Filtros na URL** (`search-filters.ts`, lógica pura com testes): mesmos nomes da API (`?q=769&status=Extraviado&minDelayDays=3&sort=delay&page=2`); `readFilters` valida cada valor com os esquemas do contrato e ignora o inválido; `writeFilters` tira os padrões (página 1, sem ordenação, `escalated=false`) e põe as escolhas múltiplas sem repetir e na ordem das opções (mesma busca = mesma URL); `updateFilters` volta à página 1 quando um filtro muda; `searchApiPath` monta `GET /api/staff/orders` com `pageSize=20`. A busca pode ser compartilhada, recarregada e volta igual pelo "voltar" do navegador; mudanças de filtro substituem a entrada do histórico (`replace`), abrir um pedido cria uma nova.
+  - **Consulta** `useStaffSearch` (`api/session.ts`): `keepPreviousData` (a página anterior fica na tela, esmaecida, enquanto a próxima carrega), sem retry em 4xx, `401` → login com aviso e volta à mesma busca.
+  - **Tela:** campo "Buscar pedido, cidade ou país" (debounce de 300 ms, Enter envia; o texto digitado não é sobrescrito quando a URL atualiza), ordenação (padrão · maior atraso · número · mais recentes), filtros em botões com `aria-pressed` (situação, modalidade, mercado e etapa com escolha múltipla; atraso mínimo qualquer/1+/3+/5+), motivo (termos da base) e "Só encaminhados à central"; chips removíveis por valor e "Limpar tudo"; tabela no estilo da fila de atenção (pedido com selo "Central", data, rota, modalidade, situação, etapa e local, atraso, motivo da base), número do pedido como link (Tab + Enter) e linha toda clicável, sempre para a visão do colaborador; total em `pt-BR` com `aria-live="polite"`; paginação (anterior · "página X de Y" · próxima). Estados: lista completa sem filtro (com dica), esqueleto ao carregar, "Nenhum pedido encontrado" com "Limpar filtros", página que deixou de existir, erro de rede com "Tentar novamente".
+  - **Entradas:** campo rápido "Buscar pedido…" no topo da Torre; "Ver todos os pedidos" no fim da fila de atenção; indicadores "Em trânsito agora", "Encaminhados à central" e "Extravios" e as barras de etapa (em trânsito e extravios) como links para a busca já filtrada. Ficaram sem link os percentuais de despacho e entrega no prazo, a promessa × realidade e as rotas com mais atraso (a busca não tem filtro equivalente).
+  - **"Voltar à busca"** na faixa "Visão do colaborador" quando o usuário veio da lista nesta aba (`last-search.ts`, só em memória); "Abrir outro pedido" continua igual (número inexistente → "não encontrado").
+
 
 ## 14. Testes
 
@@ -995,9 +1076,13 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 | `orders/fixtures-repository.test.ts` | Carga, situações e central dos 9 pedidos da demo, arquivo inválido, campos extras descartados |
 | `orders/consumo-mapper.test.ts` | 375 completo e datas iguais à `linha_do_tempo`; 76902, 34, 9, 31298; linhas x unidades (8); fuso; formato do export; ordem de itens e eventos (10 depois de 9); centavos; "Sem atraso"; casos inválidos; colunas proibidas fora das lidas |
 | `orders/escalation.test.ts` | ≥ 3 dias, 2 dias, extraviado, não pago, cancelado, adiantado |
+| `orders/tower-stats.test.ts` | Torre com os fixtures (indicadores, fila de atenção, atrasos por modalidade, `DASHBOARD_URL`), resumo por mercado; **integração com os CSVs reais** (42,7%, 74,7%, 197/43/23, 8.337, 7.222) |
+| `auth/auth-units.test.ts` | Hash scrypt (sal novo, formato), token HMAC (vencido, adulterado, outro segredo, malformado), limite de tentativas (janela, janelas vencidas esquecidas, teto de IPs) |
+| `orders/order-search.test.ts` | Busca: sem filtro, número por prefixo, texto sem acentos, situação/modalidade/mercado/etapa, causa, atraso mínimo, central, as 3 ordens, páginas, linha resumida; validação da query string |
+| `auth/routes.test.ts` | Login certo e errado (mesma resposta), atributos do cookie (`Secure` em produção), `429`, POST sem JSON, sem `STAFF_USERS`, sessão, `401` em `/api/staff/*`, Torre, pedido e busca com sessão (e `400` com `pageSize` inválido), cookie adulterado e vencido, logout, demonstração ligada e desligada |
 | `orders/consumo-sql.test.ts` | SELECT explícito com `coalesce`/`date_format`, nenhuma coluna proibida (leitura e export), export ⊇ leitura, recusa de coluna proibida, schema e nome inválidos |
 | `orders/databricks-client.test.ts` | Contra um servidor HTTP falso: corpo da consulta, token só na API e nunca no link pré-assinado, `PENDING` → `RUNNING` → `SUCCEEDED`, 3 pedaços com cabeçalho uma vez só, download em paralelo entregue em ordem, `401`/`403`, `FAILED` (tabela ausente), timeout com cancelamento, `404`, host inacessível, falha no download |
-| `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 3 consultas sem colunas proibidas, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
+| `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 3 consultas (uma por tabela) sem colunas proibidas, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
 | `orders/file-repository.test.ts` | Amostra igual aos fixtures, log, descarte de colunas nas 3 tabelas, linhas inválidas (id, repetido, curta, fora do contrato, sem pedido) sem conteúdo no log, limite de avisos, fora de ordem, BOM e CRLF, erros fatais; **integração com os CSVs reais** |
 | `privacy.test.ts` | Seção 11 (pedidos e chat, nas três fontes; `databricks` com o falso) |
 
@@ -1005,9 +1090,19 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 
 | Arquivo | Cobre |
 |---|---|
-| `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-000375-LATAM`) e pluralização de dias |
-| `lib/url-state.test.ts` | Leitura de `?pedido=76902`, rejeição de IDs inválidos (`0`, `abc`) e atualização limpa da query string |
-| `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo enviado, `409`/`502`/`504`, resposta fora do contrato) |
+| `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR` e pluralização de dias |
+| `lib/url-state.test.ts` | Rejeição de IDs inválidos (`0`, `abc`, 11 dígitos) |
+| `lib/theme.test.ts` | Tema salvo × preferência do sistema, alternar, salvar e avisar, armazenamento bloqueado |
+| `features/staff/search-filters.test.ts` | Filtros ↔ URL (ida e volta, padrões fora, inválidos ignorados, ordem estável), consulta aceita pelo `staffSearchQuerySchema`, chips removíveis, página 1 ao mudar filtro, total de páginas |
+| `features/staff/last-search.test.ts` | Última busca lembrada para "Voltar à busca" |
+| `api/session.test.ts` | Consultas do colaborador repetem só rede/5xx, nunca 4xx |
+| `lib/router.test.ts` | Rotas, `/?pedido=N`, `?voltar=` sem redirecionamento aberto, `?expirou=1`, guarda, cabeçalho público × colaborador, destino de "Acesso colaborador", títulos |
+| `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo, `credentials`, `409`/`502`/`504`, fora do contrato), `postNoContent` (`204`, `429`) |
+| `features/chat/logbot-panel.test.ts` | Painel aberto por padrão, escolha salva (e armazenamento bloqueado), reabrir ao perguntar |
+| `features/home/markets.test.ts` | Nomes dos mercados e contagem em pt-BR |
+| `features/home/motion.test.ts` | Contagem animada (começa em 0, termina no alvo), parte de cada mercado, posição na trilha, ciclo das animações |
+| `features/staff/tower-format.test.ts` | Filtro por etapa, rota em texto, números e percentuais em pt-BR, dias com sinal |
+| `features/staff/login-errors.test.ts` | Erro genérico do login, `429`, rede |
 | `features/tracking/order-status.test.ts` | Mensagem principal das 7 situações (76902, 375, 34, 222, 8, 9, 50, aguardando, adiantado, no prazo), prazo de entrega, motivo da central |
 | `features/tracking/stage-timeline.test.ts` | Etapas e estados: 76902 (alfândega com atraso), 76385 (voo com atraso), 375 (entregue), 34 (extravio + não alcançadas), 31298 (doméstica rodoviária sem voo nem alfândega), 8 (Porto Rico → Brasil), 9 e 50 (só o pedido), doméstica aérea, aguardando pagamento |
 | `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, divisor na troca de pedido (sem repetir), texto de falha por status |
@@ -1056,6 +1151,13 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | fixtures | ~2 s | 9 / 0 | — |
 | dados (CSVs) | 18 s | 65.752 / 0 | ~371 MiB |
 | databricks | 40 s (consultas 1,8 s, download 23 s, leitura 10 s) | 65.752 / 0 | ~449 MiB |
+
+**Verificado em 18/11** (depois do login, da busca e do cenário da Gold; `SESSION_SECRET` e `AUTH_DEMO` passados pelo ambiente, nunca no arquivo nem na imagem):
+
+| Modo | Até ficar `healthy` | Pedidos | Memória do container | Conferido |
+|---|---|---|---|---|
+| fixtures | 21 s com o build | 9 | 181 MiB | demonstração, `401` sem cookie, Torre, cenário do JSON, busca; imagem sem `.env`, CSV nem as variáveis; segredo fora do log |
+| dados (CSVs) | 13 s | 65.752 | 513 MiB | Torre 42,7% / 74,7% / 197 (43, 23) / 8.337 / 7.222, prazo sugerido do CSV da Gold |
 
 **Chat no Docker sempre simulado:** o agente do Marco ainda não tem imagem na `main`, e, dentro do container da API, `AGENT_URL=http://127.0.0.1:8001` apontaria para o próprio container, não para a máquina. Quando o Dockerfile do agente estiver na `main`, ele entra como serviço no compose e a API usa `AGENT_URL=http://agent:8001`. Para testar com o agente, use `pnpm dev`.
 

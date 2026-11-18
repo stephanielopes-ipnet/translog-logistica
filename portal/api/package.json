@@ -8,7 +8,8 @@
     "test": "vitest run",
     "typecheck": "tsc -p .",
     "export:dados": "node scripts/export-dados.ts",
-    "fixtures": "node scripts/generate-fixtures.ts"
+    "fixtures": "node scripts/generate-fixtures.ts",
+    "staff:add": "node scripts/staff-add.ts"
   },
   "dependencies": {
     "@fastify/swagger": "9.9.3",
