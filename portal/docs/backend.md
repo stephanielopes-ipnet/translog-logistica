@@ -999,7 +999,14 @@ De cima para baixo: número, situação e prazo (sem o código de manifesto `TL-
 
 ### 13.8. Início (`features/home/`)
 
-Herói em fundo claro com grade sutil (`.hero-grid`): sobretítulo, "Sua carga pelo mundo." + "Cada etapa visível." (âmbar), busca com a mesma validação do rastreio (vai para `/rastreio?pedido=N`) e os exemplos; à direita o **mapa animado** (`route-map.tsx`, animação do protótipo 01 em cores claras: rotas tracejadas que fluem de "EUA · Porto Rico" aos 5 mercados, azul → âmbar, com a contagem de pedidos de cada mercado vinda de `GET /api/orders/summary`; parado com `prefers-reduced-motion`). Abaixo: números (5 mercados, 4 modalidades, LogBot 24h, central seg–sex 9h–18h), como funciona (3 passos), as 4 modalidades com o prazo de despacho, central de atendimento com "Perguntar ao LogBot" e a linha "É da equipe TransLog? Acesso colaborador".
+- **Herói** em fundo claro com grade sutil (`.hero-grid`): sobretítulo, "Sua carga pelo mundo." + "Cada etapa visível." (âmbar), busca com a mesma validação do rastreio (vai para `/rastreio?pedido=N`) e os exemplos; à direita o **mapa animado** (`route-map.tsx`, animação do protótipo 01 em cores claras, com a contagem de pedidos de cada mercado vinda de `GET /api/orders/summary`).
+- **Seções animadas** (`home-sections.tsx`, revisão de 18/11), que entram ao aparecer na tela (`useInView` + `.reveal`):
+  - **A TransLog em números:** faixa azul com rotas tracejadas ao fundo; números que contam de zero (total real de pedidos, 5 mercados, 4 modalidades, LogBot 24h) e a barra "Para onde vão os pedidos", que cresce com a parte de cada mercado;
+  - **Jornada do pedido:** trilha com as 6 etapas; um pacote anda de uma à outra (a etapa acende quando ele chega), com a legenda "Agora · …"; abaixo, os 3 passos para acompanhar o pedido;
+  - **Modalidades:** medidor do prazo de despacho que se preenche (um bloco por dia; Same Day com um brilho que corre);
+  - **Central:** horário, a regra (atraso de 3 dias ou mais, extravio) e "Perguntar ao LogBot", ao lado de uma prévia de conversa que se monta sozinha (pergunta → digitando → resposta) e recomeça. O texto da prévia também fica disponível para leitores de tela.
+- Lógica pura em `motion.ts` (contagem com desaceleração, parte de cada mercado, posição na trilha, ciclo), com testes; hooks em `use-motion.ts` (`useInView`, `useCountUp`, `useCycle`, `usePrefersReducedMotion`).
+- Com `prefers-reduced-motion`: sem animação, tudo já no estado final (números no total, barras cheias, jornada na última etapa, conversa completa).
 
 ### 13.9. Área do colaborador (`features/staff/`)
 
@@ -1058,6 +1065,7 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 | `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo, `credentials`, `409`/`502`/`504`, fora do contrato), `postNoContent` (`204`, `429`) |
 | `features/chat/logbot-panel.test.ts` | Painel aberto por padrão, escolha salva (e armazenamento bloqueado), reabrir ao perguntar |
 | `features/home/markets.test.ts` | Nomes dos mercados e contagem em pt-BR |
+| `features/home/motion.test.ts` | Contagem animada (começa em 0, termina no alvo), parte de cada mercado, posição na trilha, ciclo das animações |
 | `features/staff/tower-format.test.ts` | Filtro por etapa, rota em texto, números e percentuais em pt-BR, dias com sinal |
 | `features/staff/login-errors.test.ts` | Erro genérico do login, `429`, rede |
 | `features/tracking/order-status.test.ts` | Mensagem principal das 7 situações (76902, 375, 34, 222, 8, 9, 50, aguardando, adiantado, no prazo), prazo de entrega, motivo da central |

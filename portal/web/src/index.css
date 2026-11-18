@@ -188,3 +188,55 @@ body {
     animation: none;
   }
 }
+
+/* Início: entrada ao aparecer na tela (data-inview vem de useInView) */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s ease-out,
+    transform 0.6s ease-out,
+    box-shadow 0.2s,
+    translate 0.2s;
+}
+
+.reveal[data-inview="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Grade sutil da faixa de números */
+.band-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Same Day: brilho que corre no medidor */
+.same-day-sweep {
+  animation: same-day-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes same-day-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .same-day-sweep {
+    animation: none;
+    transform: none;
+    width: 100%;
+  }
+}
