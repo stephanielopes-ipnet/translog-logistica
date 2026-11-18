@@ -9,7 +9,7 @@ import { consumoFiles } from "../orders/file-repository.ts";
 // Execution API com as linhas da amostra `orders/fixtures/consumo/` e à consulta de tabela do
 // Unity Catalog (versão das tabelas, que o teste muda em `tableVersion`). Interpreta o SELECT que o
 // portal gera: devolve só as colunas pedidas (na ordem pedida) e corta as datas de
-// `date_format(..., 'yyyy-MM-dd')`, como o warehouse. Nenhum teste chama o Databricks real.
+// `date_format(...)` (o fake devolve só a data; o portal usa só os 10 primeiros caracteres). Nenhum teste chama o Databricks real.
 
 const SAMPLE = consumoFiles(new URL("../orders/fixtures/consumo/", import.meta.url).pathname);
 const SAMPLE_BY_TABLE: Record<string, string> = {

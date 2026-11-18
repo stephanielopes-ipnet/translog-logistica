@@ -68,7 +68,7 @@ Documentação técnica completa em `docs/backend.md` (mantenha atualizada ao mu
 - Tela: roteador próprio com History API (`web/src/lib/router.ts`, lógica pura testada; `use-location.tsx`). Rotas `/`, `/rastreio?pedido=N` (e o antigo `/?pedido=N`), `/colaborador/entrar`, `/colaborador`, `/colaborador/pedidos/:id`. Conversa do LogBot fica no `App` (`use-chat-conversation.ts`), a mesma no Início e no Rastreamento; painel lateral em `features/chat/logbot-dock.tsx` (estado em `logbot-panel.ts`, `localStorage`). Sem chat na Área do colaborador.
 - A API devolve o view model `Order` pronto. A conversão das tabelas `consumo_*` → `Order` fica só em `orders/consumo-mapper.ts`; o `SELECT` (colunas explícitas) só em `orders/consumo-sql.ts`; a regra da central (`escalateToSupport`) só em `orders/escalation.ts`.
 - Chat sem histórico no servidor. A regra do assistente simulado fica só em `api/src/chat/mock-agent.ts` (nunca no frontend), com tom amigável e gentil. O nome do assistente (LogBot, confirmado em 17/11) fica só em `ASSISTANT_NAME` (`contracts/src/chat.ts`). O formato do pedido de contexto enviado ao agente fica só em `withOrderContext` (`chat/adk-agent.ts`). Nenhum reenvio automático, exceto após `404` "Session not found" (uma vez).
-- Datas são texto de calendário (`AAAA-MM-DD`): nunca `new Date(string)` (os timestamps vêm em UTC e mudariam de dia em Brasília). No SQL, `date_format(col, 'yyyy-MM-dd')`.
+- Datas são texto de calendário (`AAAA-MM-DD`): nunca `new Date(string)` (os timestamps vêm em UTC e mudariam de dia em Brasília). No SQL do export, timestamps em ISO com fuso (`date_format(col, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")`, que o agente exige); o portal usa só os 10 primeiros caracteres.
 
 ## Convenções
 

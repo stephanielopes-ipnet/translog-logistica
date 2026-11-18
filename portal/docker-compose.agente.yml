@@ -9,7 +9,7 @@
 #     compose recusa subir; com a chave vazia, o agente encerra com "ERRO: falta GOOGLE_API_KEY"
 #     e a API não sobe (depende do agente saudável). A chave entra só como variável de ambiente
 #     do container, nunca na imagem nem neste arquivo.
-#   - portal/dados/consumo_pedidos.csv (pnpm export:dados): o agente lê essa tabela, mesmo
+#   - portal/dados/consumo_*.csv (pnpm export:dados): o agente (backend csv_v2) lê as 3 tabelas, mesmo
 #     quando a API lê do Databricks. Atualize o CSV para os dois contarem a mesma história.
 #
 # Sem esta sobreposição, o chat continua simulado (AGENT=mock), que é o plano B.
@@ -23,17 +23,13 @@ services:
         required: true
     environment:
       # Têm prioridade sobre o agent/.env (o agente usa load_dotenv sem override).
-      # O mapa liga os 8 campos do agente às colunas de consumo_pedidos (nunca status_pedido).
-      TRANSLOG_ORDER_BACKEND: csv
-      TRANSLOG_ORDERS_CSV: /data/consumo_pedidos.csv
+      TRANSLOG_ORDER_BACKEND: csv_v2
+      TRANSLOG_CONSUMPTION_DIR: /data
       TRANSLOG_DATA_ORIGIN: silver
-      TRANSLOG_CSV_ENCODING: utf-8-sig
-      TRANSLOG_CSV_DELIMITER: ","
-      TRANSLOG_COLUMN_MAP: /config/agente-mapa-colunas.json
       TRANSLOG_ALLOW_DEMO_KNOWLEDGE: "false"
     volumes:
+      # Lê consumo_pedidos.csv, consumo_itens_pedido.csv e consumo_eventos_logisticos.csv (Silver v2).
       - ./dados:/data:ro
-      - ./config/agente-mapa-colunas.json:/config/agente-mapa-colunas.json:ro
     ports:
       # Só na própria máquina: para o pnpm dev e a tela de testes do ADK (/docs).
       - "127.0.0.1:8001:8001"

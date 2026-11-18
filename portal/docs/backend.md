@@ -703,7 +703,7 @@ O tempo de carga é quase todo da `csv-parse`. Alternativa medida em 14/11 e nã
 3. Baixa os pedaços pelos links pré-assinados **sem** o header `Authorization`, seguindo `next_chunk_internal_link`. O cabeçalho do CSV sai uma vez só.
 4. Cada arquivo vai para um `.parcial` e só substitui o anterior quando o download termina.
 
-O `SELECT` vem de `orders/consumo-sql.ts`: colunas explícitas (`EXPORT_COLUMNS` = todas menos as proibidas), cada uma como `coalesce(CAST(col AS STRING), '')` (o CSV do Databricks escreve NULL como `null`; assim sai vazio, igual aos CSVs do Mateus), timestamps como `date_format(col, 'yyyy-MM-dd')` (a sessão do warehouse é UTC) e `ORDER BY` estável. Schema e nomes de coluna são conferidos antes de entrar no SQL.
+O `SELECT` vem de `orders/consumo-sql.ts`: colunas explícitas (`EXPORT_COLUMNS` = todas menos as proibidas), cada uma como `coalesce(CAST(col AS STRING), '')` (o CSV do Databricks escreve NULL como `null`; assim sai vazio, igual aos CSVs do Mateus), timestamps como ISO 8601 com fuso, `date_format(col, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")` (a sessão do warehouse é UTC; o agente de IA `csv_v2` exige hora e fuso; o portal usa só a data) e `ORDER BY` estável. Schema e nomes de coluna são conferidos antes de entrar no SQL.
 
 **Medido em 16/11** (antes do download dos pedaços em paralelo, hoje até 4 por tabela): 58 a 72 s no total (a primeira tabela leva mais quando o warehouse está acordando); `consumo_pedidos` 79,6 MB (40 colunas), `consumo_itens_pedido` 13,5 MB (7), `consumo_eventos_logisticos` 61,1 MB (14). Comparado célula a célula com os CSVs do Mateus: mesmas chaves e mesmos valores nas 596.687 linhas (fora o espaço no fim do `resumo_pedido`, que o CSV do Mateus apara).
 
