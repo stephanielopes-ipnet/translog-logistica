@@ -17,6 +17,7 @@ import { formatCurrency, onlyDigits } from "@/lib/format.ts";
 import { STAFF_HOME_PATH, staffOrderHref, trackingHref } from "@/lib/router.ts";
 import { parseOrderId } from "@/lib/url-state.ts";
 import { Link, navigate } from "@/lib/use-location.tsx";
+import { lastSearch } from "./last-search.ts";
 import { formatPercent, formatSignedDays } from "./tower-format.ts";
 
 /**
@@ -69,10 +70,15 @@ function Notice({ children }: { children: ReactNode }) {
   );
 }
 
-/** Faixa escura "Visão do colaborador": voltar à Torre, abrir outro pedido e ver como o cliente vê. */
+/**
+ * Faixa escura "Visão do colaborador": voltar à busca (se veio dela), voltar à Torre, abrir outro
+ * pedido e ver como o cliente vê.
+ */
 function StaffBand({ orderParam, orderId }: { orderParam: string; orderId: number | null }) {
   const [value, setValue] = useState(orderParam);
   useEffect(() => setValue(orderParam), [orderParam]);
+  // Veio da busca de pedidos nesta aba: oferece voltar a ela com os mesmos filtros.
+  const backToSearch = lastSearch();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,11 +94,20 @@ function StaffBand({ orderParam, orderId }: { orderParam: string; orderId: numbe
         <ShieldCheck aria-hidden="true" className="w-4 h-4" />
         Visão do colaborador
       </span>
+      {backToSearch && (
+        <Link
+          href={backToSearch}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-white hover:text-accent rounded"
+        >
+          <ArrowLeft aria-hidden="true" className="w-4 h-4" />
+          Voltar à busca
+        </Link>
+      )}
       <Link
         href={STAFF_HOME_PATH}
         className="inline-flex items-center gap-1.5 text-sm text-band-muted hover:text-white rounded"
       >
-        <ArrowLeft aria-hidden="true" className="w-4 h-4" />
+        {!backToSearch && <ArrowLeft aria-hidden="true" className="w-4 h-4" />}
         Torre de controle
       </Link>
       <form onSubmit={handleSubmit} className="ml-auto flex items-center gap-2" noValidate>

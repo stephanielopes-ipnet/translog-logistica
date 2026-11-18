@@ -1,14 +1,17 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type LoginRequest,
   type SessionResponse,
   type StaffOrder,
+  type StaffSearchResponse,
   sessionResponseSchema,
   staffOrderSchema,
+  staffSearchResponseSchema,
   type TowerResponse,
   towerResponseSchema,
 } from "@translog/contracts";
 import { useEffect } from "react";
+import { type SearchFilters, searchApiPath } from "@/features/staff/search-filters.ts";
 import { staffLoginHref } from "@/lib/router.ts";
 import { navigate } from "@/lib/use-location.tsx";
 import { ApiError, getJson, postNoContent } from "./client.ts";
@@ -79,8 +82,8 @@ export function useLogout() {
   });
 }
 
-/** Repete só falha de rede ou 5xx, uma vez; nunca 401/404. */
-function staffRetry(failureCount: number, error: unknown): boolean {
+/** Repete só falha de rede ou 5xx, uma vez; nunca 4xx (401, 400, 404). */
+export function staffRetry(failureCount: number, error: unknown): boolean {
   return (
     error instanceof ApiError && (error.status === 0 || error.status >= 500) && failureCount < 1
   );
@@ -125,6 +128,24 @@ export function useStaffOrder(orderId: number | null) {
     queryFn: () => getJson(`/staff/orders/${orderId}`, staffOrderSchema),
     enabled: orderId !== null,
     retry: staffRetry,
+  });
+  useExpireOn401(query.error);
+  return query;
+}
+
+/**
+ * Busca de pedidos (`GET /api/staff/orders`). Enquanto a próxima página (ou outro filtro)
+ * carrega, a tela continua mostrando o resultado anterior (`isPlaceholderData`). `401` = sessão
+ * vencida: volta ao login com aviso e, depois de entrar, à mesma busca.
+ */
+export function useStaffSearch(filters: SearchFilters) {
+  const path = searchApiPath(filters);
+  const query = useQuery<StaffSearchResponse>({
+    queryKey: ["staff", "search", path],
+    queryFn: () => getJson(path, staffSearchResponseSchema),
+    placeholderData: keepPreviousData,
+    retry: staffRetry,
+    staleTime: 60_000,
   });
   useExpireOn401(query.error);
   return query;

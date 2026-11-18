@@ -173,6 +173,15 @@ Com o Databricks, as credenciais saem do `portal/.env` na hora de ligar o contai
 
 Ao abrir outro pedido, a conversa continua, com um aviso "Alternado para o pedido #N" separando os assuntos. O botão "Nova conversa" limpa tudo e começa do zero. O nome do assistente é **LogBot**.
 
+### Área do colaborador: como buscar um pedido
+
+Na Área do colaborador, o item **"Pedidos"** do menu abre a busca. Também dá para começar pelo campo "Buscar pedido…" no topo da Torre ou clicando num indicador da Torre (por exemplo, "Extravios" abre a lista só com os extraviados).
+
+- Digite o **número** (ou só o começo: `769` acha 76902, 7690…) ou uma **cidade, estado ou país** (`São Paulo`, `mexico`; acentos não importam).
+- Use os **filtros** para afinar: situação, modalidade, mercado, etapa atual, motivo, atraso mínimo da entrega e "só encaminhados à central". Cada filtro ativo aparece como um chip que pode ser removido; "Limpar tudo" volta à lista completa.
+- Clique num pedido (ou use Tab e Enter) para abrir a **visão do colaborador**, com o diagnóstico. A faixa escura do pedido tem "Voltar à busca", e o botão "voltar" do navegador também traz a busca de volta com os mesmos filtros.
+- O endereço da página guarda a busca: dá para recarregar ou mandar o link para outra pessoa da equipe (que precisa estar logada).
+
 ### Área do colaborador: como entrar
 
 O link fica discreto, no canto do cabeçalho e no rodapé: **"Acesso colaborador"** (com um cadeado). Ele abre o formulário de login.
@@ -194,9 +203,10 @@ Com `DATA_SOURCE=file` (ou `databricks`) e `AUTH_DEMO=true`:
 2. Digitar **76902** na busca e clicar em **Rastrear**: pedido **em trânsito**, First Class, de San Jose (EUA) para Jacarta (Indonésia), parado na **Alfândega Jacarta**, com **5 dias de atraso**. "O envio saiu com 1 dia de atraso." Motivo provável em linguagem do cliente. Aviso da central.
 3. Clicar em **"Perguntar ao assistente"**: o LogBot (a mesma conversa do Início) explica o motivo provável e avisa que o caso é acompanhado pela central. Mostrar a sugestão "Quero falar com a central".
 4. Clicar em **"Acesso colaborador"** → **"Entrar como demonstração"** → **Torre de controle**: 42,7% dos despachos no prazo, 74,7% das entregas, 197 em trânsito, 8.337 na central, 7.222 extravios. Filtrar a tabela por **Alfândega**.
-5. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho de 2 dias contra 1 prometido; com a "Promessa ajustada" de 2 dias estaria no prazo), as causas nos termos da base e de onde vem cada dado (real ou simulado). Comparar com "Ver como o cliente vê".
-6. **Sair**.
-7. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
+5. Em **"Pedidos"**, mostrar a busca: digitar `769` (vários pedidos) e depois `76902` (uma linha); clicar em "Extravios" na Torre para ver a lista já filtrada (7.222).
+6. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho de 2 dias contra 1 prometido; com a "Promessa ajustada" de 2 dias estaria no prazo), as causas nos termos da base e de onde vem cada dado (real ou simulado). Comparar com "Ver como o cliente vê".
+7. **Sair**.
+8. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
 
 Pedidos de exemplo para mostrar cada situação:
 

@@ -18,6 +18,7 @@ import { useChatConversation } from "@/features/chat/use-chat-conversation.ts";
 import { HomePage } from "@/features/home/home-page.tsx";
 import { StaffLoginPage } from "@/features/staff/staff-login-page.tsx";
 import { StaffOrderPage } from "@/features/staff/staff-order-page.tsx";
+import { StaffSearchPage } from "@/features/staff/staff-search-page.tsx";
 import { TowerPage } from "@/features/staff/tower-page.tsx";
 import { TrackingPage } from "@/features/tracking/tracking-page.tsx";
 import {
@@ -160,6 +161,9 @@ export function App() {
       case "staffTower":
         page = <TowerPage />;
         break;
+      case "staffSearch":
+        page = <StaffSearchPage search={route.search} />;
+        break;
       case "staffOrder":
         page = <StaffOrderPage orderParam={route.orderParam} />;
         break;
@@ -176,7 +180,13 @@ export function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           kind="staff"
-          towerPage={route.name === "staffTower"}
+          staffPage={
+            route.name === "staffTower"
+              ? "tower"
+              : route.name === "staffSearch"
+                ? "search"
+                : "order"
+          }
           email={staffEmail ?? "Colaborador"}
           onLogout={handleLogout}
           loggingOut={logout.isPending}

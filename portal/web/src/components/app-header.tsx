@@ -1,6 +1,16 @@
-import { ArrowLeft, Lock, LogOut, Moon, RadioTower, Search, Sun, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  ListFilter,
+  Lock,
+  LogOut,
+  Moon,
+  RadioTower,
+  Search,
+  Sun,
+  UserRound,
+} from "lucide-react";
 import type { ReactNode } from "react";
-import { STAFF_HOME_PATH } from "@/lib/router.ts";
+import { STAFF_HOME_PATH, STAFF_SEARCH_PATH } from "@/lib/router.ts";
 import type { Theme } from "@/lib/theme.ts";
 import { Link } from "@/lib/use-location.tsx";
 import { BrandMark } from "./brand-mark.tsx";
@@ -23,7 +33,8 @@ type AppHeaderProps = ThemeProps &
     | {
         kind: "staff";
         /** Página atual é a Torre (as outras páginas da área também marcam o item). */
-        towerPage: boolean;
+        /** Página atual da área: marca "Torre de controle" ou "Pedidos" (o pedido conta como Pedidos). */
+        staffPage: "tower" | "search" | "order";
         email: string;
         onLogout: () => void;
         loggingOut: boolean;
@@ -32,7 +43,7 @@ type AppHeaderProps = ThemeProps &
 
 /**
  * Cabeçalho. Público: marca (Início), "Rastreamento", "Atendimento 24h" e o link discreto
- * "Acesso colaborador". Área do colaborador: marca + "Área do colaborador", "Torre de controle",
+ * "Acesso colaborador". Área do colaborador: marca + "Área do colaborador", "Torre de controle", "Pedidos",
  * e-mail, "Sair" e "Voltar ao site".
  */
 export function AppHeader(props: AppHeaderProps) {
@@ -65,14 +76,24 @@ export function AppHeader(props: AppHeaderProps) {
 
         <nav aria-label={staff ? "Área do colaborador" : "Seções do site"} className="flex h-16">
           {staff ? (
-            <NavItem
-              href={STAFF_HOME_PATH}
-              active
-              current={props.towerPage}
-              icon={<RadioTower aria-hidden="true" className="w-[15px] h-[15px]" />}
-            >
-              Torre de controle
-            </NavItem>
+            <>
+              <NavItem
+                href={STAFF_HOME_PATH}
+                active={props.staffPage === "tower"}
+                current={props.staffPage === "tower"}
+                icon={<RadioTower aria-hidden="true" className="w-[15px] h-[15px]" />}
+              >
+                Torre de controle
+              </NavItem>
+              <NavItem
+                href={STAFF_SEARCH_PATH}
+                active={props.staffPage !== "tower"}
+                current={props.staffPage === "search"}
+                icon={<ListFilter aria-hidden="true" className="w-[15px] h-[15px]" />}
+              >
+                Pedidos
+              </NavItem>
+            </>
           ) : (
             <NavItem
               href="/rastreio"

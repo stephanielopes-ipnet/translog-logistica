@@ -12,6 +12,8 @@ export type Route =
    */
   | { name: "staffLogin"; returnTo: string | null; expired: boolean }
   | { name: "staffTower" }
+  /** Busca de pedidos; `search` é a query string com os filtros (lida em `search-filters.ts`). */
+  | { name: "staffSearch"; search: string }
   | { name: "staffOrder"; orderParam: string }
   | { name: "notFound" };
 
@@ -20,6 +22,7 @@ export type HeaderKind = "public" | "staff";
 
 export const STAFF_LOGIN_PATH = "/colaborador/entrar";
 export const STAFF_HOME_PATH = "/colaborador";
+export const STAFF_SEARCH_PATH = "/colaborador/pedidos";
 
 /** Interpreta o endereço atual. `/?pedido=N` (endereço antigo) abre o rastreio. */
 export function matchRoute(pathname: string, search: string): Route {
@@ -43,6 +46,10 @@ export function matchRoute(pathname: string, search: string): Route {
   if (path === STAFF_HOME_PATH) {
     return { name: "staffTower" };
   }
+  // Antes de `/colaborador/pedidos/:id`: sem número, é a lista de busca.
+  if (path === STAFF_SEARCH_PATH) {
+    return { name: "staffSearch", search: params.toString() ? `?${params.toString()}` : "" };
+  }
   const staffOrder = /^\/colaborador\/pedidos\/([^/]+)$/.exec(path);
   if (staffOrder?.[1]) {
     return { name: "staffOrder", orderParam: safeDecode(staffOrder[1]) };
@@ -56,6 +63,11 @@ export function trackingHref(orderParam?: string | number | null): string {
     return "/rastreio";
   }
   return `/rastreio?${new URLSearchParams({ pedido: String(orderParam) }).toString()}`;
+}
+
+/** Endereço da busca de pedidos com os filtros (`search` = "" ou "?…", de `writeFilters`). */
+export function staffSearchHref(search = ""): string {
+  return `${STAFF_SEARCH_PATH}${search}`;
 }
 
 /** Endereço da visão do colaborador de um pedido. */
@@ -103,7 +115,7 @@ export function safeReturnPath(value: string | null | undefined): string | null 
 }
 
 export function isStaffRoute(route: Route): boolean {
-  return route.name === "staffTower" || route.name === "staffOrder";
+  return route.name === "staffTower" || route.name === "staffSearch" || route.name === "staffOrder";
 }
 
 /**
@@ -157,6 +169,8 @@ export function pageTitle(route: Route): string {
       return "Entrar · Área do colaborador · TransLog";
     case "staffTower":
       return "Torre de controle · TransLog";
+    case "staffSearch":
+      return "Pedidos · Área do colaborador · TransLog";
     case "staffOrder":
       return `Pedido #${route.orderParam} · Visão do colaborador · TransLog`;
     case "notFound":

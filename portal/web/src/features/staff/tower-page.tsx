@@ -1,10 +1,19 @@
 import type { StageCount, TowerResponse } from "@translog/contracts";
-import { ArrowUpRight, ChartNoAxesColumn, FlaskConical, Loader2, RotateCcw } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  ChartNoAxesColumn,
+  FlaskConical,
+  Loader2,
+  RotateCcw,
+  Search,
+} from "lucide-react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { useTower } from "@/api/session.ts";
 import { formatDate } from "@/lib/format.ts";
-import { staffOrderHref } from "@/lib/router.ts";
+import { staffOrderHref, staffSearchHref } from "@/lib/router.ts";
 import { Link, navigate } from "@/lib/use-location.tsx";
+import { DEFAULT_FILTERS, type SearchFilters, writeFilters } from "./search-filters.ts";
 import {
   filterByStage,
   formatInt,
@@ -66,7 +75,10 @@ function TowerContent({ data }: { data: TowerResponse }) {
             {formatInt(data.totalOrders)} pedidos
           </p>
         </div>
-        <DashboardLink url={data.dashboardUrl} />
+        <div className="ml-auto flex items-center gap-3">
+          <TowerQuickSearch />
+          <DashboardLink url={data.dashboardUrl} />
+        </div>
       </header>
 
       <section aria-label="Indicadores" className="grid grid-cols-5 gap-3">
@@ -87,18 +99,21 @@ function TowerContent({ data }: { data: TowerResponse }) {
           label="Em trânsito agora"
           value={formatInt(indicators.inTransit.total)}
           detail={`${formatInt(indicators.inTransit.late)} atrasados · ${formatInt(indicators.inTransit.lateForSupport)} com 3+ dias`}
+          href={searchHref({ status: ["Em trânsito"], sort: "delay" })}
         />
         <Indicator
           tone="accent"
           label="Encaminhados à central"
           value={formatInt(indicators.escalatedToSupport)}
           detail="atraso de 3+ dias ou extravio"
+          href={searchHref({ escalated: true })}
         />
         <Indicator
           tone="danger"
           label="Extravios"
           value={formatInt(indicators.lost)}
           detail="rastreio simulado"
+          href={searchHref({ status: ["Extraviado"] })}
         />
       </section>
 
@@ -112,6 +127,9 @@ function TowerContent({ data }: { data: TowerResponse }) {
           subtitle="Onde estão os pedidos que ainda não chegaram."
           counts={data.inTransitByStage}
           barClass="bg-primary"
+          hrefFor={(stage) =>
+            searchHref({ status: ["Em trânsito"], stage: [stage], sort: "delay" })
+          }
         />
         <StageBars
           title="Extravios por etapa"
@@ -119,6 +137,7 @@ function TowerContent({ data }: { data: TowerResponse }) {
           counts={data.lostByStage}
           barClass="bg-red-500"
           simulated
+          hrefFor={(stage) => searchHref({ status: ["Extraviado"], stage: [stage] })}
         />
         <Block
           title="Rotas com mais atraso"
@@ -155,7 +174,7 @@ function DashboardLink({ url }: { url: string | null }) {
       <span
         aria-disabled="true"
         title="O link do painel ainda não foi definido"
-        className="ml-auto h-9 px-3.5 rounded-md border border-dashed border-slate-300 text-sm text-slate-400 inline-flex items-center gap-2 cursor-not-allowed"
+        className="h-9 px-3.5 rounded-md border border-dashed border-slate-300 text-sm text-slate-400 inline-flex items-center gap-2 cursor-not-allowed"
       >
         <ChartNoAxesColumn aria-hidden="true" className="w-4 h-4" />
         Painel completo de performance · link a definir
@@ -167,7 +186,7 @@ function DashboardLink({ url }: { url: string | null }) {
       href={url}
       target="_blank"
       rel="noreferrer"
-      className="ml-auto h-9 px-3.5 rounded-md border border-slate-300 bg-surface text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary inline-flex items-center gap-2 transition"
+      className="h-9 px-3.5 rounded-md border border-slate-300 bg-surface text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary inline-flex items-center gap-2 transition"
     >
       <ChartNoAxesColumn aria-hidden="true" className="w-4 h-4" />
       Painel completo de performance
@@ -187,22 +206,87 @@ function Indicator({
   label,
   value,
   detail,
+  href,
 }: {
   tone: keyof typeof TONE_TOP;
   label: string;
   value: string;
   detail: string;
+  /** Busca já filtrada com estes pedidos (o cartão vira link). */
+  href?: string;
 }) {
-  return (
-    <div
-      className={`bg-surface border border-slate-300/90 border-t-[3px] ${TONE_TOP[tone]} rounded-lg shadow-sm px-4 py-3`}
-    >
+  const className = `block bg-surface border border-slate-300/90 border-t-[3px] ${TONE_TOP[tone]} rounded-lg shadow-sm px-4 py-3`;
+  const content = (
+    <>
       <p className="label-mono">{label}</p>
       <p className="mt-1 text-[28px] leading-none font-bold tracking-tight text-slate-900 tabular">
         {value}
       </p>
       <p className="mt-1.5 text-xs text-slate-500">{detail}</p>
-    </div>
+      {href && (
+        <p className="mt-1.5 text-xs font-medium text-primary inline-flex items-center gap-1">
+          Ver pedidos
+          <ArrowRight
+            aria-hidden="true"
+            className="w-3 h-3 group-hover:translate-x-0.5 transition"
+          />
+        </p>
+      )}
+    </>
+  );
+  return href ? (
+    <Link
+      href={href}
+      className={`${className} group hover:border-primary-200 hover:shadow-md transition`}
+    >
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
+  );
+}
+
+/** Busca de pedidos com estes filtros (o resto no padrão). */
+function searchHref(patch: Partial<SearchFilters>): string {
+  return staffSearchHref(writeFilters({ ...DEFAULT_FILTERS, ...patch }));
+}
+
+/** Campo rápido da Torre: envia para a busca de pedidos (`/colaborador/pedidos?q=…`). */
+function TowerQuickSearch() {
+  const [text, setText] = useState("");
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    navigate(searchHref({ q: text.trim() }));
+  }
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center">
+      <label htmlFor="towerQuickSearch" className="sr-only">
+        Buscar pedido, cidade ou país
+      </label>
+      <div className="relative">
+        <Search
+          aria-hidden="true"
+          className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+        />
+        <input
+          id="towerQuickSearch"
+          type="search"
+          autoComplete="off"
+          maxLength={60}
+          placeholder="Buscar pedido…"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          className="w-56 h-9 rounded-l-md border border-slate-300 bg-slate-50/60 pl-9 pr-2 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+        />
+      </div>
+      <button
+        type="submit"
+        aria-label="Buscar"
+        className="h-9 w-9 rounded-r-md bg-primary text-white grid place-items-center hover:bg-primary-700"
+      >
+        <ArrowRight aria-hidden="true" className="w-4 h-4" />
+      </button>
+    </form>
   );
 }
 
@@ -331,15 +415,24 @@ function AttentionTable({ data }: { data: TowerResponse }) {
           )}
         </tbody>
       </table>
-      {rows.length > ATTENTION_ROWS && (
-        <button
-          type="button"
-          onClick={() => setShowAll((value) => !value)}
-          className="mt-3 text-sm font-medium text-primary hover:underline underline-offset-4 rounded"
+      <div className="mt-3 flex items-center gap-5">
+        {rows.length > ATTENTION_ROWS && (
+          <button
+            type="button"
+            onClick={() => setShowAll((value) => !value)}
+            className="text-sm font-medium text-primary hover:underline underline-offset-4 rounded"
+          >
+            {showAll ? "Mostrar menos" : `Mostrar todos (${formatInt(rows.length)})`}
+          </button>
+        )}
+        <Link
+          href={staffSearchHref()}
+          className="ml-auto text-sm font-medium text-primary hover:underline underline-offset-4 rounded inline-flex items-center gap-1"
         >
-          {showAll ? "Mostrar menos" : `Mostrar todos (${formatInt(rows.length)})`}
-        </button>
-      )}
+          Ver todos os pedidos
+          <ArrowRight aria-hidden="true" className="w-3.5 h-3.5" />
+        </Link>
+      </div>
     </Block>
   );
 }
@@ -434,12 +527,15 @@ function StageBars({
   counts,
   barClass,
   simulated = false,
+  hrefFor,
 }: {
   title: string;
   subtitle: string;
   counts: readonly StageCount[];
   barClass: string;
   simulated?: boolean;
+  /** Busca já filtrada pela etapa (o nome da etapa vira link). */
+  hrefFor?: (stage: number) => string;
 }) {
   const max = Math.max(1, ...counts.map((item) => item.count));
   return (
@@ -450,7 +546,16 @@ function StageBars({
             key={item.stage}
             className="grid grid-cols-[92px_minmax(0,1fr)_56px] items-center gap-3"
           >
-            <span className="text-sm text-slate-700">{item.label}</span>
+            {hrefFor ? (
+              <Link
+                href={hrefFor(item.stage)}
+                className="text-sm text-primary hover:underline underline-offset-4 rounded"
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <span className="text-sm text-slate-700">{item.label}</span>
+            )}
             <span className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
               <span
                 className={`block h-full rounded-full ${barClass}`}

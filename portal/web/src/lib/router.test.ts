@@ -8,6 +8,7 @@ import {
   staffAccessHref,
   staffLoginHref,
   staffOrderHref,
+  staffSearchHref,
   trackingHref,
 } from "./router.ts";
 
@@ -39,7 +40,7 @@ describe("matchRoute", () => {
     expect(matchRoute("/rastreio/", "")).toEqual({ name: "tracking", orderParam: null });
     expect(matchRoute("/colaborador/", "")).toEqual({ name: "staffTower" });
     expect(matchRoute("/qualquer", "")).toEqual({ name: "notFound" });
-    expect(matchRoute("/colaborador/pedidos/", "")).toEqual({ name: "notFound" });
+    expect(matchRoute("/colaborador/pedidos/", "")).toEqual({ name: "staffSearch", search: "" });
     expect(matchRoute("/colaborador/pedidos/1/2", "")).toEqual({ name: "notFound" });
   });
 
@@ -160,5 +161,35 @@ describe("pageTitle", () => {
     expect(pageTitle({ name: "tracking", orderParam: "76902" })).toBe("Pedido #76902 · TransLog");
     expect(pageTitle({ name: "tracking", orderParam: null })).toBe("Rastreamento · TransLog");
     expect(pageTitle({ name: "staffTower" })).toBe("Torre de controle · TransLog");
+  });
+});
+
+describe("busca de pedidos do colaborador", () => {
+  it("abre a lista em /colaborador/pedidos, sem conflito com /colaborador/pedidos/:id", () => {
+    expect(matchRoute("/colaborador/pedidos", "")).toEqual({ name: "staffSearch", search: "" });
+    expect(matchRoute("/colaborador/pedidos", "?q=769&page=2")).toEqual({
+      name: "staffSearch",
+      search: "?q=769&page=2",
+    });
+    expect(matchRoute("/colaborador/pedidos/76902", "?q=769")).toEqual({
+      name: "staffOrder",
+      orderParam: "76902",
+    });
+    expect(staffSearchHref()).toBe("/colaborador/pedidos");
+    expect(staffSearchHref("?q=769")).toBe("/colaborador/pedidos?q=769");
+  });
+
+  it("é protegida: sem sessão vai ao login e volta à busca com os mesmos filtros", () => {
+    const route = { name: "staffSearch", search: "?status=Extraviado" } as const;
+    expect(headerKind(route)).toBe("staff");
+    expect(pageTitle(route)).toBe("Pedidos · Área do colaborador · TransLog");
+    const redirect = guardRedirect(route, "/colaborador/pedidos?status=Extraviado", "anonymous");
+    expect(redirect).toBe(
+      "/colaborador/entrar?voltar=%2Fcolaborador%2Fpedidos%3Fstatus%3DExtraviado",
+    );
+    expect(matchRoute("/colaborador/entrar", new URL(`http://x${redirect}`).search)).toMatchObject({
+      returnTo: "/colaborador/pedidos?status=Extraviado",
+    });
+    expect(guardRedirect(route, "/colaborador/pedidos", "authenticated")).toBeNull();
   });
 });
