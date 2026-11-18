@@ -121,7 +121,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
         <div className="mt-7">
           <div className="flex items-baseline justify-between gap-4">
             <h3 className="text-sm font-semibold">Para onde vão os pedidos</h3>
-            <span className="font-mono text-[11px] text-primary-200">por mercado de destino</span>
+            <span className="font-mono text-[11px] text-white/65">por mercado de destino</span>
           </div>
           <div
             role="img"
@@ -160,7 +160,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
                   />
                   {MARKET_LABEL[share.market]}
                 </span>
-                <span className="mt-0.5 block font-mono text-primary-200">
+                <span className="mt-0.5 block font-mono text-white/65">
                   {share.pct.toLocaleString("pt-BR")}% · {formatOrderCount(share.orders)}
                 </span>
               </li>
@@ -197,7 +197,7 @@ function BigNumber({
             {value}
           </span>
         </span>
-        <span aria-hidden="true" className="mt-2 block text-[13px] leading-snug text-primary-100">
+        <span aria-hidden="true" className="mt-2 block text-[13px] leading-snug text-white/85">
           {label}
         </span>
       </dd>
@@ -248,7 +248,7 @@ export function JourneySection() {
         title="Cada etapa da viagem, do pedido à sua porta"
       />
 
-      <div className="mt-5 rounded-xl border border-slate-200 bg-white px-8 pt-8 pb-6 shadow-sm">
+      <div className="mt-5 rounded-xl border border-slate-200 bg-surface px-8 pt-8 pb-6 shadow-sm">
         <div className="relative">
           {/* Trilha do centro do primeiro nó ao centro do último: base, progresso e pacote */}
           <div className="absolute left-7 right-7 min-[1180px]:left-12 min-[1180px]:right-12 top-[19px] h-1">
@@ -262,7 +262,7 @@ export function JourneySection() {
               className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 motion-safe:transition-[left] motion-safe:duration-[1100ms] ease-in-out z-10"
               style={{ left: `${offset}%` }}
             >
-              <span className="relative grid place-items-center w-[50px] h-[50px] rounded-full bg-accent text-slate-900 shadow-lg ring-4 ring-white">
+              <span className="relative grid place-items-center w-[50px] h-[50px] rounded-full bg-accent text-slate-900 shadow-lg ring-4 ring-surface">
                 <span className="absolute inset-0 rounded-full bg-accent/40 motion-safe:animate-ping" />
                 <CurrentIcon className="relative w-5 h-5" />
               </span>
@@ -283,7 +283,7 @@ export function JourneySection() {
                     className={`w-10 h-10 rounded-full grid place-items-center border-2 motion-safe:transition-colors motion-safe:duration-500 ${
                       done
                         ? "bg-primary border-primary text-white"
-                        : "bg-white border-slate-200 text-slate-400"
+                        : "bg-surface border-slate-200 text-slate-400"
                     }`}
                   >
                     <Icon aria-hidden="true" className="w-4 h-4" />
@@ -317,7 +317,7 @@ export function JourneySection() {
         {STEPS.map((item, index) => (
           <li
             key={item.title}
-            className="reveal rounded-lg border border-slate-200 bg-white p-5 shadow-sm flex gap-4 hover:-translate-y-0.5 hover:shadow-md motion-safe:transition"
+            className="reveal rounded-lg border border-slate-200 bg-surface p-5 shadow-sm flex gap-4 hover:-translate-y-0.5 hover:shadow-md motion-safe:transition"
             data-inview={inView}
             style={delay(200 + index * 140)}
           >
@@ -371,7 +371,7 @@ export function ModesSection() {
         {MODES.map((item, index) => (
           <li
             key={item.mode}
-            className="reveal group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:-translate-y-1 hover:shadow-md motion-safe:transition"
+            className="reveal group relative overflow-hidden rounded-xl border border-slate-200 bg-surface p-5 shadow-sm hover:-translate-y-1 hover:shadow-md motion-safe:transition"
             data-inview={inView}
             style={delay(index * 120)}
           >
@@ -453,7 +453,7 @@ export function SupportSection({ onOpenLogBot }: { onOpenLogBot: () => void }) {
       aria-labelledby="central"
     >
       <div
-        className="reveal rounded-xl border border-slate-200 border-l-4 border-l-accent bg-white px-6 py-6 shadow-sm flex flex-col"
+        className="reveal rounded-xl border border-slate-200 border-l-4 border-l-accent bg-surface px-6 py-6 shadow-sm flex flex-col"
         data-inview={inView}
       >
         <span className="w-11 h-11 rounded-md bg-primary-50 text-primary grid place-items-center">
@@ -477,7 +477,7 @@ export function SupportSection({ onOpenLogBot }: { onOpenLogBot: () => void }) {
         <button
           type="button"
           onClick={onOpenLogBot}
-          className="mt-5 self-start h-10 px-4 rounded-md bg-slate-900 text-sm font-semibold text-white shadow-sm hover:bg-primary inline-flex items-center gap-2 transition"
+          className="mt-5 self-start h-10 px-4 rounded-md bg-ink text-sm font-semibold text-ink-fg shadow-sm hover:bg-primary hover:text-white inline-flex items-center gap-2 transition"
         >
           <MessageSquareText aria-hidden="true" className="w-4 h-4" />
           Perguntar ao {ASSISTANT_NAME}
@@ -485,14 +485,14 @@ export function SupportSection({ onOpenLogBot }: { onOpenLogBot: () => void }) {
       </div>
 
       <figure
-        className="reveal rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col"
+        className="reveal rounded-xl border border-slate-200 bg-surface shadow-sm overflow-hidden flex flex-col"
         data-inview={inView}
         style={delay(150)}
       >
         <figcaption className="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center gap-2.5">
           <span className="relative w-8 h-8 rounded-md bg-primary text-white grid place-items-center">
             <MessageSquareText aria-hidden="true" className="w-4 h-4" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white bg-accent" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface bg-accent" />
           </span>
           <span className="text-sm font-semibold text-slate-900">{ASSISTANT_NAME}</span>
           <span className="ml-auto label-mono">Exemplo de conversa</span>
@@ -501,7 +501,7 @@ export function SupportSection({ onOpenLogBot }: { onOpenLogBot: () => void }) {
           Exemplo: o cliente pergunta "{PREVIEW_QUESTION}" e o {ASSISTANT_NAME} responde:{" "}
           {PREVIEW_ANSWER}
         </p>
-        <div aria-hidden="true" className="flex-1 min-h-[200px] px-4 py-4 space-y-3 bg-white">
+        <div aria-hidden="true" className="flex-1 min-h-[200px] px-4 py-4 space-y-3 bg-surface">
           {phase >= 1 && (
             <div className="flex justify-end fade-in">
               <span className="max-w-[80%] rounded-lg rounded-br-sm bg-primary px-3 py-2 text-sm text-white">

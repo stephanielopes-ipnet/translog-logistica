@@ -19,6 +19,8 @@ O site da TransLog, com três partes:
 
 No Início e no Rastreamento, o **LogBot** (o assistente) fica num painel à direita, que pode ser minimizado e reaberto. A conversa é a mesma nas duas páginas.
 
+O botão com o sol ou a lua, no canto do cabeçalho, alterna entre o **tema claro e o escuro**. A escolha fica salva no navegador; sem escolha, o site segue o tema do computador.
+
 A TransLog é uma operadora logística fictícia que despacha pedidos dos EUA e de Porto Rico para cinco mercados, em quatro modalidades (Standard Class, Second Class, First Class e Same Day). A dor central do projeto é a **promessa irreal**: o prazo de despacho das modalidades rápidas quase nunca é cumprido.
 
 ## De onde vêm os dados

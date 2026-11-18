@@ -31,6 +31,7 @@ import {
   staffAccessHref,
   trackingHref,
 } from "@/lib/router.ts";
+import { createBrowserThemeStore, nextTheme } from "@/lib/theme.ts";
 import { parseOrderId } from "@/lib/url-state.ts";
 import { navigate, useLocationHref } from "@/lib/use-location.tsx";
 
@@ -91,6 +92,11 @@ export function App() {
     onMentionedOrder: handleMentionedOrder,
   });
 
+  // Tema claro/escuro (classe `dark` no <html>; escolha salva no navegador).
+  const [themeStore] = useState(createBrowserThemeStore);
+  const theme = useSyncExternalStore(themeStore.subscribe, themeStore.get, () => "light" as const);
+  const toggleTheme = useCallback(() => themeStore.set(nextTheme(themeStore.get())), [themeStore]);
+
   // Painel do LogBot (aberto ou minimizado), o mesmo no Início e no Rastreamento.
   const [panel] = useState(() => createLogBotPanelStore(browserStorage()));
   const panelOpen = useSyncExternalStore(panel.subscribe, panel.isOpen, () => true);
@@ -111,7 +117,7 @@ export function App() {
   /** Páginas do cliente: conteúdo à esquerda e o painel do LogBot à direita. */
   const customerLayout = (content: ReactNode, background = "") => (
     <div className={background}>
-      <div className="mx-auto max-w-[1440px] pl-6 flex gap-6">
+      <div className="mx-auto max-w-[1440px] px-6 flex">
         <div className="flex-1 min-w-0">{content}</div>
         <LogBotDock open={panelOpen} onOpen={() => panel.setOpen(true)}>
           <ChatPanel
@@ -164,9 +170,11 @@ export function App() {
   }
 
   return (
-    <div className="min-h-full flex flex-col overflow-x-clip bg-slate-100/80 text-slate-900 antialiased">
+    <div className="min-h-full flex flex-col overflow-x-clip bg-page text-slate-900 antialiased">
       {kind === "staff" ? (
         <AppHeader
+          theme={theme}
+          onToggleTheme={toggleTheme}
           kind="staff"
           towerPage={route.name === "staffTower"}
           email={staffEmail ?? "Colaborador"}
@@ -175,6 +183,8 @@ export function App() {
         />
       ) : (
         <AppHeader
+          theme={theme}
+          onToggleTheme={toggleTheme}
           kind="public"
           trackingActive={route.name === "tracking"}
           staffAccessHref={accessHref}

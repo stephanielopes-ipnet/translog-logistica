@@ -57,7 +57,7 @@ export function ChatInput({ id, disabled, hasOrder, onSend }: ChatInputProps) {
     <div className="shrink-0 border-t border-slate-200 bg-slate-50/40 p-3">
       <form
         onSubmit={handleSubmit}
-        className="flex items-end gap-2 rounded-md border border-slate-300 bg-white p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition"
+        className="flex items-end gap-2 rounded-md border border-slate-300 bg-surface p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition"
       >
         <textarea
           id={id}

@@ -1,25 +1,34 @@
-import { ArrowLeft, Lock, LogOut, RadioTower, Search, UserRound } from "lucide-react";
+import { ArrowLeft, Lock, LogOut, Moon, RadioTower, Search, Sun, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { STAFF_HOME_PATH } from "@/lib/router.ts";
+import type { Theme } from "@/lib/theme.ts";
 import { Link } from "@/lib/use-location.tsx";
 import { BrandMark } from "./brand-mark.tsx";
 
-type AppHeaderProps =
-  | {
-      kind: "public";
-      /** Página atual é o rastreio (marca a navegação). */
-      trackingActive: boolean;
-      /** Destino de "Acesso colaborador" (login, ou a Torre com sessão). */
-      staffAccessHref: string;
-    }
-  | {
-      kind: "staff";
-      /** Página atual é a Torre (as outras páginas da área também marcam o item). */
-      towerPage: boolean;
-      email: string;
-      onLogout: () => void;
-      loggingOut: boolean;
-    };
+/** Tema atual e troca (botão no canto direito, nos dois cabeçalhos). */
+interface ThemeProps {
+  theme: Theme;
+  onToggleTheme: () => void;
+}
+
+type AppHeaderProps = ThemeProps &
+  (
+    | {
+        kind: "public";
+        /** Página atual é o rastreio (marca a navegação). */
+        trackingActive: boolean;
+        /** Destino de "Acesso colaborador" (login, ou a Torre com sessão). */
+        staffAccessHref: string;
+      }
+    | {
+        kind: "staff";
+        /** Página atual é a Torre (as outras páginas da área também marcam o item). */
+        towerPage: boolean;
+        email: string;
+        onLogout: () => void;
+        loggingOut: boolean;
+      }
+  );
 
 /**
  * Cabeçalho. Público: marca (Início), "Rastreamento", "Atendimento 24h" e o link discreto
@@ -30,7 +39,7 @@ export function AppHeader(props: AppHeaderProps) {
   const staff = props.kind === "staff";
 
   return (
-    <header className="shrink-0 sticky top-0 bg-white border-b border-slate-200 z-30">
+    <header className="shrink-0 sticky top-0 bg-surface border-b border-slate-200 z-30">
       <div className="mx-auto max-w-[1440px] px-6 h-16 flex items-center gap-8">
         <Link
           href={staff ? STAFF_HOME_PATH : "/"}
@@ -44,7 +53,7 @@ export function AppHeader(props: AppHeaderProps) {
             <div className="flex items-center gap-2">
               <span className="text-[17px] font-bold tracking-tight text-slate-900">TransLog</span>
               <span className="inline-block h-3.5 w-px bg-slate-300" />
-              <span className="label-mono !text-primary font-semibold">
+              <span className="label-mono !text-[var(--text-link)] font-semibold">
                 International Logistics
               </span>
             </div>
@@ -88,7 +97,7 @@ export function AppHeader(props: AppHeaderProps) {
                 type="button"
                 onClick={props.onLogout}
                 disabled={props.loggingOut}
-                className="h-8 px-2.5 rounded border border-slate-300 bg-white font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 inline-flex items-center gap-1.5 transition"
+                className="h-8 px-2.5 rounded border border-slate-300 bg-surface font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 inline-flex items-center gap-1.5 transition"
               >
                 <LogOut aria-hidden="true" className="w-3.5 h-3.5" />
                 Sair
@@ -100,6 +109,7 @@ export function AppHeader(props: AppHeaderProps) {
                 <ArrowLeft aria-hidden="true" className="w-3.5 h-3.5" />
                 Voltar ao site
               </Link>
+              <ThemeToggle theme={props.theme} onToggle={props.onToggleTheme} />
             </>
           ) : (
             <>
@@ -111,6 +121,7 @@ export function AppHeader(props: AppHeaderProps) {
                 Atendimento 24h
               </span>
               <StaffAccessLink href={props.staffAccessHref} />
+              <ThemeToggle theme={props.theme} onToggle={props.onToggleTheme} />
             </>
           )}
         </div>
@@ -122,6 +133,27 @@ export function AppHeader(props: AppHeaderProps) {
         <div className="flex-1 bg-primary" />
       </div>
     </header>
+  );
+}
+
+/** Alterna entre o tema claro e o escuro. */
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  const dark = theme === "dark";
+  const label = dark ? "Ativar tema claro" : "Ativar tema escuro";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={label}
+      title={label}
+      className="w-8 h-8 rounded-md border border-slate-200 bg-surface text-slate-500 hover:text-slate-900 hover:bg-slate-50 grid place-items-center transition"
+    >
+      {dark ? (
+        <Sun aria-hidden="true" className="w-4 h-4" />
+      ) : (
+        <Moon aria-hidden="true" className="w-4 h-4" />
+      )}
+    </button>
   );
 }
 

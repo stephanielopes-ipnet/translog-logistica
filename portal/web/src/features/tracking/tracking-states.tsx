@@ -1,6 +1,6 @@
 import { PackageSearch, RefreshCw, RotateCcw, SearchX, WifiOff } from "lucide-react";
 
-const CARD_CLS = "bg-white border border-slate-300/90 rounded-lg shadow-sm";
+const CARD_CLS = "bg-surface border border-slate-300/90 rounded-lg shadow-sm";
 
 export function TrackingEmptyState() {
   return (
@@ -17,7 +17,7 @@ export function TrackingEmptyState() {
 
       <div className="mt-8 pt-6 border-t border-slate-200/80 grid grid-cols-3 gap-4 max-w-2xl mx-auto text-left">
         <div className="rounded-md border border-slate-200/80 bg-slate-50/70 px-3.5 py-2.5">
-          <p className="label-mono !text-primary">01 · Situação e prazo</p>
+          <p className="label-mono !text-[var(--text-link)]">01 · Situação e prazo</p>
           <p className="mt-1 text-xs text-slate-600 leading-relaxed">
             Previsão de entrega, dias de atraso ou adiantamento sem rodeios.
           </p>
@@ -107,7 +107,7 @@ export function TrackingNotFoundState({
         <button
           type="button"
           onClick={onClearSearch}
-          className="mt-5 h-9 px-4 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 transition"
+          className="mt-5 h-9 px-4 rounded-md border border-slate-300 bg-surface text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 transition"
         >
           <RotateCcw className="w-4 h-4" />
           Tentar outro número
@@ -133,7 +133,7 @@ export function TrackingErrorState({ onRetry }: { onRetry: () => void }) {
       <button
         type="button"
         onClick={onRetry}
-        className="mt-5 h-9 px-4 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 transition"
+        className="mt-5 h-9 px-4 rounded-md border border-slate-300 bg-surface text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 inline-flex items-center gap-2 transition"
       >
         <RefreshCw className="w-4 h-4" />
         Tentar novamente

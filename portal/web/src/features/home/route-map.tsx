@@ -99,8 +99,8 @@ export function RouteMap({ summary }: { summary: OrdersSummaryResponse | undefin
               cx={TARGET_X + 8}
               cy={y}
               r="8"
-              fill="#ffffff"
-              stroke="#0f4c81"
+              fill="var(--color-surface)"
+              stroke="var(--color-primary)"
               strokeWidth="2.4"
             />
             <text

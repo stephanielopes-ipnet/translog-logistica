@@ -20,7 +20,7 @@ export function OrderItemsTable({ items, total }: OrderItemsTableProps) {
   }
 
   return (
-    <section className="bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
+    <section className="bg-surface border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
       <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
         <div className="flex items-center gap-2">
           <Boxes className="w-4 h-4 text-slate-500" />

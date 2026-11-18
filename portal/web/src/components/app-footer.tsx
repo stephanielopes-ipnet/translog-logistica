@@ -6,7 +6,7 @@ import { StaffAccessLink } from "./app-header.tsx";
  */
 export function AppFooter({ staffAccessHref }: { staffAccessHref: string | null }) {
   return (
-    <footer className="shrink-0 border-t border-slate-200 bg-white text-[12px] text-slate-400">
+    <footer className="shrink-0 border-t border-slate-200 bg-surface text-[12px] text-slate-400">
       <div className="mx-auto max-w-[1440px] px-6 h-11 flex items-center gap-6">
         <p className="truncate">
           <span className="font-medium text-slate-500">TransLog International Logistics</span>
@@ -21,7 +21,7 @@ export function AppFooter({ staffAccessHref }: { staffAccessHref: string | null 
               alt="IPNET"
               width={37}
               height={20}
-              className="h-5 w-auto brightness-0 opacity-45"
+              className="h-5 w-auto brightness-0 opacity-45 dark:invert dark:opacity-60"
             />
           </p>
         </div>

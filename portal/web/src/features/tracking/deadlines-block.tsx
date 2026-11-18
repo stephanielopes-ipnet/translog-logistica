@@ -34,7 +34,7 @@ export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
           actualFallback={deliveryFallback(order)}
           delayDays={delivery.delayDays}
         />
-        <section className="rounded-md border border-slate-200 bg-white">
+        <section className="rounded-md border border-slate-200 bg-surface">
           <header className="px-3.5 py-2 border-b border-slate-100 flex items-baseline justify-between gap-2">
             <h3 className="label-mono !text-slate-700 font-semibold">Envio</h3>
             <span className="text-[11px] text-slate-500 truncate">{order.shippingMode}</span>
@@ -85,7 +85,7 @@ export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
               <button
                 type="button"
                 onClick={() => onAskAssistant(`Por que o pedido #${order.orderId} atrasou?`)}
-                className="h-9 px-3.5 rounded-md bg-slate-900 text-xs font-semibold text-white shadow-sm hover:bg-primary inline-flex items-center gap-2 transition"
+                className="h-9 px-3.5 rounded-md bg-ink text-xs font-semibold text-ink-fg shadow-sm hover:bg-primary hover:text-white inline-flex items-center gap-2 transition"
               >
                 <MessageSquareMore className="w-4 h-4" />
                 <span>Perguntar ao assistente</span>
@@ -127,7 +127,7 @@ function DeadlineColumn({
   delayDays: number | null;
 }) {
   return (
-    <section className="rounded-md border border-slate-200 bg-white">
+    <section className="rounded-md border border-slate-200 bg-surface">
       <header className="px-3.5 py-2 border-b border-slate-100 flex items-baseline justify-between gap-2">
         <h3 className="label-mono !text-slate-700 font-semibold">{title}</h3>
         <span className="text-[11px] text-slate-500 truncate">{subtitle}</span>

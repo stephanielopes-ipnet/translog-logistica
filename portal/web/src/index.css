@@ -2,13 +2,19 @@
 @import "tw-animate-css";
 @import "@fontsource-variable/inter";
 
-/* Tema escuro fora do escopo: fixa apenas tema claro */
-@custom-variant dark (&:is(.dark *));
+/* Tema escuro: classe `dark` no <html> (lib/theme.ts; script no index.html evita o "piscar"). */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
 
+/*
+ * Cores como variáveis (sem `inline`): os utilitários usam var(--color-…), e o tema escuro só
+ * redefine as variáveis em `.dark`, sem `dark:` em cada componente.
+ */
+@theme {
   --color-primary: #0f4c81;
   --color-primary-50: #eef4fa;
   --color-primary-100: #d7e5f2;
@@ -24,12 +30,104 @@
   --color-accent-700: #b45309;
   --color-accent-800: #92400e;
   --color-accent-900: #78350f;
+
+  /* Fundo da página e dos cartões */
+  --color-page: #f4f7fa;
+  --color-surface: #ffffff;
+  /* Botões escuros ("Perguntar ao assistente") e ícones concluídos da linha do tempo */
+  --color-ink: #0f172a;
+  --color-ink-fg: #ffffff;
+  /* Faixa "Visão do colaborador" (escura nos dois temas) */
+  --color-band: #0f172a;
+  --color-band-fg: #e2e8f0;
+  --color-band-muted: #cbd5e1;
+  --color-band-line: #334155;
+  --color-band-field: #1e293b;
 }
 
 :root {
   color-scheme: light;
   /* Altura do cabeçalho (64 px + fita de 3 px + borda): o rastreio ocupa o resto da tela. */
   --header-h: 68px;
+  --hero-bg: #f8fafc;
+  --hero-line: rgba(148, 163, 184, 0.16);
+  --hero-glow-a: rgba(15, 76, 129, 0.07);
+  --hero-glow-b: rgba(245, 158, 11, 0.08);
+  --text-link: var(--color-primary);
+}
+
+/*
+ * Tema escuro. A escala slate é invertida (fundos claros viram escuros, textos escuros viram
+ * claros) e as escalas de cor ganham tons escuros nos fundos (50–300) e claros nos textos (600+).
+ */
+.dark {
+  color-scheme: dark;
+  --hero-bg: #0a1322;
+  --hero-line: rgba(148, 163, 184, 0.07);
+  --hero-glow-a: rgba(59, 130, 196, 0.16);
+  --hero-glow-b: rgba(245, 158, 11, 0.07);
+  --text-link: #6eaee8;
+
+  --color-page: #0a1322;
+  --color-surface: #0f1a2b;
+  --color-ink: #e2e8f0;
+  --color-ink-fg: #0b1220;
+  --color-band: #16233a;
+  --color-band-line: #2b3c57;
+  --color-band-field: #0f1a2b;
+
+  --color-slate-50: #152136;
+  --color-slate-100: #1b293f;
+  --color-slate-200: #26364e;
+  --color-slate-300: #34465f;
+  --color-slate-400: #64768f;
+  --color-slate-500: #93a2b7;
+  --color-slate-600: #aebbcc;
+  --color-slate-700: #c7d1de;
+  --color-slate-800: #dde4ec;
+  --color-slate-900: #eef2f7;
+  --color-slate-950: #f8fafc;
+
+  --color-primary: #2c74b8;
+  --color-primary-50: #12233a;
+  --color-primary-100: #16304f;
+  --color-primary-200: #1f4670;
+  --color-primary-700: #3b86cf;
+
+  --color-accent-50: #2a1f0b;
+  --color-accent-100: #3a2a0d;
+  --color-accent-700: #fbbf24;
+
+  --color-red-50: #2a1416;
+  --color-red-100: #3a1719;
+  --color-red-200: #5b2024;
+  --color-red-300: #8b2a2f;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+
+  --color-amber-50: #2a1f0b;
+  --color-amber-300: #7a5512;
+  --color-amber-400: #b07a10;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+
+  --color-emerald-50: #0d2a20;
+  --color-emerald-200: #134e3a;
+  --color-emerald-300: #1f6b50;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+
+  --color-violet-50: #221a3d;
+  --color-violet-200: #3f3470;
+  --color-violet-700: #c4b5fd;
+}
+
+/* Azul de texto mais claro no escuro (o azul de fundo dos botões continua com contraste p/ branco). */
+.dark .text-primary,
+.dark .hover\:text-primary:hover {
+  color: var(--text-link);
 }
 
 html,
@@ -72,22 +170,22 @@ body {
   font-weight: 500;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-slate-500);
 }
 
 .perf-t {
-  border-top: 1.5px dashed #cbd5e1;
+  border-top: 1.5px dashed var(--color-slate-300);
 }
 
 .perf-b {
-  border-bottom: 1.5px dashed #cbd5e1;
+  border-bottom: 1.5px dashed var(--color-slate-300);
 }
 
 .route-line {
   background-image: repeating-linear-gradient(
     to right,
-    #94a3b8 0,
-    #94a3b8 6px,
+    var(--color-slate-400) 0,
+    var(--color-slate-400) 6px,
     transparent 6px,
     transparent 12px
   );
@@ -96,7 +194,7 @@ body {
 
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--color-slate-300) transparent;
 }
 
 .scroll-thin::-webkit-scrollbar {
@@ -105,7 +203,7 @@ body {
 }
 
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-slate-300);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: content-box;
@@ -120,7 +218,7 @@ body {
   width: 5px;
   height: 5px;
   border-radius: 9999px;
-  background: #0f4c81;
+  background: var(--color-primary);
   animation: typing 1.2s infinite ease-in-out;
 }
 
@@ -162,12 +260,12 @@ body {
 
 /* Início: grade sutil do herói (como no protótipo 01, em tom claro) */
 .hero-grid {
-  background-color: #f8fafc;
+  background-color: var(--hero-bg);
   background-image:
-    radial-gradient(ellipse 60% 70% at 15% 10%, rgba(15, 76, 129, 0.07), transparent 70%),
-    radial-gradient(ellipse 50% 60% at 85% 80%, rgba(245, 158, 11, 0.08), transparent 70%),
-    linear-gradient(to right, rgba(148, 163, 184, 0.16) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(148, 163, 184, 0.16) 1px, transparent 1px);
+    radial-gradient(ellipse 60% 70% at 15% 10%, var(--hero-glow-a), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 85% 80%, var(--hero-glow-b), transparent 70%),
+    linear-gradient(to right, var(--hero-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hero-line) 1px, transparent 1px);
   background-size:
     auto,
     auto,

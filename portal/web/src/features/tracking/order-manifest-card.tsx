@@ -54,7 +54,7 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
   const RouteIcon = order.transportMode === "Rodoviário" ? Truck : Plane;
 
   return (
-    <article className="bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
+    <article className="bg-surface border border-slate-300/90 rounded-lg shadow-sm overflow-hidden fade-in">
       <div className={`h-[3px] w-full ${accentClass(order)}`} />
       {/* Topo de Guia de Remessa */}
       <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between gap-4 flex-wrap">
@@ -127,7 +127,7 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
             <div className="min-w-0">
               <p className="label-mono flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full border-2 border-primary bg-white shrink-0" />
+                <span className="w-2 h-2 rounded-full border-2 border-primary bg-surface shrink-0" />
                 De · Origem
               </p>
               <p className="mt-0.5 text-base font-bold text-slate-900 leading-tight truncate">

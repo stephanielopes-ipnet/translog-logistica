@@ -79,7 +79,7 @@ export function OrderSearchForm({
   }
 
   return (
-    <div className="bg-white border border-slate-300/90 rounded-lg shadow-sm px-5 py-4">
+    <div className="bg-surface border border-slate-300/90 rounded-lg shadow-sm px-5 py-4">
       <form onSubmit={handleSubmit} className="flex items-end gap-3" noValidate>
         <div className="flex-1">
           <label htmlFor="orderInput" className="label-mono block mb-1.5">
@@ -100,7 +100,7 @@ export function OrderSearchForm({
               placeholder="Ex.: 76902"
               value={queryValue}
               onChange={(e) => handleInputChange(e.target.value)}
-              className="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 pl-10 pr-10 font-mono text-[15px] font-medium text-slate-900 tabular placeholder:font-sans placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 pl-10 pr-10 font-mono text-[15px] font-medium text-slate-900 tabular placeholder:font-sans placeholder:text-slate-400 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
             />
             {queryValue ? (
               <button
@@ -115,7 +115,7 @@ export function OrderSearchForm({
             ) : (
               <kbd
                 title="Pressione / para buscar"
-                className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded border border-slate-200 bg-white font-mono text-[10px] text-slate-400 pointer-events-none select-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded border border-slate-200 bg-surface font-mono text-[10px] text-slate-400 pointer-events-none select-none"
               >
                 /
               </kbd>
@@ -156,14 +156,14 @@ export function OrderSearchForm({
                 className={`h-7 px-2.5 rounded border font-mono text-xs tabular inline-flex items-center gap-1.5 transition ${
                   isActive
                     ? "border-primary bg-primary text-white font-semibold shadow-sm"
-                    : "border-slate-300 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary"
+                    : "border-slate-300 bg-surface text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary"
                 }`}
               >
                 <span>#{id}</span>
                 {hint && (
                   <span
                     className={`font-sans text-[11px] ${
-                      isActive ? "text-primary-100" : "text-slate-400"
+                      isActive ? "text-white/75" : "text-slate-400"
                     }`}
                   >
                     {hint}

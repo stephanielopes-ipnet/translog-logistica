@@ -62,7 +62,7 @@ function Notice({ children }: { children: ReactNode }) {
   return (
     <p
       role="status"
-      className="bg-white border border-slate-300/90 rounded-lg shadow-sm px-5 py-10 text-center text-sm text-slate-600"
+      className="bg-surface border border-slate-300/90 rounded-lg shadow-sm px-5 py-10 text-center text-sm text-slate-600"
     >
       {children}
     </p>
@@ -83,14 +83,14 @@ function StaffBand({ orderParam, orderId }: { orderParam: string; orderId: numbe
   }
 
   return (
-    <div className="rounded-lg bg-slate-900 text-slate-200 px-4 py-2.5 flex items-center gap-4 shadow-sm">
+    <div className="rounded-lg bg-band text-band-fg px-4 py-2.5 flex items-center gap-4 shadow-sm">
       <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent">
         <ShieldCheck aria-hidden="true" className="w-4 h-4" />
         Visão do colaborador
       </span>
       <Link
         href={STAFF_HOME_PATH}
-        className="inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-white rounded"
+        className="inline-flex items-center gap-1.5 text-sm text-band-muted hover:text-white rounded"
       >
         <ArrowLeft aria-hidden="true" className="w-4 h-4" />
         Torre de controle
@@ -111,7 +111,7 @@ function StaffBand({ orderParam, orderId }: { orderParam: string; orderId: numbe
             maxLength={10}
             value={value}
             onChange={(event) => setValue(onlyDigits(event.target.value))}
-            className="w-32 h-8 rounded border border-slate-700 bg-slate-800 pl-8 pr-2 font-mono text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+            className="w-32 h-8 rounded border border-band-line bg-band-field pl-8 pr-2 font-mono text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
           />
         </div>
         <button
@@ -127,7 +127,7 @@ function StaffBand({ orderParam, orderId }: { orderParam: string; orderId: numbe
           href={trackingHref(orderId)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs text-slate-300 hover:text-white rounded"
+          className="inline-flex items-center gap-1.5 text-xs text-band-muted hover:text-white rounded"
         >
           Ver como o cliente vê
           <ExternalLink aria-hidden="true" className="w-3.5 h-3.5" />
@@ -145,7 +145,7 @@ function StaffOrderContent({ order }: { order: StaffOrder }) {
     <>
       <section
         aria-label="Diagnóstico do pedido"
-        className="bg-white border border-slate-300/90 rounded-lg shadow-sm"
+        className="bg-surface border border-slate-300/90 rounded-lg shadow-sm"
       >
         <header className="px-5 py-3 border-b border-slate-200 flex items-center gap-3 flex-wrap">
           <h1 className="font-mono text-xl font-bold text-slate-900">#{order.orderId}</h1>

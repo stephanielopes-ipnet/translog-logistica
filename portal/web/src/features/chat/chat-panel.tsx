@@ -28,7 +28,7 @@ export function ChatPanel({
   const canClearChat = messages.length > 0 || typing;
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col bg-surface border border-slate-300/90 rounded-lg shadow-sm overflow-hidden">
       {/* Cabeçalho do Assistente */}
       <div className="shrink-0 px-5 py-3.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-2">
         <div className="flex items-center gap-3">
@@ -36,7 +36,7 @@ export function ChatPanel({
             <MessageSquareText className="w-4 h-4" />
             <span
               aria-hidden="true"
-              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white bg-accent"
+              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface bg-accent"
             />
           </div>
           <div className="leading-tight min-w-0">
@@ -48,7 +48,7 @@ export function ChatPanel({
           type="button"
           onClick={onNewChat}
           disabled={!canClearChat}
-          className="ml-auto shrink-0 whitespace-nowrap h-8 px-2.5 rounded border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 disabled:hover:bg-white disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition"
+          className="ml-auto shrink-0 whitespace-nowrap h-8 px-2.5 rounded border border-slate-300 bg-surface text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 disabled:hover:bg-surface disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           Nova conversa

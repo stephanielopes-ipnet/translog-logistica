@@ -37,7 +37,7 @@ export function TowerPage() {
           <button
             type="button"
             onClick={() => void tower.refetch()}
-            className="h-9 px-3.5 rounded-md border border-slate-300 bg-white text-sm font-medium inline-flex items-center gap-2 hover:bg-slate-50"
+            className="h-9 px-3.5 rounded-md border border-slate-300 bg-surface text-sm font-medium inline-flex items-center gap-2 hover:bg-slate-50"
           >
             <RotateCcw aria-hidden="true" className="w-4 h-4" />
             Tentar novamente
@@ -57,7 +57,7 @@ function TowerContent({ data }: { data: TowerResponse }) {
   const { indicators } = data;
   return (
     <StaffShell>
-      <header className="bg-white border border-slate-300/90 rounded-lg shadow-sm px-5 py-4 flex items-center gap-4">
+      <header className="bg-surface border border-slate-300/90 rounded-lg shadow-sm px-5 py-4 flex items-center gap-4">
         <div>
           <p className="label-mono">Área do colaborador</p>
           <h1 className="text-[22px] font-bold tracking-tight text-slate-900">Torre de controle</h1>
@@ -167,7 +167,7 @@ function DashboardLink({ url }: { url: string | null }) {
       href={url}
       target="_blank"
       rel="noreferrer"
-      className="ml-auto h-9 px-3.5 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary inline-flex items-center gap-2 transition"
+      className="ml-auto h-9 px-3.5 rounded-md border border-slate-300 bg-surface text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary inline-flex items-center gap-2 transition"
     >
       <ChartNoAxesColumn aria-hidden="true" className="w-4 h-4" />
       Painel completo de performance
@@ -195,7 +195,7 @@ function Indicator({
 }) {
   return (
     <div
-      className={`bg-white border border-slate-300/90 border-t-[3px] ${TONE_TOP[tone]} rounded-lg shadow-sm px-4 py-3`}
+      className={`bg-surface border border-slate-300/90 border-t-[3px] ${TONE_TOP[tone]} rounded-lg shadow-sm px-4 py-3`}
     >
       <p className="label-mono">{label}</p>
       <p className="mt-1 text-[28px] leading-none font-bold tracking-tight text-slate-900 tabular">
@@ -218,7 +218,7 @@ function Block({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-white border border-slate-300/90 rounded-lg shadow-sm px-5 py-4 min-w-0">
+    <section className="bg-surface border border-slate-300/90 rounded-lg shadow-sm px-5 py-4 min-w-0">
       <div className="flex items-start gap-4 mb-3">
         <div className="flex-1 min-w-0">
           <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
@@ -267,7 +267,7 @@ function AttentionTable({ data }: { data: TowerResponse }) {
                 className={`h-7 px-2.5 rounded border font-mono text-xs transition ${
                   active
                     ? "border-primary bg-primary text-white font-semibold"
-                    : "border-slate-300 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary"
+                    : "border-slate-300 bg-surface text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary"
                 }`}
               >
                 {filter.label}

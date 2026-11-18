@@ -32,7 +32,7 @@ export function StaffLoginPage({ expired }: { expired: boolean }) {
 
   return (
     <div className="mx-auto max-w-[1440px] px-6 py-14">
-      <section className="mx-auto max-w-[420px] bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden">
+      <section className="mx-auto max-w-[420px] bg-surface border border-slate-300/90 rounded-lg shadow-sm overflow-hidden">
         <div className="h-[3px] flex">
           <div className="w-16 bg-accent" />
           <div className="flex-1 bg-primary" />
@@ -72,7 +72,7 @@ export function StaffLoginPage({ expired }: { expired: boolean }) {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="nome@translog.com"
-                className="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                className="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
               />
             </div>
             <div>
@@ -85,7 +85,7 @@ export function StaffLoginPage({ expired }: { expired: boolean }) {
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 px-3 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                className="w-full h-10 rounded-md border border-slate-300 bg-slate-50/60 px-3 text-sm text-slate-900 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
               />
             </div>
 
@@ -118,7 +118,7 @@ export function StaffLoginPage({ expired }: { expired: boolean }) {
                   login.reset();
                   demo.mutate();
                 }}
-                className="w-full h-10 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-60 inline-flex items-center justify-center gap-2 transition"
+                className="w-full h-10 rounded-md border border-slate-300 bg-surface text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-60 inline-flex items-center justify-center gap-2 transition"
               >
                 {demo.isPending ? (
                   <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />

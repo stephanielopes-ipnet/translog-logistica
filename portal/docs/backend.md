@@ -935,7 +935,8 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
   - Âmbar `#F59E0B` (`--color-accent`) reservado para atenção ("Motivo provável" e "Aguardando pagamento");
   - Vermelho (`red-600` / `red-700` / `red-50`) exclusivo para atraso de entrega e extravio: etiqueta de prazo, dias de atraso, fita superior do manifesto, "Onde está agora" atrasado e etapa atual ou do extravio na linha do tempo;
   - Verde (`emerald-700` / `emerald-50`) para pedidos entregues no prazo ou adiantados;
-  - Neutros `slate` (apenas tema claro);
+  - Neutros `slate`;
+  - **Tema claro e escuro (18/11):** as cores são variáveis CSS (`@theme` sem `inline`), e o tema escuro só as redefine em `.dark` no `<html>`: a escala `slate` é invertida, as escalas de cor ganham fundos escuros e textos claros, e `--text-link` clareia o azul de texto. Tokens próprios: `page` (fundo da página), `surface` (cartões; no lugar de `bg-white`), `ink`/`ink-fg` (botões escuros e etapas concluídas, que no escuro viram claros) e `band-*` (faixa "Visão do colaborador", escura nos dois temas). Botão sol/lua nos dois cabeçalhos; escolha em `localStorage` (`translog.tema`), sem escolha segue `prefers-color-scheme`; um script no `index.html` aplica o tema antes de desenhar (sem "piscar"). Lógica em `lib/theme.ts`, com testes;
   - Regras em `@layer base` corrigem o cursor padrão de botões do Tailwind v4 (`cursor: pointer` em botões ativos) e padronizam `:focus-visible`.
 - **Detalhes gráficos de manifesto internacional:**
   - `.perf-t`: divisor horizontal com serrilhado de manifesto logístico no rodapé de total da fatura;
@@ -961,7 +962,7 @@ Roteador feito à mão com a History API (URLs limpas): são cinco rotas fixas, 
 
 ### 13.3. Painel lateral do LogBot (`features/chat/logbot-dock.tsx`, `logbot-panel.ts`)
 
-- Nas páginas do cliente (Início e Rastreamento), o LogBot fica à direita, ao lado do conteúdo (não por cima), com 400 px e a altura útil abaixo do cabeçalho (fixo ao rolar o Início). Não é botão flutuante.
+- Nas páginas do cliente (Início e Rastreamento), o LogBot fica à direita, ao lado do conteúdo (não por cima), com 400 px e a altura útil abaixo do cabeçalho (fixo ao rolar o Início). Não é botão flutuante. Minimizado, não ocupa espaço: o conteúdo fica centralizado na tela (margens iguais) e a aba fica fixa na borda direita da tela.
 - **Minimizar:** botão no cabeçalho do chat. O painel desliza para a direita (250 ms, largura + `transform`) e deixa uma aba fina vertical ("LogBot" + ícone) para reabrir; o conteúdo ocupa o espaço com a mesma transição. Sem animação com `prefers-reduced-motion` (`motion-safe:`).
 - **Estado:** aberto por padrão; a escolha vale entre Início e Rastreamento e fica no `localStorage` (`translog.logbot.aberto`, leitura e escrita com `try/catch`). `askLogBot` reabre o painel quando a página pergunta ("Perguntar ao assistente", sugestões); "Perguntar ao LogBot" do Início abre e foca o campo.
 - **Acessibilidade:** botões com `aria-expanded` e `aria-controls`; painel como região "Conversa com o LogBot"; o painel fechado fica `inert`; o foco vai para o campo ao reabrir e para a aba ao minimizar.
@@ -1061,6 +1062,7 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 |---|---|
 | `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR` e pluralização de dias |
 | `lib/url-state.test.ts` | Rejeição de IDs inválidos (`0`, `abc`, 11 dígitos) |
+| `lib/theme.test.ts` | Tema salvo × preferência do sistema, alternar, salvar e avisar, armazenamento bloqueado |
 | `lib/router.test.ts` | Rotas, `/?pedido=N`, `?voltar=` sem redirecionamento aberto, `?expirou=1`, guarda, cabeçalho público × colaborador, destino de "Acesso colaborador", títulos |
 | `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo, `credentials`, `409`/`502`/`504`, fora do contrato), `postNoContent` (`204`, `429`) |
 | `features/chat/logbot-panel.test.ts` | Painel aberto por padrão, escolha salva (e armazenamento bloqueado), reabrir ao perguntar |

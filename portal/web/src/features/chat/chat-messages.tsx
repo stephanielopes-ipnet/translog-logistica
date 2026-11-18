@@ -187,7 +187,9 @@ export function ChatMessages({
             <div key={msg.id} className="max-w-[92%] fade-in">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                <span className="label-mono !text-primary font-semibold">{ASSISTANT_NAME}</span>
+                <span className="label-mono !text-[var(--text-link)] font-semibold">
+                  {ASSISTANT_NAME}
+                </span>
               </div>
               <div className="border-l-2 border-primary bg-slate-50/90 rounded-r-md px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 break-words border-y border-r border-y-slate-200/80 border-r-slate-200/80">
                 <RichText text={msg.text} />
@@ -203,7 +205,9 @@ export function ChatMessages({
           <div className="max-w-[85%] fade-in">
             <div className="flex items-center gap-1.5 mb-1">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              <span className="label-mono !text-primary font-semibold">{ASSISTANT_NAME}</span>
+              <span className="label-mono !text-[var(--text-link)] font-semibold">
+                {ASSISTANT_NAME}
+              </span>
             </div>
             <div className="border-l-2 border-primary bg-slate-50 px-3.5 py-2.5 rounded-r-md border-y border-r border-slate-200 inline-flex items-center gap-2.5">
               <span className="typing">

@@ -26,7 +26,7 @@ const STAGE_ICONS: Record<number, LucideIcon> = {
 /** Quadrado do ícone e selo de cada estado. */
 const STATE_STYLE: Record<StageState, { box: string; chip: string; chipText: string }> = {
   done: {
-    box: "bg-slate-900 text-white",
+    box: "bg-ink text-ink-fg",
     chip: "text-slate-500",
     chipText: "Concluída",
   },
@@ -46,7 +46,7 @@ const STATE_STYLE: Record<StageState, { box: string; chip: string; chipText: str
     chipText: "Extraviado aqui",
   },
   pending: {
-    box: "border-2 border-dashed border-slate-300 bg-white text-slate-300",
+    box: "border-2 border-dashed border-slate-300 bg-surface text-slate-300",
     chip: "text-slate-400",
     chipText: "Aguardando",
   },

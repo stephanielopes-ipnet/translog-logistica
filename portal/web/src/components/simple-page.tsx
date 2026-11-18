@@ -12,7 +12,7 @@ interface SimplePageProps {
 export function SimplePage({ label, title, children }: SimplePageProps) {
   return (
     <div className="mx-auto max-w-[1440px] px-6 py-12">
-      <section className="mx-auto max-w-xl bg-white border border-slate-300/90 rounded-lg shadow-sm px-8 py-10 text-center">
+      <section className="mx-auto max-w-xl bg-surface border border-slate-300/90 rounded-lg shadow-sm px-8 py-10 text-center">
         <p className="label-mono">{label}</p>
         <h1 className="mt-2 text-xl font-semibold text-slate-900">{title}</h1>
         {children && <div className="mt-3 text-sm text-slate-600 space-y-4">{children}</div>}

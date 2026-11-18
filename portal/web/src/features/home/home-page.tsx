@@ -85,7 +85,7 @@ function HomeSearch() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="rounded-lg border border-slate-300/90 bg-white p-4 shadow-sm"
+        className="rounded-lg border border-slate-300/90 bg-surface p-4 shadow-sm"
       >
         <label htmlFor="homeOrderInput" className="label-mono !text-accent-700 block mb-1.5">
           Número do pedido
@@ -110,7 +110,7 @@ function HomeSearch() {
                 if (cleaned) setShowEmptyHint(false);
                 setValue(cleaned);
               }}
-              className="w-full h-11 rounded-md border border-slate-300 bg-slate-50/60 pl-10 pr-3 font-mono text-[15px] font-medium text-slate-900 tabular placeholder:font-sans placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              className="w-full h-11 rounded-md border border-slate-300 bg-slate-50/60 pl-10 pr-3 font-mono text-[15px] font-medium text-slate-900 tabular placeholder:font-sans placeholder:text-slate-400 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
             />
           </div>
           <button
@@ -136,7 +136,7 @@ function HomeSearch() {
           <Link
             key={id}
             href={trackingHref(id)}
-            className="h-7 px-2.5 rounded-full border border-slate-300 bg-white font-mono text-xs text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary inline-flex items-center gap-1.5 transition"
+            className="h-7 px-2.5 rounded-full border border-slate-300 bg-surface font-mono text-xs text-slate-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary inline-flex items-center gap-1.5 transition"
           >
             <b className="font-semibold">#{id}</b>
             {SAMPLE_HINTS[id] && (
