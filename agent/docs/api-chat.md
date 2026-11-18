@@ -1,5 +1,7 @@
 # API de chat — contrato de integração v0.1
 
+Atualização de 17/11: as rotas nativas abaixo permanecem iguais. A ferramenta de pedidos ganhou o backend `csv_v2`, com `order`, `items`, `events` e origem histórica/simulada. Ver [contrato da fonte e reprodução](integracao-silver-v2-2026-11-17.md). O texto final continua extraído da mesma forma. Integração da nova versão na máquina do FullStack ainda não foi demonstrada.
+
 Atualizado em 14/11/2026 para Google ADK **2.14.1**, versão fixada no projeto. Este documento descreve a API nativa existente; não cria um endpoint adicional no portal.
 
 ## Endereço e execução
@@ -64,8 +66,6 @@ Corpo JSON, com os mesmos identificadores da sessão criada:
 ```
 
 O campo `text` contém a mensagem completa em linguagem natural. Não é necessário um campo separado de código do pedido neste contrato. O agente solicita o código quando estiver ausente.
-
-Quando a tela de detalhes fornecer um pedido aberto, o backend pode prefixar a mensagem com `[Pedido aberto no portal: 375] ` (substituindo `375` pelo código da tela). O prompt do agente trata esse marcador como contexto: não o repete ao cliente e ainda consulta `consultar_pedido` antes de afirmar informações. O texto da pergunta vem depois do prefixo, por exemplo: `[Pedido aberto no portal: 375] Quando chega?`.
 
 O backend deve aguardar o término dessa chamada antes de enviar outra mensagem à mesma sessão. O cliente de exemplo usa timeout de 60 segundos; esse valor é uma configuração do cliente, não um prazo de resposta garantido do Gemini.
 
@@ -144,3 +144,5 @@ Não repetir o envio automaticamente quando não se sabe se a mensagem já foi p
 O primeiro teste de integração usa a **amostra fictícia/histórica** de `data/samples/orders.csv`, não a Silver recebida de Dados. FAQ/políticas revisadas e conector SQL continuam pendentes; a configuração padrão não habilita o corpus demo. Consulta de pedido é estruturada, não uma busca vetorial dos pedidos.
 
 Em 14/11/2026, a conferência para esta documentação executou os testes existentes de API e CLI/cliente: **11 passaram, 3 avisos de depreciação**. As rotas ADK e a ferramenta são reais; o modelo é determinístico de teste e não usa Gemini. Também foram conferidos os argumentos no `adk api_server --help`. O teste com Gemini e a execução na máquina de Matheus FullStack continuam pendentes nesta etapa. Nenhuma credencial foi incluída nos exemplos.
+
+Atualização de 15/11: Marco apresentou um teste manual bem-sucedido do cliente de exemplo pela API local na porta 8002, com o agente configurado e resposta correta do 1001 na amostra. Evidência em [teste-api-local-2026-11-15.md](teste-api-local-2026-11-15.md). A execução na máquina do FullStack e a ligação do portal continuam pendentes. Esta atualização documental está na pasta original; sua inclusão na branch deve levar também o registro referenciado.
