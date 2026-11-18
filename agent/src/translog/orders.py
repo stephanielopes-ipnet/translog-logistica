@@ -96,7 +96,7 @@ class CsvOrderRepository:
 
 class PendingSqlRepository:
     def read_items(self):
-        raise SourceError("Banco definitivo pendente: configurar conector após decisão do grupo.")
+        raise SourceError("Conector SQL direto do agente não implementado; a fonte do projeto já está alinhada no Databricks.")
 
     def source(self):
         return {"backend": "sql_pending"}
@@ -107,6 +107,11 @@ def consult_order(repository: OrderRepository, order_id: str):
         return {"status": "invalid_input", "message": "Informe um código de pedido válido, sem comandos ou espaços internos."}
     code = order_id.strip()
     try:
+        if hasattr(repository, "read_order"):
+            payload = repository.read_order(code)
+            return {"status": "found" if payload["order"] is not None else "not_found", "order_id": code,
+                    **payload, "source": repository.source(),
+                    "message": "Consulta histórica com complemento simulado; não é rastreio ao vivo."}
         # Valida toda a exportação antes de responder, evitando resultados de fonte parcialmente inválida.
         items = [item for item in repository.read_items() if item["order_id"] == code]
         source = repository.source()

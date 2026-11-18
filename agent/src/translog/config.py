@@ -28,14 +28,15 @@ class Settings:
     model_cache: Path
     allow_demo: bool
     model: str
+    consumption_dir: Path
 
     @classmethod
     def from_env(cls):
         load_dotenv(ROOT / ".env", override=False)
         backend = os.getenv("TRANSLOG_ORDER_BACKEND", "csv")
         origin = os.getenv("TRANSLOG_DATA_ORIGIN", "sample")
-        if backend not in {"csv", "sql_pending"}:
-            raise ValueError("TRANSLOG_ORDER_BACKEND deve ser csv ou sql_pending.")
+        if backend not in {"csv", "csv_v2", "sql_pending"}:
+            raise ValueError("TRANSLOG_ORDER_BACKEND deve ser csv, csv_v2 ou sql_pending.")
         if origin not in {"sample", "silver", "gold"}:
             raise ValueError("TRANSLOG_DATA_ORIGIN deve ser sample, silver ou gold.")
         delimiter = os.getenv("TRANSLOG_CSV_DELIMITER", ",")
@@ -56,4 +57,5 @@ class Settings:
             model_cache=resolve_path(os.getenv("TRANSLOG_MODEL_CACHE", ".cache/models")),
             allow_demo=os.getenv("TRANSLOG_ALLOW_DEMO_KNOWLEDGE", "false").lower() == "true",
             model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+            consumption_dir=resolve_path(os.getenv("TRANSLOG_CONSUMPTION_DIR", "data/silver/v2-2026-11-17")),
         )
