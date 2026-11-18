@@ -108,6 +108,7 @@ const envSchema = z
     DATABRICKS_WAREHOUSE_ID: databricksWarehouseId.optional(),
     DATABRICKS_TOKEN: z.string().optional(),
     DATABRICKS_CATALOG_SCHEMA: databricksCatalogSchema.default("workspace.silver"),
+    DATABRICKS_GOLD_SCHEMA: databricksCatalogSchema.default("workspace.gold"),
     DATABRICKS_REFRESH_MINUTES: databricksRefreshMinutes.default(10),
     STAFF_USERS: staffUsers.optional(),
     SESSION_SECRET: z.string().min(32).optional(),
@@ -171,6 +172,7 @@ const expectations: Record<EnvName, string> = {
     "deve ser o id do SQL warehouse (letras, números, _ ou -), obrigatório com DATA_SOURCE=databricks",
   DATABRICKS_TOKEN: "é obrigatória com DATA_SOURCE=databricks (token de acesso, só no portal/.env)",
   DATABRICKS_CATALOG_SCHEMA: "deve ser catalogo.schema (ex.: workspace.silver)",
+  DATABRICKS_GOLD_SCHEMA: "deve ser catalogo.schema da Gold (ex.: workspace.gold)",
   DATABRICKS_REFRESH_MINUTES: "deve ser um número inteiro de minutos entre 0 (só ao subir) e 1440",
   STAFF_USERS:
     "deve ser uma lista email:hash separada por vírgula, com o hash gerado por pnpm staff:add <email>",
@@ -207,6 +209,7 @@ const configSchema = envSchema.transform((env) => {
             warehouseId: env.DATABRICKS_WAREHOUSE_ID,
             token: env.DATABRICKS_TOKEN,
             catalogSchema: env.DATABRICKS_CATALOG_SCHEMA,
+            goldSchema: env.DATABRICKS_GOLD_SCHEMA,
             /** Pedidos já convertidos, para subir sem esperar o Databricks (fora do Git). */
             cacheFile: resolve(dataDir, DATABRICKS_CACHE_FILE),
             refreshIntervalMs: env.DATABRICKS_REFRESH_MINUTES * 60_000,

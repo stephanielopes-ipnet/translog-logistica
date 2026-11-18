@@ -32,6 +32,7 @@ Das tabelas oficiais do time de dados (Mateus), no Databricks:
 | `workspace.silver.consumo_pedidos` | 1 linha por pedido (65.752): situação, prazos, causa, local atual |
 | `workspace.silver.consumo_itens_pedido` | os itens de cada pedido, com o valor |
 | `workspace.silver.consumo_eventos_logisticos` | os eventos da viagem (coleta, voo, alfândega…) |
+| `workspace.gold.param_cenario_prazo` | a "Promessa ajustada": o prazo de despacho que a operação consegue cumprir em cada modalidade (First Class 2 dias, Same Day 1, Second Class 4, Standard 4). A Área do colaborador compara a promessa atual com ela |
 
 O portal carrega tudo **uma vez, ao ligar**, e depois responde da memória. O "hoje" dos dados é **06/02/2018** (a data mais recente da base): a situação mostrada é a dessa data.
 
@@ -61,7 +62,7 @@ DATABRICKS_TOKEN=<token de acesso>
 **3. Baixar os dados: `pnpm export:dados`** (obrigatório na primeira vez)
 
 ```bash
-pnpm export:dados     # leva ~1 minuto; grava 3 arquivos CSV em portal/dados/
+pnpm export:dados     # de 1 a 5 minutos (depende do Databricks); grava 4 arquivos CSV em portal/dados/
 ```
 
 Por que é preciso: os CSVs (86 MB, 14 MB e 66 MB) **não ficam no GitHub**, então um clone novo vem sem eles. Sem esse passo:
@@ -133,7 +134,7 @@ pnpm dev
 
 ### Com os CSVs (plano B)
 
-1. Os arquivos `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` precisam estar em `portal/dados/`. Eles não vêm no GitHub: baixe com **`pnpm export:dados`** (~1 min; precisa das credenciais do Databricks, veja os "Primeiros passos").
+1. Os arquivos `consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv` e `gold_param_cenario_prazo.csv` (a "Promessa ajustada") precisam estar em `portal/dados/`. Se faltar o último, o servidor não liga e pede para rodar o export. Eles não vêm no GitHub: baixe com **`pnpm export:dados`** (~1 min; precisa das credenciais do Databricks, veja os "Primeiros passos").
 2. No `portal/.env`: `DATA_SOURCE=file`.
 3. `pnpm dev`. O servidor leva ~15 s para carregar os 65.752 pedidos.
 
@@ -181,6 +182,7 @@ O link fica discreto, no canto do cabeçalho e no rodapé: **"Acesso colaborador
 - `SESSION_SECRET` é um texto aleatório de pelo menos 32 caracteres (gere com `openssl rand -base64 48`). Sem ele, ninguém entra.
 - A sessão dura 8 horas. "Sair" encerra na hora. Se a sessão vencer, a tela volta ao login com um aviso.
 - O link "Painel completo de performance" da Torre usa `DASHBOARD_URL`; enquanto não houver, aparece "link a definir".
+- Para achar um pedido sem saber o número, o servidor tem uma busca (`/api/staff/orders`): por cidade, país, situação, modalidade, etapa, motivo, atraso mínimo ou encaminhados à central.
 
 Depois de mudar o `.env`, reinicie o `pnpm dev`.
 
@@ -219,7 +221,6 @@ Nenhuma resposta do portal traz dados do cliente (id, segmento) nem valores inte
 ## Pontos em aberto
 
 - Link do painel de performance do Marcelo (`DASHBOARD_URL`).
-- A "Promessa ajustada" está copiada da tabela da Gold no código; ler a tabela direto do Databricks fica para depois.
 - Regra da central: "3 dias ou mais" (como está) ou "mais de 3 dias".
 - Telefone ou e-mail da central para o aviso da tela.
 - A explicação da base diz "cumprido em apenas 0.0%" (ponto decimal, número estranho): ajuste pedido ao Mateus.

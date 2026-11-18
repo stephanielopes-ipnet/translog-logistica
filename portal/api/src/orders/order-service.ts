@@ -1,7 +1,14 @@
-import type { Order, OrdersSummaryResponse, StaffOrder, TowerResponse } from "@translog/contracts";
+import type {
+  Order,
+  OrdersSummaryResponse,
+  StaffOrder,
+  StaffSearchQuery,
+  StaffSearchResponse,
+  TowerResponse,
+} from "@translog/contracts";
 import type { OrderRepository } from "./order-repository.ts";
+import { searchOrders } from "./order-search.ts";
 import { toCustomerOrder, toStaffOrder } from "./order-views.ts";
-import type { PromiseScenario } from "./promise-scenario.ts";
 import { buildOrdersSummary, buildTower } from "./tower-stats.ts";
 
 /** Erro de domínio: o pedido não existe na fonte. Vira `404` em `http/errors.ts`. */
@@ -30,14 +37,14 @@ export interface OrderService {
   getTower(): TowerResponse;
   /** Pedidos por mercado, para o mapa do Início (público, só números). */
   getSummary(): OrdersSummaryResponse;
+  /** Busca do colaborador: linhas resumidas, filtradas, ordenadas e paginadas. */
+  searchStaffOrders(query: StaffSearchQuery): StaffSearchResponse;
 }
 
 export interface OrderServiceDeps {
   orders: OrderRepository;
   /** `SAMPLE_ORDER_IDS`, na ordem de exibição. */
   sampleOrderIds: readonly number[];
-  /** Prazo de despacho sugerido por modalidade (Promessa ajustada, da Gold). */
-  promiseScenario: PromiseScenario;
   /** Painel completo de performance (`DASHBOARD_URL`), ou `null`. */
   dashboardUrl?: string | null;
 }
@@ -45,7 +52,6 @@ export interface OrderServiceDeps {
 export function createOrderService({
   orders,
   sampleOrderIds,
-  promiseScenario,
   dashboardUrl = null,
 }: OrderServiceDeps): OrderService {
   async function getRecord(orderId: number) {
@@ -67,7 +73,7 @@ export function createOrderService({
     getStaffOrder: async (orderId) =>
       toStaffOrder(await getRecord(orderId), {
         stats: orders.stats(),
-        scenario: promiseScenario,
+        scenario: orders.scenario(),
       }),
 
     async sampleOrderIds() {
@@ -80,12 +86,14 @@ export function createOrderService({
     getTower() {
       const stats = orders.stats();
       return buildTower(stats.tower, {
-        scenario: promiseScenario,
+        scenario: orders.scenario(),
         deliveryByRoute: stats.deliveryByRoute,
         dashboardUrl,
       });
     },
 
     getSummary: () => buildOrdersSummary(orders.stats().tower),
+
+    searchStaffOrders: (query) => searchOrders(orders.records(), query),
   };
 }

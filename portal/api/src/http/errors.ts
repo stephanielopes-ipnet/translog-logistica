@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifySchemaValidationError } from
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 import {
   InvalidCredentialsError,
+  JsonRequiredError,
   TooManyAttemptsError,
   UnauthenticatedError,
 } from "../auth/auth-service.ts";
@@ -20,6 +21,7 @@ const INVALID_CREDENTIALS_MESSAGE = "E-mail ou senha inválidos.";
 const TOO_MANY_ATTEMPTS_MESSAGE =
   "Muitas tentativas de login. Aguarde um minuto e tente novamente.";
 const UNAUTHENTICATED_MESSAGE = "Sua sessão expirou ou não existe. Entre novamente.";
+const JSON_REQUIRED_MESSAGE = "Envie os dados em JSON (Content-Type: application/json).";
 
 const clientErrorMessages: Record<number, string> = {
   400: "Requisição inválida.",
@@ -35,7 +37,8 @@ const clientErrorMessages: Record<number, string> = {
  *   `409 CHAT_BUSY`, `AgentUnavailableError` → `502 AGENT_UNAVAILABLE`, `AgentTimeoutError` →
  *   `504 AGENT_TIMEOUT` (o chat-service já registrou o motivo técnico no log);
  * - login: `InvalidCredentialsError` → `401 INVALID_CREDENTIALS`, `TooManyAttemptsError` →
- *   `429 TOO_MANY_ATTEMPTS`, `UnauthenticatedError` (rotas `/api/staff/*`) → `401 UNAUTHENTICATED`;
+ *   `429 TOO_MANY_ATTEMPTS`, `UnauthenticatedError` (rotas `/api/staff/*`) → `401 UNAUTHENTICATED`,
+ *   `JsonRequiredError` (`POST /api/auth/*` sem JSON) → `415 UNSUPPORTED_MEDIA_TYPE`;
  * - validação Zod: `400 VALIDATION_ERROR`, citando os campos;
  * - outros 4xx do Fastify: mesmo status, `VALIDATION_ERROR` (400) ou `BAD_REQUEST`;
  * - qualquer outro erro: `500 INTERNAL_ERROR` genérico, com o detalhe só no log;
@@ -64,6 +67,9 @@ export function registerErrorHandler(app: FastifyInstance): void {
     }
     if (error instanceof UnauthenticatedError) {
       return sendError(reply, 401, "UNAUTHENTICATED", UNAUTHENTICATED_MESSAGE);
+    }
+    if (error instanceof JsonRequiredError) {
+      return sendError(reply, 415, "UNSUPPORTED_MEDIA_TYPE", JSON_REQUIRED_MESSAGE);
     }
 
     if (hasZodFastifySchemaValidationErrors(error)) {

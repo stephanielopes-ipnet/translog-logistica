@@ -63,10 +63,10 @@ A tela fala só com a API do portal (via proxy `/api` no Vite em desenvolvimento
 | @tanstack/react-query | 5.107.1 | `web` | Cache, estado assíncrono, retentativas e sincronização com a API |
 | lucide-react | 1.72.0 | `web` | Ícones consistentes com os protótipos |
 | @fontsource-variable/inter | 5.3.0 | `web` | Fonte `Inter Variable` empacotada localmente |
-| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (254 testes, mais 1 de integração com o agente real, desligado por padrão) |
+| Vitest | 5.1.0 | `api`, `web` | Testes unitários e de integração (588 testes em 18/11, mais 2 de integração com o agente e o Databricks reais, desligados por padrão) |
 | Biome | 2.6.7 | todos | Lint, formatação, acessibilidade e ordem dos imports |
 
-Tamanho aproximado: ~1.600 linhas de código na API + ~3.100 no frontend (das quais ~400 são os pedidos de exemplo dos testes), cobertos por **254 testes automatizados** (209 na API + 45 no frontend). O chat não trouxe dependência nova: o adapter do agente usa o `fetch` nativo do Node.
+Tamanho aproximado: ~1.600 linhas de código na API + ~3.100 no frontend (das quais ~400 são os pedidos de exemplo dos testes), cobertos por **588 testes automatizados** em 18/11 (458 na API + 98 no frontend + 32 do contrato). O chat não trouxe dependência nova: o adapter do agente usa o `fetch` nativo do Node.
 
 ## 2. Estrutura de pastas
 
@@ -122,11 +122,11 @@ portal/
 │       │   ├── routes.ts              # /api/auth/login, logout, session e demo (só com AUTH_DEMO)
 │       │   ├── auth-service.ts        # login, demonstração, sessão + erros de login
 │       │   ├── password.ts            # hash scrypt e comparação em tempo constante
-│       │   ├── session-token.ts       # conteúdo do cookie assinado (HMAC)
+│       │   ├── session-signature.ts   # conteúdo do cookie assinado (HMAC); nome sem "token": o .gitignore da raiz ignora *token*
 │       │   ├── session-cookie.ts      # leitura e gravação do cookie HttpOnly
-│       │   └── login-limiter.ts       # 5 erros por minuto por IP (memória)
+│       │   └── login-limiter.ts       # 5 erros por minuto por IP (memória limitada: janelas vencidas saem, até 10 mil IPs)
 │       ├── staff/
-│       │   └── routes.ts              # /api/staff/orders/:id e /api/staff/tower, com o guarda de sessão
+│       │   └── routes.ts              # /api/staff/orders (busca), /api/staff/orders/:id e /api/staff/tower, com o guarda de sessão
 │       ├── chat/
 │       │   ├── routes.ts              # POST /api/chat
 │       │   ├── chat-service.ts        # pedido de contexto, trava por conversa, log sem conteúdo, ChatBusyError
@@ -149,10 +149,13 @@ portal/
 │           ├── order-views.ts         # projeções Order (cliente) e StaffOrder (colaborador)
 │           ├── order-stats.ts         # números da carga (contexto do colaborador)
 │           ├── tower-stats.ts         # Torre e resumo por mercado (mesma passada da carga)
-│           ├── promise-scenario.ts    # "Promessa ajustada" da Gold (constantes)
+│           ├── order-search.ts        # busca do colaborador (filtros, ordem, páginas) sobre os registros em memória
+│           ├── promise-scenario.ts    # "Promessa ajustada" da Gold: leitura do CSV, do JSON dos fixtures e do cache
+│           ├── databricks-cache.ts    # cache local do adapter databricks (pedidos + cenário, um pedido por linha)
 │           └── fixtures/
 │               ├── orders.json        # 9 pedidos da demo (vão para a imagem)
-│               └── consumo/           # amostra das 3 tabelas para testes (não vai para a imagem)
+│               ├── promise-scenario.json # cenário "Promessa ajustada" gerado da Gold, com a data (vai para a imagem)
+│               └── consumo/           # amostra das 3 tabelas + gold_param_cenario_prazo.csv para testes (não vai para a imagem)
 └── web/                     # @translog/web (React 19 + Vite 8 + Tailwind v4)
     ├── index.html           # ponto de entrada HTML (pt-BR, título e fontes IBM Plex Mono)
     ├── public/ipnet.svg     # logo do rodapé ("Desenvolvido por")
@@ -395,6 +398,7 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 | `errorResponseSchema` | `{ error: { code, message } }` |
 | `staffOrderSchema` / `StaffOrder` | Resposta de `GET /api/staff/orders/:orderId`: o `Order` com causas da base, `explanation`, `market`, `routeService` e o diagnóstico |
 | `loginRequestSchema`, `sessionResponseSchema`, `DEMO_STAFF_EMAIL` | Login do colaborador (`contracts/src/auth.ts`): `{ email, password }` e `{ authenticated, email, demoAvailable }` |
+| `staffSearchQuerySchema`, `staffSearchResponseSchema` / `StaffSearchRow` | Busca do colaborador (`contracts/src/staff-search.ts`): filtros da query string e `{ total, page, pageSize, results }` com linhas resumidas |
 | `towerResponseSchema` / `TowerResponse` | Torre de controle (`contracts/src/tower.ts`): indicadores, fila de atenção, promessa × realidade, etapas, rotas, `dashboardUrl` |
 | `ordersSummaryResponseSchema` | `{ totalOrders, markets: [{ market, orders }] }` (mapa do Início, público) |
 
@@ -448,10 +452,11 @@ O OpenAPI de `/docs` traz um exemplo de corpo e as respostas `200`, `400`, `409`
 | `GET /api/orders/:orderId` | `200 Order` | `400 VALIDATION_ERROR`, `404 ORDER_NOT_FOUND` |
 | `POST /api/chat` | `200 { sessionId, reply, mentionedOrderId }` | `400 VALIDATION_ERROR`, `409 CHAT_BUSY`, `502 AGENT_UNAVAILABLE`, `504 AGENT_TIMEOUT` |
 | `GET /api/orders/summary` | `200 { totalOrders, markets }`: pedidos por mercado (só números, calculados na carga) | |
-| `POST /api/auth/login` | `204` + cookie de sessão | `401 INVALID_CREDENTIALS` (mesma resposta para e-mail ou senha errados), `429 TOO_MANY_ATTEMPTS`, `415` sem JSON |
+| `POST /api/auth/login` | `204` + cookie de sessão | `401 INVALID_CREDENTIALS` (mesma resposta para e-mail ou senha errados), `429 TOO_MANY_ATTEMPTS`, `415 UNSUPPORTED_MEDIA_TYPE` sem JSON |
 | `POST /api/auth/logout` | `204` (apaga o cookie) | |
 | `GET /api/auth/session` | `200 { authenticated, email, demoAvailable }` | |
 | `POST /api/auth/demo` | `204` + cookie de `demo@translog.local` | só existe com `AUTH_DEMO=true` (senão `404`) |
+| `GET /api/staff/orders` | `200 { total, page, pageSize, results }` (busca) | `401 UNAUTHENTICATED`, `400 VALIDATION_ERROR` |
 | `GET /api/staff/orders/:orderId` | `200 StaffOrder` | `401 UNAUTHENTICATED`, `400`, `404 ORDER_NOT_FOUND` |
 | `GET /api/staff/tower` | `200 TowerResponse` | `401 UNAUTHENTICATED` |
 | `GET /docs` | Swagger UI (`/docs/json` = OpenAPI) | |
@@ -461,11 +466,13 @@ O OpenAPI de `/docs` traz um exemplo de corpo e as respostas `200`, `400`, `409`
 - usuários em `STAFF_USERS` (`email:hash`, separados por vírgula; hash `scrypt.<sal>.<chave>` gerado por `pnpm staff:add <email>`, que pede a senha sem ecoar); comparação em tempo constante e o mesmo trabalho para e-mail inexistente;
 - sessão num cookie `translog_session` assinado com HMAC-SHA256 (`SESSION_SECRET`, mínimo de 32 caracteres), `HttpOnly`, `SameSite=Lax`, `Path=/`, 8 h, `Secure` com `NODE_ENV=production`. Sem banco de sessões; feito com `node:crypto` (sem `@fastify/cookie`);
 - `/api/staff/*` passa por um único hook (`staff/routes.ts`) que exige sessão válida;
-- 5 logins errados em 1 minuto do mesmo IP → `429` (em memória; zera ao reiniciar a API e após um login certo);
-- `POST` de `/api/auth/*` só com `Content-Type: application/json` (com `SameSite=Lax`, cobre CSRF neste escopo);
+- 5 logins errados em 1 minuto do mesmo IP → `429` (em memória; zera ao reiniciar a API e após um login certo; as janelas vencidas saem a cada falha e no máximo 10 mil IPs são acompanhados, os mais antigos são esquecidos);
+- `POST` de `/api/auth/*` só com `Content-Type: application/json` (com `SameSite=Lax`, cobre CSRF neste escopo); sem JSON, o hook lança `JsonRequiredError` e `http/errors.ts` responde `415 UNSUPPORTED_MEDIA_TYPE`;
 - log do login só com o resultado (`ok`, `rejected`, `demo`): sem e-mail, senha ou cookie.
 
-**Torre e resumo (`orders/tower-stats.ts`).** Acumulados na mesma passada da carga que já calcula o contexto do colaborador (`computeOrderStats`), nos 3 modos. Definições: despacho avaliado = tem data real, no prazo = `dispatch.delayDays <= 0`; entrega avaliada = tem atraso calculado (entregues e em trânsito; extraviados fora); fila de atenção = todos os em trânsito, mais atrasados primeiro; rotas com mais atraso = `rota_servico` com 300+ entregas avaliadas (8 primeiras). Conferido com os CSVs reais (17/11): 42,7% (15.739/36.866), 74,7% (22.130/29.644), 197 em trânsito (43 atrasados, 23 com 3+ dias), 8.337 na central, 7.222 extravios. A "Promessa ajustada" vem de `orders/promise-scenario.ts` (`ADJUSTED_PROMISE_SCENARIO`, constantes copiadas de `workspace.gold.param_cenario_prazo`: First 2, Same Day 1, Second 4, Standard 4); ler a tabela da Gold é pendência.
+**Torre e resumo (`orders/tower-stats.ts`).** Acumulados na mesma passada da carga que já calcula o contexto do colaborador (`computeOrderStats`), nos 3 modos. Definições: despacho avaliado = tem data real, no prazo = `dispatch.delayDays <= 0`; entrega avaliada = tem atraso calculado (entregues e em trânsito; extraviados fora); fila de atenção = todos os em trânsito, mais atrasados primeiro; rotas com mais atraso = `rota_servico` com 300+ entregas avaliadas (8 primeiras). Conferido com os CSVs reais (17/11): 42,7% (15.739/36.866), 74,7% (22.130/29.644), 197 em trânsito (43 atrasados, 23 com 3+ dias), 8.337 na central, 7.222 extravios. A "Promessa ajustada" (prazo sugerido) vem da Gold, lida pelo próprio adapter de cada modo (seção 8, "Cenário da Gold"): em 18/11, First Class 2, Same Day 1, Second Class 4, Standard 4. Conferido nos modos `file` e `databricks` (18/11): Torre, `GET /api/staff/orders/76902` e `GET /api/orders/76902` idênticos entre os dois.
+
+**Busca do colaborador (`orders/order-search.ts`, 18/11).** `GET /api/staff/orders` varre os registros em memória (`OrderRepository.records()`). Filtros, que se somam: `q` (só dígitos = número do pedido que começa com eles; texto = destino, origem, região ou rota, sem acentos nem maiúsculas, até 100 caracteres), `status`, `shippingMode`, `market`, `stage` (0 a 5), `cause` (termo da base, no despacho ou na entrega), `minDelayDays` (atraso de entrega) e `escalated` (`true`/`false`). `sort`: `delay` (padrão, maior atraso de entrega primeiro, sem atraso calculado no fim), `orderId` ou `orderDate` (mais recentes primeiro). `page` e `pageSize` (1 a 50, padrão 20). Cada linha traz só número, data, situação, modalidade, mercado, rota, origem, destino, etapa e local, atrasos, central e causa da base (campos listados um a um). O texto pesquisável de cada pedido é montado na primeira busca (`WeakMap`): ~160 ms na primeira com os 65.752 pedidos, alguns ms depois.
 
 O `orderId` aceita só dígitos (1 a 10), maior que zero; zeros à esquerda passam (`00375` → 375). `1e3`, `0x1F`, `-1`, `1.5`, espaços e 11 dígitos são recusados.
 
@@ -583,12 +590,13 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 |---|---|---|
 | `API_PORT` | `3333` | Porta da API (1 a 65535) |
 | `DATA_SOURCE` | `fixtures` | `fixtures`, `file` ou `databricks` |
-| `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` (`file` e `pnpm export:dados`). Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
+| `DATA_DIR` | `dados` | Pasta com `consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv` e `gold_param_cenario_prazo.csv` (`file` e `pnpm export:dados`) e o cache do `databricks`. Relativo parte de `portal/`. Substitui `ORDERS_FILE` (16/11) |
 | `SAMPLE_ORDER_IDS` | `76902,375,34,8` | Lista separada por vírgula; cada item inteiro positivo de até 10 dígitos; repetidos são removidos |
 | `DATABRICKS_HOST` | vazio | Host do workspace (sem ou com `https://`); obrigatório com `databricks`. `http://` só para `localhost`/`127.0.0.1` (testes) |
 | `DATABRICKS_WAREHOUSE_ID` | vazio | Id do SQL warehouse (letras, números, `_`, `-`); obrigatório com `databricks` |
 | `DATABRICKS_TOKEN` | vazio | Token de acesso; obrigatório com `databricks`. Só no `portal/.env`; a mensagem de erro de configuração nunca mostra o valor |
 | `DATABRICKS_CATALOG_SCHEMA` | `workspace.silver` | `catalogo.schema` das tabelas `consumo_*` (vai no SQL: só letras, números e `_`) |
+| `DATABRICKS_GOLD_SCHEMA` | `workspace.gold` | `catalogo.schema` da Gold, com a `param_cenario_prazo` ("Promessa ajustada"); usado pelo adapter `databricks` e pelo `pnpm export:dados` |
 | `AGENT` | `mock` | Assistente do chat: `mock` ou `adk` |
 | `AGENT_URL` | vazio | Endereço http(s) do agente; obrigatório com `adk` (dev: `http://127.0.0.1:8001`). Barra final removida |
 | `AGENT_APP_NAME` | `translog_agent` | Nome do app no ADK; só letras, números, `_` e `-` (vai no caminho da URL) |
@@ -621,12 +629,28 @@ Regras (`api/src/config.ts`):
 
 ```ts
 interface OrderRepository {
-  findById(orderId: number): Promise<Order | null>;
+  findById(orderId: number): Promise<OrderRecord | null>;
   count(): Promise<number>;
+  records(): Iterable<OrderRecord>; // busca do colaborador
+  stats(): OrderStats;              // contexto, Torre e resumo, calculados na carga
+  scenario(): PromiseScenario;      // "Promessa ajustada" da Gold, da mesma fonte
+  close?(): void;
 }
 ```
 
-Os dois adapters montam um `Map<orderId, Order>` e o entregam a `createInMemoryRepository`. A porta é assíncrona para que uma fonte futura (banco ou Parquet) não exija mudar serviço nem rotas.
+Os três adapters montam um `Map<orderId, OrderRecord>` e o entregam, com o cenário, a `createInMemoryRepository`, que calcula os números da carga uma vez. O cenário fica na porta porque vem da mesma fonte dos pedidos em cada modo e é trocado junto com eles quando o `databricks` recarrega.
+
+### Cenário da Gold ("Promessa ajustada", 18/11)
+
+Prazo de despacho sugerido por modalidade, das linhas ativas (`ativo = true`) do cenário "Promessa ajustada" de `workspace.gold.param_cenario_prazo` (colunas lidas: `cenario`, `classe_servico`, `prazo_despacho_dias`, `criterio`, `ativo`, `dt_atualizacao`; nenhuma é dado do cliente). Usado no diagnóstico do colaborador (`dispatchDiagnosis.suggestedDays`) e na Torre (promessa × realidade).
+
+| Modo | De onde vem | Sem ele |
+|---|---|---|
+| `databricks` | Consulta em paralelo com as 3 tabelas (`goldScenarioStatement` em `consumo-sql.ts`; schema de `DATABRICKS_GOLD_SCHEMA`), guardada no cache local; a versão da tabela entra na conferência de mudanças | A API não sobe ("Não foi possível carregar workspace.gold.param_cenario_prazo do Databricks ... use DATA_SOURCE=file") |
+| `file` | `DATA_DIR/gold_param_cenario_prazo.csv`, gravado pelo `pnpm export:dados` (lido antes dos CSVs grandes) | A API não sobe ("... não encontrado em DATA_DIR: rode pnpm export:dados") |
+| `fixtures` | `orders/fixtures/promise-scenario.json`, gerado pelo `pnpm --filter @translog/api fixtures` com a fonte e a data de geração | — |
+
+O leitor (`parseScenarioCsv`) confere de novo `ativo` e o nome do cenário e recusa modalidade desconhecida, prazo inválido, modalidade repetida ou nenhuma linha ativa: a API não sobe com cenário errado.
 
 ### Tabelas oficiais (16/11)
 
@@ -643,11 +667,12 @@ Os três adapters carregam tudo uma vez, ao subir, e servem da memória. Não h�
 ### `fixtures`
 
 - `orders/fixtures/orders.json`: os 9 pedidos da demo (76902, 375, 34, 222, 8, 9, 50, 31298, 76385), gerados das tabelas por `pnpm --filter @translog/api fixtures` (`api/scripts/generate-fixtures.ts`), que também gera a amostra de teste `orders/fixtures/consumo/`.
-- Validados contra `z.array(orderSchema)` ao carregar. Arquivo inválido impede a API de subir, com a mensagem do Zod apontando o campo. Campos fora do contrato são descartados na leitura.
+- `orders/fixtures/promise-scenario.json`: o cenário "Promessa ajustada", gerado no mesmo comando a partir de `DATA_DIR/gold_param_cenario_prazo.csv`.
+- Validados contra `z.array(orderRecordSchema)` ao carregar. Arquivo inválido impede a API de subir, com a mensagem do Zod apontando o campo. Campos fora do contrato são descartados na leitura.
 
 ### `file` (CSVs das tabelas `consumo_*`, plano B)
 
-`loadFileRepository(dir, log)` lê `DATA_DIR/consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv`. A carga é a de `loadConsumoRepository(sources, log)`, feita para ser reaproveitada pelo adapter `databricks` (os pedaços em CSV do Databricks entram pelo mesmo caminho):
+`loadFileRepository(dir, log)` lê `DATA_DIR/gold_param_cenario_prazo.csv` (primeiro: sem ele a API não sobe, antes dos ~10 s de leitura) e depois `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv`. A carga é a de `loadConsumoRepository(sources, log)`, feita para ser reaproveitada pelo adapter `databricks` (os pedaços em CSV do Databricks entram pelo mesmo caminho):
 
 1. Cada tabela é lida numa passada, em streaming (`pipeline(stream, parse(...), consumidor)`), com registros como arrays.
 2. O cabeçalho define a posição de cada coluna de `READ_COLUMNS` da tabela. Se faltar alguma, a carga é interrompida com erro.
@@ -696,7 +721,7 @@ O tempo de carga é quase todo da `csv-parse`. Alternativa medida em 14/11 e nã
 
 ### `pnpm export:dados` (Databricks → CSV)
 
-`api/scripts/export-dados.ts` baixa as 3 tabelas para `DATA_DIR` (padrão `portal/dados/`), lendo `DATABRICKS_HOST`, `DATABRICKS_WAREHOUSE_ID` e `DATABRICKS_TOKEN` do ambiente ou do `portal/.env` (nunca impressos). Usa `orders/databricks-client.ts`:
+`api/scripts/export-dados.ts` baixa as 3 tabelas e o cenário "Promessa ajustada" da Gold (`gold_param_cenario_prazo.csv`, conferido antes de gravar) para `DATA_DIR` (padrão `portal/dados/`), lendo `DATABRICKS_HOST`, `DATABRICKS_WAREHOUSE_ID` e `DATABRICKS_TOKEN` do ambiente ou do `portal/.env` (nunca impressos). Usa `orders/databricks-client.ts`:
 
 1. `POST https://<host>/api/2.0/sql/statements` com `disposition: "EXTERNAL_LINKS"`, `format: "CSV"`, `wait_timeout: "30s"` e `on_wait_timeout: "CONTINUE"` (o resultado não cabe na resposta direta). O token vai só no header `Authorization` dessas chamadas.
 2. Enquanto `PENDING`/`RUNNING`, consulta `GET /api/2.0/sql/statements/{id}` a cada 2 s, com limite de 3 min (o warehouse da edição gratuita dorme); no limite, cancela a consulta e explica o que fazer. `401`/`403`, `FAILED` (ex.: tabela ausente) e host inacessível viram mensagens em pt-BR que sugerem `DATA_SOURCE=file`.
@@ -745,6 +770,14 @@ Log (sem dados nem token):
 | Comparação com `file` | 18 pedidos (os 9 da demo, 8 variados e 1 inexistente) idênticos |
 
 Antes do download em paralelo, a carga levava ~100 s: cada link pré-assinado sai a ~1,4 MB/s, e os pedaços eram baixados um por vez.
+
+#### Cache local (`orders/databricks-cache.ts`)
+
+`loadCachedDatabricksRepository` sobe pelo cache `DATA_DIR/cache-databricks.json.gz` quando ele é do mesmo código, workspace e schemas (chave com o conteúdo dos arquivos da conversão, `catalogSchema` e `goldSchema`), e confere em segundo plano a versão das 4 tabelas (3 `consumo_*` + `param_cenario_prazo`) no Unity Catalog (`DATABRICKS_REFRESH_MINUTES`, padrão 10). Mudou alguma: baixa de novo, troca pedidos e cenário em memória e regrava o cache. Sem cache (ou de outra chave): baixa antes de abrir a porta.
+
+Formato 4 (18/11): gzip com uma linha de cabeçalho (`format`, `key`, `version`, `savedAt`, `scenario`, `orders` = quantos pedidos vêm) e um `OrderRecord` por linha, lido em streaming (`readline`). O formato anterior era um JSON único: com `resumo_pedido` e `linha_do_tempo` ele passou de 189 MB descompactado, e o `JSON.parse` levava o RSS a ~1,3 GB. Arquivo cortado (menos pedidos que o cabeçalho), linha inválida, pedido fora do contrato ou cenário vazio: o cache é ignorado e a API baixa do Databricks. Gravação num temporário (`0600`) trocado pelo definitivo.
+
+**Medido em 18/11** (warehouse lento): primeira subida, sem cache, 303 s (o export do mesmo dia levou ~90 s por tabela); subida pelo cache, 3,8 s, com "Tabelas sem mudança no Databricks" logo depois; heap retido após a leitura do cache 146 MB (igual ao `file`). O RSS com o formato 4 ainda não foi medido com a base real.
 
 **Memória.** O RSS varia muito entre execuções iguais, nos dois modos (de ~210 a ~730 MB, conforme o momento em que o V8 coleta lixo); o heap retido depois da coleta fica em ~103 MB. Entregar ao `csv-parse` os pedaços inteiros (~20 MB) deixava os `Buffer` presos (RSS ~670 MB numa simulação com os CSVs locais); em fatias de 64 KB, ~425 MB.
 
@@ -912,6 +945,7 @@ Tudo em `http/errors.ts`. Rotas e serviços não têm `try/catch` para montar re
 | `AgentTimeoutError` (assistente) | 504 | `AGENT_TIMEOUT` | O assistente demorou demais para responder. Tente novamente. |
 | Validação Zod (params, corpo) | 400 | `VALIDATION_ERROR` | `Requisição inválida: <campo>: <motivo>.` |
 | JSON malformado | 400 | `VALIDATION_ERROR` | Requisição inválida. |
+| `POST /api/auth/*` sem `Content-Type: application/json` (`JsonRequiredError`) | `415` | `UNSUPPORTED_MEDIA_TYPE` | "Envie os dados em JSON (Content-Type: application/json)." |
 | Outros 4xx do Fastify | mesmo status | `BAD_REQUEST` | Mensagem genérica por status (ex.: 415 "Tipo de conteúdo não suportado.") |
 | Rota inexistente | 404 | `NOT_FOUND` | Recurso não encontrado. |
 | Qualquer outro erro | 500 | `INTERNAL_ERROR` | Ocorreu um erro inesperado. Tente novamente. (detalhe só no log) |
@@ -1048,11 +1082,13 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 | `orders/consumo-mapper.test.ts` | 375 completo e datas iguais à `linha_do_tempo`; 76902, 34, 9, 31298; linhas x unidades (8); fuso; formato do export; ordem de itens e eventos (10 depois de 9); centavos; "Sem atraso"; casos inválidos; colunas proibidas fora das lidas |
 | `orders/escalation.test.ts` | ≥ 3 dias, 2 dias, extraviado, não pago, cancelado, adiantado |
 | `orders/tower-stats.test.ts` | Torre com os fixtures (indicadores, fila de atenção, promessa × realidade, sem cenário, `DASHBOARD_URL`), resumo por mercado; **integração com os CSVs reais** (42,7%, 74,7%, 197/43/23, 8.337, 7.222) |
-| `auth/auth-units.test.ts` | Hash scrypt (sal novo, formato), token HMAC (vencido, adulterado, outro segredo, malformado), limite de tentativas |
-| `auth/routes.test.ts` | Login certo e errado (mesma resposta), atributos do cookie (`Secure` em produção), `429`, POST sem JSON, sem `STAFF_USERS`, sessão, `401` em `/api/staff/*`, Torre e pedido com sessão, cookie adulterado e vencido, logout, demonstração ligada e desligada |
+| `auth/auth-units.test.ts` | Hash scrypt (sal novo, formato), token HMAC (vencido, adulterado, outro segredo, malformado), limite de tentativas (janela, janelas vencidas esquecidas, teto de IPs) |
+| `orders/promise-scenario.test.ts` | Leitura do cenário (só ativas da Promessa ajustada; modalidade desconhecida, prazo inválido, repetida, sem linha ativa, colunas faltando, BOM), JSON dos fixtures com fonte e data, `goldScenarioStatement` (SQL e schema inválido) |
+| `orders/order-search.test.ts` | Busca: sem filtro, número por prefixo, texto sem acentos, situação/modalidade/mercado/etapa, causa, atraso mínimo, central, as 3 ordens, páginas, linha resumida; validação da query string |
+| `auth/routes.test.ts` | Login certo e errado (mesma resposta), atributos do cookie (`Secure` em produção), `429`, POST sem JSON, sem `STAFF_USERS`, sessão, `401` em `/api/staff/*`, Torre, pedido e busca com sessão (e `400` com `pageSize` inválido), cookie adulterado e vencido, logout, demonstração ligada e desligada |
 | `orders/consumo-sql.test.ts` | SELECT explícito com `coalesce`/`date_format`, nenhuma coluna proibida (leitura e export), export ⊇ leitura, recusa de coluna proibida, schema e nome inválidos |
 | `orders/databricks-client.test.ts` | Contra um servidor HTTP falso: corpo da consulta, token só na API e nunca no link pré-assinado, `PENDING` → `RUNNING` → `SUCCEEDED`, 3 pedaços com cabeçalho uma vez só, download em paralelo entregue em ordem, `401`/`403`, `FAILED` (tabela ausente), timeout com cancelamento, `404`, host inacessível, falha no download |
-| `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 3 consultas sem colunas proibidas, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
+| `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 4 consultas (3 tabelas + cenário da Gold) sem colunas proibidas, só as linhas ativas do cenário, Gold sem a tabela, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
 | `orders/file-repository.test.ts` | Amostra igual aos fixtures, log, descarte de colunas nas 3 tabelas, linhas inválidas (id, repetido, curta, fora do contrato, sem pedido) sem conteúdo no log, limite de avisos, fora de ordem, BOM e CRLF, erros fatais; **integração com os CSVs reais** |
 | `privacy.test.ts` | Seção 11 (pedidos e chat, nas três fontes; `databricks` com o falso) |
 
@@ -1107,7 +1143,7 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 |---|---|
 | `docker-compose.yml` | Serviço `api` com `DATA_SOURCE=fixtures`, `AGENT=mock`, porta `${API_PORT:-3333}`, healthcheck em `/api/health` (`start_period: 60s`, `start_interval: 1s`) |
 | `docker-compose.dados.yml` | Sobreposição: `DATA_SOURCE=file`, `DATA_DIR=/data`, volume `./dados:/data:ro` (substitui o `docker-compose.silver.yml`) |
-| `docker-compose.databricks.yml` | Sobreposição: `DATA_SOURCE=databricks` e as `DATABRICKS_*` interpoladas do `portal/.env` (ou do ambiente) **na hora de subir**, com `${VAR:?mensagem}` para as obrigatórias; `start_period: 240s` (warehouse dormindo) |
+| `docker-compose.databricks.yml` | Sobreposição: `DATA_SOURCE=databricks`, `DATABRICKS_GOLD_SCHEMA` (padrão `workspace.gold`) e as `DATABRICKS_*` interpoladas do `portal/.env` (ou do ambiente) **na hora de subir**, com `${VAR:?mensagem}` para as obrigatórias; `start_period: 240s` (warehouse dormindo) |
 
 **Credenciais fora da imagem:** a imagem não recebe nenhuma `DATABRICKS_*` no build; elas entram só como variáveis de ambiente do container. Conferido em 16/11: `docker image inspect` sem nenhuma `DATABRICKS_*` e o token ausente do log do container. Para validar o compose sem imprimir o token, use `docker compose -f docker-compose.yml -f docker-compose.databricks.yml config --quiet` (sem `--quiet`, o `config` mostra os valores).
 
@@ -1118,6 +1154,13 @@ O layout do workspace é mantido na imagem de propósito: o Node não remove tip
 | fixtures | ~2 s | 9 / 0 | — |
 | dados (CSVs) | 18 s | 65.752 / 0 | ~371 MiB |
 | databricks | 40 s (consultas 1,8 s, download 23 s, leitura 10 s) | 65.752 / 0 | ~449 MiB |
+
+**Verificado em 18/11** (depois do login, da busca e do cenário da Gold; `SESSION_SECRET` e `AUTH_DEMO` passados pelo ambiente, nunca no arquivo nem na imagem):
+
+| Modo | Até ficar `healthy` | Pedidos | Memória do container | Conferido |
+|---|---|---|---|---|
+| fixtures | 21 s com o build | 9 | 181 MiB | demonstração, `401` sem cookie, Torre, cenário do JSON, busca; imagem sem `.env`, CSV nem as variáveis; segredo fora do log |
+| dados (CSVs) | 13 s | 65.752 | 513 MiB | Torre 42,7% / 74,7% / 197 (43, 23) / 8.337 / 7.222, prazo sugerido do CSV da Gold |
 
 **Chat no Docker sempre simulado:** o agente do Marco ainda não tem imagem na `main`, e, dentro do container da API, `AGENT_URL=http://127.0.0.1:8001` apontaria para o próprio container, não para a máquina. Quando o Dockerfile do agente estiver na `main`, ele entra como serviço no compose e a API usa `AGENT_URL=http://agent:8001`. Para testar com o agente, use `pnpm dev`.
 

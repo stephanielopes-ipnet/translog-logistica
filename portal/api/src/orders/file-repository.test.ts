@@ -10,6 +10,7 @@ import { type ConsumoTable, FORBIDDEN_COLUMNS } from "./consumo-mapper.ts";
 import { consumoFiles, loadFileRepository } from "./file-repository.ts";
 import { FIXTURES_FILE } from "./fixtures-repository.ts";
 import { orderRecordSchema } from "./order-record.ts";
+import { GOLD_SCENARIO_FILE } from "./promise-scenario.ts";
 
 /**
  * Amostra das 3 tabelas com os 9 pedidos da demo (gerada por `pnpm --filter @translog/api
@@ -40,10 +41,10 @@ function toCsv(records: readonly CsvRecord[], columns: readonly string[]): strin
 }
 
 /**
- * Pasta temporária com as 3 tabelas da amostra; `changes` substitui o conteúdo de uma tabela
- * (texto pronto) ou a omite (`null`).
+ * Pasta temporária com as 3 tabelas da amostra e o cenário da Gold; `changes` substitui o
+ * conteúdo de uma tabela (texto pronto) ou a omite (`null`); `scenario: null` omite o cenário.
  */
-async function tempDir(changes: Partial<Record<ConsumoTable, string | null>> = {}) {
+async function tempDir(changes: Partial<Record<ConsumoTable | "scenario", string | null>> = {}) {
   const dir = await mkdtemp(join(tmpdir(), "translog-consumo-"));
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const files = consumoFiles(dir);
@@ -52,6 +53,11 @@ async function tempDir(changes: Partial<Record<ConsumoTable, string | null>> = {
     if (content !== null && content !== undefined) {
       await writeFile(files[table], content);
     }
+  }
+  const scenario =
+    "scenario" in changes ? changes.scenario : readFileSync(join(SAMPLE_DIR, GOLD_SCENARIO_FILE));
+  if (scenario !== null && scenario !== undefined) {
+    await writeFile(join(dir, GOLD_SCENARIO_FILE), scenario);
   }
   return dir;
 }
@@ -192,9 +198,38 @@ describe("loadFileRepository (amostra das tabelas consumo_*)", () => {
     expect(await (await loadFileRepository(dir, fakeLog())).count()).toBe(9);
   });
 
-  it("pasta inexistente impede a carga com mensagem clara", async () => {
+  it("pasta inexistente impede a carga e manda rodar o export", async () => {
     await expect(loadFileRepository("/nao/existe", fakeLog())).rejects.toThrow(
-      "Não foi possível ler DATA_DIR (/nao/existe): consumo_pedidos.csv não encontrado.",
+      "gold_param_cenario_prazo.csv não encontrado em DATA_DIR (/nao/existe): rode pnpm export:dados",
+    );
+  });
+
+  it("lê o cenário Promessa ajustada da Gold junto com os CSVs", async () => {
+    const orders = await loadFileRepository(SAMPLE_DIR, fakeLog());
+
+    expect(Object.fromEntries(orders.scenario())).toStrictEqual({
+      "First Class": 2,
+      "Same Day": 1,
+      "Second Class": 4,
+      "Standard Class": 4,
+    });
+  });
+
+  it("sem o CSV do cenário, a API não sobe e diz para rodar pnpm export:dados", async () => {
+    const dir = await tempDir({ scenario: null });
+
+    await expect(loadFileRepository(dir, fakeLog())).rejects.toThrow(/rode pnpm export:dados/);
+  });
+
+  it("cenário sem linha ativa impede a carga", async () => {
+    const dir = await tempDir({
+      scenario:
+        "cenario,classe_servico,prazo_despacho_dias,criterio,ativo,dt_atualizacao\n" +
+        "Promessa ajustada,First Class,2,x,false,2026-11-17\n",
+    });
+
+    await expect(loadFileRepository(dir, fakeLog())).rejects.toThrow(
+      /gold_param_cenario_prazo.csv inválido: nenhuma linha ativa/,
     );
   });
 

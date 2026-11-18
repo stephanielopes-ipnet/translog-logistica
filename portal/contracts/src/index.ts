@@ -4,4 +4,5 @@ export * from "./errors.ts";
 export * from "./health.ts";
 export * from "./orders.ts";
 export * from "./staff-orders.ts";
+export * from "./staff-search.ts";
 export * from "./tower.ts";

@@ -2,7 +2,6 @@ import type { Order } from "@translog/contracts";
 import { describe, expect, it } from "vitest";
 import { createFixturesRepository } from "../orders/fixtures-repository.ts";
 import { createOrderService } from "../orders/order-service.ts";
-import { NO_PROMISE_SCENARIO } from "../orders/promise-scenario.ts";
 import {
   ASK_NUMBER_REPLY,
   createMockAgent,
@@ -17,7 +16,6 @@ const repository = await createFixturesRepository();
 const orders = createOrderService({
   orders: repository,
   sampleOrderIds: [],
-  promiseScenario: NO_PROMISE_SCENARIO,
 });
 const agent = createMockAgent({ orders });
 

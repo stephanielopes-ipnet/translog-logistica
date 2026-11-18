@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { orderRecordSchema } from "./order-record.ts";
 import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
+import { FIXTURE_SCENARIO_FILE, loadFixtureScenario } from "./promise-scenario.ts";
 
 /**
  * Os 9 pedidos da demo, gerados das tabelas `consumo_*` por `pnpm --filter @translog/api
@@ -10,11 +11,13 @@ import { createInMemoryRepository, type OrderRepository } from "./order-reposito
 export const FIXTURES_FILE = new URL("./fixtures/orders.json", import.meta.url);
 
 /**
- * Adapter `fixtures`: pedidos de exemplo que vêm no código. Valida o arquivo inteiro
- * contra o contrato ao carregar; qualquer pedido inválido impede a API de subir.
+ * Adapter `fixtures`: pedidos de exemplo que vêm no código, com o cenário "Promessa ajustada"
+ * gerado junto (`fixtures/promise-scenario.json`). Valida o arquivo inteiro contra o contrato
+ * ao carregar; qualquer pedido inválido impede a API de subir.
  */
 export async function createFixturesRepository(
   file: URL = FIXTURES_FILE,
+  scenarioFile: URL = FIXTURE_SCENARIO_FILE,
 ): Promise<OrderRepository> {
   const result = z.array(orderRecordSchema).safeParse(JSON.parse(await readFile(file, "utf8")));
   if (!result.success) {
@@ -22,5 +25,8 @@ export async function createFixturesRepository(
       `Pedidos de exemplo inválidos em ${file.pathname}:\n${z.prettifyError(result.error)}`,
     );
   }
-  return createInMemoryRepository(new Map(result.data.map((order) => [order.orderId, order])));
+  return createInMemoryRepository(
+    new Map(result.data.map((order) => [order.orderId, order])),
+    await loadFixtureScenario(scenarioFile),
+  );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createLoginLimiter } from "./login-limiter.ts";
 import { hashPassword, isPasswordHash, verifyPassword } from "./password.ts";
-import { createSessionToken, readSessionToken } from "./session-token.ts";
+import { createSessionToken, readSessionToken } from "./session-signature.ts";
 
 const SECRET = "segredo-de-teste-com-mais-de-32-caracteres";
 
@@ -64,6 +64,38 @@ describe("limite de tentativas", () => {
 
     time = 1000;
     expect(limiter.isBlocked("1.1.1.1")).toBe(false);
+  });
+
+  it("esquece as janelas vencidas ao registrar uma falha nova", () => {
+    let time = 0;
+    const limiter = createLoginLimiter({ maxFailures: 5, windowMs: 1000, now: () => time });
+    for (let index = 0; index < 50; index++) {
+      limiter.recordFailure(`10.0.0.${index}`);
+    }
+    expect(limiter.trackedIps()).toBe(50);
+
+    time = 1500;
+    limiter.recordFailure("10.0.1.1");
+
+    expect(limiter.trackedIps()).toBe(1);
+  });
+
+  it("com IPs demais, esquece os mais antigos e continua bloqueando os recentes", () => {
+    let time = 0;
+    const limiter = createLoginLimiter({
+      maxFailures: 1,
+      windowMs: 60_000,
+      maxTrackedIps: 3,
+      now: () => time,
+    });
+    for (const ip of ["a", "b", "c", "d"]) {
+      time++;
+      limiter.recordFailure(ip);
+    }
+
+    expect(limiter.trackedIps()).toBe(3);
+    expect(limiter.isBlocked("a")).toBe(false);
+    expect(limiter.isBlocked("d")).toBe(true);
   });
 
   it("zera as falhas depois de um login certo", () => {

@@ -2,13 +2,14 @@ import {
   errorResponseSchema,
   sessionResponseSchema,
   staffOrderSchema,
+  staffSearchResponseSchema,
   towerResponseSchema,
 } from "@translog/contracts";
 import { beforeAll, describe, expect, it, onTestFinished } from "vitest";
 import { loadConfig } from "../config.ts";
 import { buildServer } from "../server.ts";
 import { hashPassword } from "./password.ts";
-import { createSessionToken } from "./session-token.ts";
+import { createSessionToken } from "./session-signature.ts";
 
 const SECRET = "segredo-de-teste-com-mais-de-32-caracteres";
 const PASSWORD = "Senha-de-teste-1";
@@ -98,6 +99,13 @@ describe("POST /api/auth/login", () => {
       payload: `{"email":"ana@translog.com","password":"${PASSWORD}"}`,
     });
     expect(response.statusCode).toBe(415);
+    expect(response.json()).toStrictEqual({
+      error: {
+        code: "UNSUPPORTED_MEDIA_TYPE",
+        message: "Envie os dados em JSON (Content-Type: application/json).",
+      },
+    });
+    expect(response.headers["set-cookie"]).toBeUndefined();
   });
 
   it("ninguém entra sem STAFF_USERS", async () => {
@@ -133,7 +141,7 @@ describe("sessão, rotas do colaborador e logout", () => {
 
   it("exige sessão em /api/staff/* (401), e com sessão devolve a Torre e o pedido", async () => {
     const app = await buildTestServer();
-    for (const url of ["/api/staff/tower", "/api/staff/orders/76902"]) {
+    for (const url of ["/api/staff/tower", "/api/staff/orders/76902", "/api/staff/orders?q=7"]) {
       const response = await app.inject({ method: "GET", url });
       expect(response.statusCode, url).toBe(401);
       expect(response.json(), url).toMatchObject({ error: { code: "UNAUTHENTICATED" } });
@@ -164,6 +172,26 @@ describe("sessão, rotas do colaborador e logout", () => {
       dispatchDiagnosis: { suggestedDays: 2, onTimeWithSuggested: true },
     });
     expect(missing.statusCode).toBe(404);
+
+    const search = await app.inject({
+      method: "GET",
+      url: "/api/staff/orders?status=Em%20tr%C3%A2nsito&pageSize=1",
+      headers: { cookie },
+    });
+    expect(search.statusCode).toBe(200);
+    expect(staffSearchResponseSchema.strict().parse(search.json())).toMatchObject({
+      total: 2,
+      page: 1,
+      pageSize: 1,
+      results: [{ orderId: 76385 }],
+    });
+    const invalid = await app.inject({
+      method: "GET",
+      url: "/api/staff/orders?pageSize=500",
+      headers: { cookie },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
   });
 
   it("recusa cookie adulterado e sessão expirada", async () => {

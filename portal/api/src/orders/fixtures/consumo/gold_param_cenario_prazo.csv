@@ -1,0 +1,5 @@
+cenario,classe_servico,prazo_despacho_dias,criterio,ativo,dt_atualizacao
+Promessa ajustada,First Class,2,Despacho real é sempre 2 dias,true,2026-11-17 01:24:24.052706
+Promessa ajustada,Same Day,1,Despacho real é 0 ou 1 dia,true,2026-11-17 01:24:24.052706
+Promessa ajustada,Second Class,4,Despacho real de 2 a 6 dias; alinhado à Standard,true,2026-11-17 01:24:24.052706
+Promessa ajustada,Standard Class,4,Mantém o prazo atual,true,2026-11-17 01:24:24.052706

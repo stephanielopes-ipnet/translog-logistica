@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import { createFixturesRepository } from "./fixtures-repository.ts";
 import { createOrderService, OrderNotFoundError } from "./order-service.ts";
 
+const fixtures = await createFixturesRepository();
 const service = createOrderService({
-  orders: await createFixturesRepository(),
+  // Cenário trocado pelo teste: só First Class tem prazo sugerido (3 dias).
+  orders: { ...fixtures, scenario: () => new Map<ShippingMode, number>([["First Class", 3]]) },
   sampleOrderIds: [76902, 1, 375],
-  promiseScenario: new Map<ShippingMode, number>([["First Class", 2]]),
 });
 
 describe("createOrderService", () => {
@@ -23,7 +24,8 @@ describe("createOrderService", () => {
 
     expect(order.dispatch.probableCause).toBe("Promessa irreal");
     expect(order.market).toBe("Pacific Asia");
-    expect(order.dispatchDiagnosis.suggestedDays).toBe(2);
+    expect(order.dispatchDiagnosis.suggestedDays).toBe(3);
+    expect((await service.getStaffOrder(375)).dispatchDiagnosis.suggestedDays).toBeNull();
     expect(order.context.shippingMode.dispatchedOrders).toBe(3);
   });
 

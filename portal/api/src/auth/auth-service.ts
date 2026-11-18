@@ -1,7 +1,7 @@
 import { DEMO_STAFF_EMAIL } from "@translog/contracts";
 import { createLoginLimiter, type LoginLimiter } from "./login-limiter.ts";
 import { DUMMY_PASSWORD_HASH, verifyPassword } from "./password.ts";
-import { createSessionToken, readSessionToken, type SessionData } from "./session-token.ts";
+import { createSessionToken, readSessionToken, type SessionData } from "./session-signature.ts";
 
 /** E-mail ou senha errados (mesma resposta nos dois casos). Vira `401` em `http/errors.ts`. */
 export class InvalidCredentialsError extends Error {
@@ -24,6 +24,17 @@ export class UnauthenticatedError extends Error {
   constructor() {
     super("Sessão ausente ou expirada.");
     this.name = "UnauthenticatedError";
+  }
+}
+
+/**
+ * `POST` de login/logout/demo sem `Content-Type: application/json` (junto com `SameSite=Lax`,
+ * barra formulário de outro site, o CSRF deste escopo). Vira `415` em `http/errors.ts`.
+ */
+export class JsonRequiredError extends Error {
+  constructor() {
+    super("Pedido de escrita sem JSON.");
+    this.name = "JsonRequiredError";
   }
 }
 

@@ -6,13 +6,12 @@ import { loadFileRepository } from "./file-repository.ts";
 import { createFixturesRepository } from "./fixtures-repository.ts";
 import type { OrderRepository } from "./order-repository.ts";
 import { createOrderService } from "./order-service.ts";
-import { ADJUSTED_PROMISE_SCENARIO, NO_PROMISE_SCENARIO } from "./promise-scenario.ts";
+import { NO_PROMISE_SCENARIO } from "./promise-scenario.ts";
 
 function service(orders: OrderRepository, dashboardUrl: string | null = null) {
   return createOrderService({
     orders,
     sampleOrderIds: [],
-    promiseScenario: ADJUSTED_PROMISE_SCENARIO,
     dashboardUrl,
   });
 }
@@ -79,9 +78,8 @@ describe("Torre de controle (fixtures)", () => {
   it("sem cenário, não sugere prazo; com DASHBOARD_URL, devolve o link", async () => {
     const orders = await createFixturesRepository();
     const withoutScenario = createOrderService({
-      orders,
+      orders: { ...orders, scenario: () => NO_PROMISE_SCENARIO },
       sampleOrderIds: [],
-      promiseScenario: NO_PROMISE_SCENARIO,
     }).getTower();
 
     expect(withoutScenario.promiseByMode.every((mode) => mode.suggestedDays === null)).toBe(true);

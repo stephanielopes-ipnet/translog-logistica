@@ -88,7 +88,7 @@ describe("GET /api/health", () => {
       orders: 9,
       agent: "mock",
     });
-    expect(fake.statements).toHaveLength(3);
+    expect(fake.statements).toHaveLength(4); // 3 tabelas + cenário da Gold
   });
 
   it("com DATA_SOURCE=databricks e token recusado, o servidor não sobe", async () => {
@@ -111,9 +111,7 @@ describe("GET /api/health", () => {
       buildServer(loadConfig({ DATA_SOURCE: "file", DATA_DIR: "/nao/existe" }), {
         logger: false,
       }),
-    ).rejects.toThrow(
-      "Não foi possível ler DATA_DIR (/nao/existe): consumo_pedidos.csv não encontrado.",
-    );
+    ).rejects.toThrow(/não encontrado em DATA_DIR \(\/nao\/existe\): rode pnpm export:dados/);
   });
 });
 

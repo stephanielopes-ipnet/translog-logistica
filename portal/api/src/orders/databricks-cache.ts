@@ -1,18 +1,28 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { access, mkdir, readFile, rename, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import { promisify } from "node:util";
-import { gunzip, gzip } from "node:zlib";
+import { createInterface } from "node:readline";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { createGunzip, createGzip } from "node:zlib";
 import { z } from "zod";
 import { type OrderRecord, orderRecordSchema } from "./order-record.ts";
+import {
+  type PromiseScenario,
+  scenarioFromJson,
+  scenarioJsonSchema,
+  scenarioToJson,
+} from "./promise-scenario.ts";
 
 // Cache local do adapter `databricks`: os pedidos já convertidos (o `OrderRecord` que a API
-// guarda, de onde saem as visões do cliente e do colaborador, sem nenhuma coluna proibida) num JSON com gzip dentro de `DATA_DIR`, que
-// fica fora do Git e da imagem Docker. Medido em 17/11 com os 65.752 pedidos: ~7 MB no disco,
-// leitura em ~3 s, contra 25 s a 3 min de consulta e download no Databricks.
+// guarda, sem nenhuma coluna proibida) e o cenário "Promessa ajustada" da Gold, com gzip dentro
+// de `DATA_DIR` (fora do Git e da imagem Docker). Formato: uma linha de cabeçalho em JSON e um
+// pedido por linha, lido em streaming. Medido em 18/11 com os 65.752 pedidos: ~11 MB no disco,
+// leitura em ~3 s, contra 25 s a 5 min de consulta e download no Databricks.
 
 /** Muda quando o formato do arquivo muda (o cache antigo é descartado). */
-const FORMAT = 2;
+const FORMAT = 4;
 
 /**
  * Código que define como as tabelas viram `OrderRecord`. Mudou um deles, os pedidos do cache podem
@@ -24,6 +34,7 @@ const CONVERSION_FILES = [
   new URL("./escalation.ts", import.meta.url),
   new URL("./file-repository.ts", import.meta.url),
   new URL("./order-record.ts", import.meta.url),
+  new URL("./promise-scenario.ts", import.meta.url),
   new URL("../../../contracts/src/orders.ts", import.meta.url),
   new URL("../../../contracts/src/staff-orders.ts", import.meta.url),
 ];
@@ -34,30 +45,36 @@ export interface OrderCache {
   /** Quando o cache foi gravado (ISO 8601, UTC). */
   savedAt: string;
   orders: Map<number, OrderRecord>;
+  /** Cenário "Promessa ajustada" da Gold, baixado junto com os pedidos. */
+  scenario: PromiseScenario;
 }
 
 export type CacheReadResult =
   | { ok: true; cache: OrderCache }
   | { ok: false; reason: "ausente" | "de outra versão do código ou da fonte" | "ilegível" };
 
-const cacheFileSchema = z.object({
+/** Primeira linha do arquivo; as seguintes são os pedidos, um por linha. */
+const cacheHeaderSchema = z.object({
   format: z.number(),
   key: z.string(),
   version: z.string().nullable(),
   savedAt: z.string(),
-  orders: z.array(z.unknown()),
+  scenario: scenarioJsonSchema,
+  /** Quantos pedidos vêm depois: arquivo cortado no meio não passa como cache válido. */
+  orders: z.number().int().nonnegative(),
 });
-
-const gzipAsync = promisify(gzip);
-const gunzipAsync = promisify(gunzip);
 
 /**
  * Identifica de onde e com que código os pedidos vieram: formato do arquivo, workspace,
- * `catalogo.schema` e o conteúdo dos arquivos da conversão.
+ * `catalogo.schema` dos pedidos e da Gold e o conteúdo dos arquivos da conversão.
  */
-export async function cacheKey(source: { baseUrl: string; catalogSchema: string }) {
+export async function cacheKey(source: {
+  baseUrl: string;
+  catalogSchema: string;
+  goldSchema: string;
+}) {
   const hash = createHash("sha256").update(
-    `${FORMAT}\n${source.baseUrl}\n${source.catalogSchema}\n`,
+    `${FORMAT}\n${source.baseUrl}\n${source.catalogSchema}\n${source.goldSchema}\n`,
   );
   for (const file of CONVERSION_FILES) {
     hash.update(await readFile(file));
@@ -66,55 +83,78 @@ export async function cacheKey(source: { baseUrl: string; catalogSchema: string 
 }
 
 /**
- * Lê o cache. Arquivo ausente, de outra chave ou ilegível (corrompido, formato antigo, pedido
- * fora do contrato) não é erro: devolve o motivo, e quem chama baixa do Databricks.
+ * Lê o cache em streaming, um pedido por linha (sem montar um texto de ~190 MB na memória, o
+ * que levava o RSS a ~1,3 GB). Arquivo ausente, de outra chave ou ilegível (corrompido, formato
+ * antigo, pedido fora do contrato, sem cenário) não é erro: devolve o motivo, e quem chama baixa
+ * do Databricks.
  */
 export async function readOrderCache(file: string, key: string): Promise<CacheReadResult> {
-  let raw: Buffer;
   try {
-    raw = await readFile(file);
+    await access(file);
   } catch {
     return { ok: false, reason: "ausente" };
   }
+  const input = createReadStream(file);
+  const lines = createInterface({ input: input.pipe(createGunzip()), crlfDelay: Infinity });
+  const intern = createInterner();
   try {
-    const content = cacheFileSchema.parse(JSON.parse((await gunzipAsync(raw)).toString("utf8")));
-    if (content.format !== FORMAT || content.key !== key) {
-      return { ok: false, reason: "de outra versão do código ou da fonte" };
-    }
-    internStrings(content.orders);
+    let header: z.infer<typeof cacheHeaderSchema> | undefined;
     const orders = new Map<number, OrderRecord>();
-    for (const value of content.orders) {
-      const order = orderRecordSchema.parse(value);
+    for await (const line of lines) {
+      if (header === undefined) {
+        header = cacheHeaderSchema.parse(JSON.parse(line));
+        if (header.format !== FORMAT || header.key !== key) {
+          return { ok: false, reason: "de outra versão do código ou da fonte" };
+        }
+        continue;
+      }
+      const order = orderRecordSchema.parse(intern(JSON.parse(line)));
       orders.set(order.orderId, order);
     }
-    return { ok: true, cache: { version: content.version, savedAt: content.savedAt, orders } };
+    const scenario = header ? scenarioFromJson(header.scenario) : new Map();
+    if (header === undefined || scenario.size === 0 || orders.size !== header.orders) {
+      return { ok: false, reason: "ilegível" };
+    }
+    return {
+      ok: true,
+      cache: { version: header.version, savedAt: header.savedAt, orders, scenario },
+    };
   } catch {
     return { ok: false, reason: "ilegível" };
+  } finally {
+    lines.close();
+    input.destroy();
   }
 }
 
 /**
- * Grava o cache num arquivo temporário e troca pelo definitivo: uma gravação interrompida
- * nunca deixa um cache pela metade. Só o dono lê (0600).
+ * Grava o cache (cabeçalho + um pedido por linha, com gzip) num arquivo temporário e troca pelo
+ * definitivo: uma gravação interrompida nunca deixa um cache pela metade. Só o dono lê (0600).
  */
 export async function writeOrderCache(
   file: string,
   key: string,
   version: string | null,
-  orders: ReadonlyMap<number, OrderRecord>,
+  { orders, scenario }: { orders: ReadonlyMap<number, OrderRecord>; scenario: PromiseScenario },
 ): Promise<void> {
-  const content = JSON.stringify({
+  const header = {
     format: FORMAT,
     key,
     version,
     savedAt: new Date().toISOString(),
-    orders: [...orders.values()],
-  });
-  const zipped = await gzipAsync(content);
+    scenario: scenarioToJson(scenario),
+    orders: orders.size,
+  } satisfies z.infer<typeof cacheHeaderSchema>;
+  function* lines() {
+    yield `${JSON.stringify(header)}\n`;
+    for (const order of orders.values()) {
+      yield `${JSON.stringify(order)}\n`;
+    }
+  }
   await mkdir(dirname(file), { recursive: true });
   const temp = `${file}.${process.pid}.tmp`;
   try {
-    await writeFile(temp, zipped, { mode: 0o600 });
+    await pipeline(Readable.from(lines()), createGzip(), createWriteStream(temp, { mode: 0o600 }));
     await rename(temp, file);
   } catch (error) {
     await rm(temp, { force: true });
@@ -124,10 +164,10 @@ export async function writeOrderCache(
 
 /**
  * Uma instância só de cada texto repetido (modalidades, regiões, datas, locais dos eventos),
- * como a leitura dos CSVs faz. Sem isso, o heap dos 65.752 pedidos passa de ~83 para ~210 MB
- * (medido em 17/11); o custo é ~0,7 s na leitura.
+ * como a leitura dos CSVs faz, com um dicionário compartilhado por todos os pedidos da leitura.
+ * Sem isso, o heap dos 65.752 pedidos passa de ~83 para ~210 MB (medido em 17/11).
  */
-function internStrings(values: unknown[]): void {
+function createInterner(): (value: unknown) => unknown {
   const pool = new Map<string, string>();
   const visit = (value: unknown): unknown => {
     if (typeof value === "string") {
@@ -150,5 +190,5 @@ function internStrings(values: unknown[]): void {
     }
     return value;
   };
-  visit(values);
+  return visit;
 }

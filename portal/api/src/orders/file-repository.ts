@@ -13,6 +13,7 @@ import {
 } from "./consumo-mapper.ts";
 import type { OrderRecord } from "./order-record.ts";
 import { createInMemoryRepository, type OrderRepository } from "./order-repository.ts";
+import { loadScenarioFile } from "./promise-scenario.ts";
 
 /** O que a carga precisa do log (o `app.log` do Fastify serve). */
 export interface LoadLogger {
@@ -44,7 +45,8 @@ export function consumoFiles(dir: string): Record<ConsumoTable, string> {
 
 /**
  * Adapter `file`: lê as três tabelas `consumo_*` em CSV da pasta `DATA_DIR`
- * (`consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv`).
+ * (`consumo_pedidos.csv`, `consumo_itens_pedido.csv`, `consumo_eventos_logisticos.csv`) e o
+ * cenário "Promessa ajustada" da Gold (`gold_param_cenario_prazo.csv`), todos do `pnpm export:dados`.
  * Pasta ou arquivo ausente, vazio ou sem as colunas esperadas impede a API de subir.
  */
 export async function loadFileRepository(dir: string, log: LoadLogger): Promise<OrderRepository> {
@@ -53,13 +55,15 @@ export async function loadFileRepository(dir: string, log: LoadLogger): Promise<
     name: `${CONSUMO_TABLES[table]}.csv`,
     open: () => createReadStream(files[table]),
   });
+  // O cenário primeiro: sem ele a API não sobe, e o erro aparece antes dos ~10 s de leitura.
+  const scenario = await loadScenarioFile(dir);
   try {
     const orders = await loadConsumoOrders(
       { orders: source("orders"), items: source("items"), events: source("events") },
       log,
       { dataDir: dir },
     );
-    return createInMemoryRepository(orders);
+    return createInMemoryRepository(orders, scenario);
   } catch (error) {
     throw new Error(`Não foi possível ler DATA_DIR (${dir}): ${describeError(error)}`);
   }

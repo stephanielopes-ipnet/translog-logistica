@@ -2,7 +2,10 @@ import {
   errorResponseSchema,
   orderIdParamsSchema,
   type StaffOrder,
+  type StaffSearchResponse,
   staffOrderSchema,
+  staffSearchQuerySchema,
+  staffSearchResponseSchema,
   type TowerResponse,
   towerResponseSchema,
 } from "@translog/contracts";
@@ -27,6 +30,28 @@ export const staffRoutes: FastifyPluginAsyncZod<StaffRoutesOptions> = async (
       throw new UnauthenticatedError();
     }
   });
+
+  app.get(
+    "/staff/orders",
+    {
+      schema: {
+        summary: "Busca de pedidos (colaborador)",
+        description:
+          "Filtra os pedidos carregados por número (prefixo) ou texto (cidade, estado, país, região " +
+          "ou rota, sem acentos), situação, modalidade, mercado, etapa, causa da base, atraso " +
+          "mínimo e encaminhamento à central; ordena e pagina (até 50 por página). Linhas " +
+          "resumidas; o pedido completo está em /api/staff/orders/:orderId. Exige sessão (401).",
+        tags: ["colaborador"],
+        querystring: staffSearchQuerySchema,
+        response: {
+          200: staffSearchResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+        },
+      },
+    },
+    async (request): Promise<StaffSearchResponse> => orderService.searchStaffOrders(request.query),
+  );
 
   app.get(
     "/staff/orders/:orderId",

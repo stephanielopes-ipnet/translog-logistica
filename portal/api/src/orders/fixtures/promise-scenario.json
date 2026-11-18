@@ -1,0 +1,10 @@
+{
+  "source": "workspace.gold.param_cenario_prazo (linhas ativas do cenário \"Promessa ajustada\")",
+  "generatedAt": "2026-11-18T13:00:54.935Z",
+  "scenario": {
+    "First Class": 2,
+    "Same Day": 1,
+    "Second Class": 4,
+    "Standard Class": 4
+  }
+}

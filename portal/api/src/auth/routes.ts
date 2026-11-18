@@ -7,7 +7,7 @@ import {
 import type { FastifyRequest } from "fastify";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
-import type { AuthService } from "./auth-service.ts";
+import { type AuthService, JsonRequiredError } from "./auth-service.ts";
 import { readSessionCookie, writeSessionCookie } from "./session-cookie.ts";
 
 export interface AuthRoutesOptions {
@@ -25,11 +25,9 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRoutesOptions> = async (
   app,
   { auth, secureCookie },
 ) => {
-  app.addHook("onRequest", async (request, reply) => {
+  app.addHook("onRequest", async (request) => {
     if (request.method === "POST" && !isJson(request)) {
-      return reply.status(415).send({
-        error: { code: "BAD_REQUEST", message: "Tipo de conteúdo não suportado." },
-      });
+      throw new JsonRequiredError();
     }
   });
 

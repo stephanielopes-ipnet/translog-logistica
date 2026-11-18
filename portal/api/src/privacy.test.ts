@@ -10,6 +10,7 @@ import { FIXTURES_FILE } from "./orders/fixtures-repository.ts";
 import { type OrderRecord, orderRecordSchema } from "./orders/order-record.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
 import { computeOrderStats } from "./orders/order-stats.ts";
+import { NO_PROMISE_SCENARIO } from "./orders/promise-scenario.ts";
 import { buildServer } from "./server.ts";
 import { startFakeDatabricks } from "./testing/fake-databricks.ts";
 import { tempDir } from "./testing/temp-dir.ts";
@@ -107,7 +108,9 @@ function leakyRepository(leak: (record: OrderRecord) => object): OrderRepository
       return record ? (Object.assign({}, record, leak(record)) as OrderRecord) : null;
     },
     count: async () => fixtures.length,
+    records: () => fixtures,
     stats: () => computeOrderStats(fixtures),
+    scenario: () => NO_PROMISE_SCENARIO,
   };
 }
 
@@ -310,7 +313,7 @@ describe("visão do cliente × visão do colaborador", () => {
   );
 
   it.each([...SOURCES])(
-    "a Torre e o pedido do colaborador (com sessão) não têm chave ou valor proibido (fonte $source)",
+    "a Torre, a busca e o pedido do colaborador (com sessão) não têm chave ou valor proibido (fonte $source)",
     async ({ env }) => {
       const app = await buildTestServer({
         ...(await env()),
@@ -320,7 +323,12 @@ describe("visão do cliente × visão do colaborador", () => {
       const demo = await app.inject({ method: "POST", url: "/api/auth/demo", payload: {} });
       const cookie = String(demo.headers["set-cookie"]).split(";")[0] ?? "";
 
-      const urls = ["/api/staff/tower", ...ALL_IDS.map((id) => `/api/staff/orders/${id}`)];
+      const urls = [
+        "/api/staff/tower",
+        "/api/staff/orders?pageSize=50",
+        "/api/staff/orders?q=brasil&sort=orderDate",
+        ...ALL_IDS.map((id) => `/api/staff/orders/${id}`),
+      ];
       for (const url of urls) {
         const response = await app.inject({ method: "GET", url, headers: { cookie } });
         expect(response.statusCode, url).toBe(200);

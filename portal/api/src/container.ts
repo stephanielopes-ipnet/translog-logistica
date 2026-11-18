@@ -10,7 +10,6 @@ import { type LoadLogger, loadFileRepository } from "./orders/file-repository.ts
 import { createFixturesRepository } from "./orders/fixtures-repository.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
 import { createOrderService, type OrderService } from "./orders/order-service.ts";
-import { ADJUSTED_PROMISE_SCENARIO } from "./orders/promise-scenario.ts";
 
 /**
  * Dependências da aplicação. A escolha dos adapters (`DATA_SOURCE` e `AGENT`) acontece só aqui.
@@ -46,8 +45,6 @@ export async function createContainer(
   const orderService = createOrderService({
     orders,
     sampleOrderIds: config.sampleOrderIds,
-    // Cenário "Promessa ajustada" da Gold, copiado como constantes (ler a tabela é pendência).
-    promiseScenario: ADJUSTED_PROMISE_SCENARIO,
     dashboardUrl: config.dashboardUrl,
   });
   const chatLog = log.child({ agent: config.agent });
