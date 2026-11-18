@@ -9,6 +9,7 @@ import { type ContainerOverrides, createContainer } from "./container.ts";
 import { FIXTURES_FILE } from "./orders/fixtures-repository.ts";
 import { type OrderRecord, orderRecordSchema } from "./orders/order-record.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
+import { createOrderSearch } from "./orders/order-search.ts";
 import { computeOrderStats } from "./orders/order-stats.ts";
 import { NO_PROMISE_SCENARIO } from "./orders/promise-scenario.ts";
 import { buildServer } from "./server.ts";
@@ -108,7 +109,7 @@ function leakyRepository(leak: (record: OrderRecord) => object): OrderRepository
       return record ? (Object.assign({}, record, leak(record)) as OrderRecord) : null;
     },
     count: async () => fixtures.length,
-    records: () => fixtures,
+    search: createOrderSearch(fixtures),
     stats: () => computeOrderStats(fixtures),
     scenario: () => NO_PROMISE_SCENARIO,
   };
@@ -326,7 +327,7 @@ describe("visão do cliente × visão do colaborador", () => {
       const urls = [
         "/api/staff/tower",
         "/api/staff/orders?pageSize=50",
-        "/api/staff/orders?q=brasil&sort=orderDate",
+        "/api/staff/orders?q=brasil&sort=date",
         ...ALL_IDS.map((id) => `/api/staff/orders/${id}`),
       ];
       for (const url of urls) {

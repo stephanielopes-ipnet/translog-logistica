@@ -7,7 +7,6 @@ import type {
   TowerResponse,
 } from "@translog/contracts";
 import type { OrderRepository } from "./order-repository.ts";
-import { searchOrders } from "./order-search.ts";
 import { toCustomerOrder, toStaffOrder } from "./order-views.ts";
 import { buildOrdersSummary, buildTower } from "./tower-stats.ts";
 
@@ -94,6 +93,6 @@ export function createOrderService({
 
     getSummary: () => buildOrdersSummary(orders.stats().tower),
 
-    searchStaffOrders: (query) => searchOrders(orders.records(), query),
+    searchStaffOrders: (query) => orders.search(query),
   };
 }

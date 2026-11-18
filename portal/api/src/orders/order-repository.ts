@@ -1,4 +1,6 @@
+import type { StaffSearchQuery, StaffSearchResponse } from "@translog/contracts";
 import type { OrderRecord } from "./order-record.ts";
+import { createOrderSearch } from "./order-search.ts";
 import { computeOrderStats, type OrderStats } from "./order-stats.ts";
 import type { PromiseScenario } from "./promise-scenario.ts";
 
@@ -13,8 +15,8 @@ export interface OrderRepository {
   findById(orderId: number): Promise<OrderRecord | null>;
   /** Quantos pedidos a fonte tem. */
   count(): Promise<number>;
-  /** Todos os registros carregados (para a busca do colaborador). */
-  records(): Iterable<OrderRecord>;
+  /** Busca do colaborador: filtra, ordena e pagina (índice montado na criação do repositório). */
+  search(query: StaffSearchQuery): StaffSearchResponse;
   /** Números agregados dos pedidos carregados (calculados na carga, não a cada consulta). */
   stats(): OrderStats;
   /** Prazo de despacho sugerido por modalidade (Promessa ajustada, da Gold), da mesma fonte. */
@@ -36,7 +38,7 @@ export function createInMemoryRepository(
     async count() {
       return byId.size;
     },
-    records: () => byId.values(),
+    search: createOrderSearch(byId.values()),
     stats: () => stats,
     scenario: () => scenario,
   };

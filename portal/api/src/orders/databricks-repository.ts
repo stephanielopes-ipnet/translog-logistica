@@ -120,7 +120,8 @@ export async function loadCachedDatabricksRepository(
   return {
     findById: (orderId) => orders.findById(orderId),
     count: () => orders.count(),
-    records: () => orders.records(),
+    // Sempre o repositório atual: depois de uma recarga, a busca usa o índice novo.
+    search: (query) => orders.search(query),
     stats: () => orders.stats(),
     scenario: () => orders.scenario(),
     refresh,
