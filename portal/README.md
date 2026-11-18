@@ -33,6 +33,79 @@ Das tabelas oficiais do time de dados (Mateus), no Databricks:
 
 O portal carrega tudo **uma vez, ao ligar**, e depois responde da memória. O "hoje" dos dados é **06/02/2018** (a data mais recente da base): a situação mostrada é a dessa data.
 
+## Primeiros passos (clonou o projeto agora?)
+
+Siga na ordem. Leva uns 15 minutos, quase todo no download dos dados.
+
+**O que você precisa ter instalado:** Git, Node 24 (o arquivo `.nvmrc` indica a versão; com o nvm, `nvm use`), pnpm (`corepack enable`) e, só para ligar a IA ou usar o Docker, o Docker.
+
+**1. Baixar o projeto e instalar**
+
+```bash
+git clone <endereço do repositório>
+cd translog-logistica/portal
+pnpm install
+cp .env.example .env
+```
+
+**2. Preencher as credenciais do Databricks no `portal/.env`** (peça ao Matheus ou ao Mateus; o token é segredo e nunca vai para o GitHub nem para mensagens):
+
+```
+DATABRICKS_HOST=dbc-xxxxxxxx-xxxx.cloud.databricks.com
+DATABRICKS_WAREHOUSE_ID=<id do SQL warehouse>
+DATABRICKS_TOKEN=<token de acesso>
+```
+
+**3. Baixar os dados: `pnpm export:dados`** (obrigatório na primeira vez)
+
+```bash
+pnpm export:dados     # leva ~1 minuto; grava 3 arquivos CSV em portal/dados/
+```
+
+Por que é preciso: os CSVs (86 MB, 14 MB e 66 MB) **não ficam no GitHub**, então um clone novo vem sem eles. Sem esse passo:
+
+- só o modo `fixtures` funciona (9 pedidos de exemplo);
+- o modo `file` (plano B da banca) não sobe;
+- o **agente de IA não encontra nenhum pedido**, porque ele lê esses mesmos arquivos.
+
+Rode de novo sempre que o time de dados atualizar as tabelas, para a API e a IA continuarem contando a mesma história.
+
+**4. Configurar o `portal/.env`**
+
+```
+DATA_SOURCE=file                  # lê os CSVs baixados (ou databricks, para ler direto da fonte)
+SESSION_SECRET=<texto aleatório>  # gere com: openssl rand -base64 48
+AUTH_DEMO=true                    # liga "Entrar como demonstração" na Área do colaborador
+```
+
+**5. Ligar o portal**
+
+```bash
+pnpm dev
+```
+
+Espere aparecer "Pedidos carregados" no terminal (~15 s) e abra http://localhost:5173. Para conferir, abra http://localhost:5173/rastreio?pedido=76902: deve aparecer um pedido em trânsito, com 5 dias de atraso e parado na Alfândega Jacarta.
+
+**6. (Opcional) Ligar o LogBot com IA de verdade.** Sem isso, o chat usa o assistente simulado, que já funciona.
+
+```bash
+cp ../agent/.env.example ../agent/.env   # e preencha GOOGLE_API_KEY (chave do Gemini, só nesse arquivo)
+pnpm agent:up                            # sobe o agente no Docker (a primeira vez leva alguns minutos)
+```
+
+No `portal/.env`: `AGENT=adk` e `AGENT_URL=http://127.0.0.1:8001`; depois reinicie o `pnpm dev`. O plano gratuito do Gemini permite poucas perguntas por dia; se acabar, volte para `AGENT=mock`.
+
+**Deu errado?**
+
+| Sintoma | Causa provável |
+|---|---|
+| `pnpm export:dados` diz "DATABRICKS_HOST não definida" (ou outra `DATABRICKS_*`), ou recusa o token | Credenciais não preenchidas no `portal/.env` ou token vencido |
+| A API não sobe com `DATA_SOURCE=file` e diz "consumo_pedidos.csv não encontrado" | Passo 3 não foi feito (faltam os CSVs em `portal/dados/`) |
+| A tela mostra "Não foi possível conectar" logo depois do `pnpm dev` | A API ainda está carregando os dados; espere a mensagem "Pedidos carregados" e tente de novo |
+| O chat diz que a fonte de pedidos está indisponível | O agente não achou os CSVs (passo 3) ou eles estão com o formato antigo: rode `pnpm export:dados` de novo |
+| O chat responde na hora com erro | Cota diária do Gemini esgotada; use `AGENT=mock` |
+| Não consigo entrar na Área do colaborador | Falta `SESSION_SECRET` ou `AUTH_DEMO=true` no `.env` (e reiniciar o `pnpm dev`) |
+
 ## Como rodar
 
 Precisa de Node 24 e pnpm (`corepack enable`). Na pasta `portal/`:
@@ -58,7 +131,7 @@ pnpm dev
 
 ### Com os CSVs (plano B)
 
-1. Coloque `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` em `portal/dados/`. Para baixá-los do Databricks: `pnpm export:dados` (leva ~1 min; precisa das credenciais abaixo).
+1. Os arquivos `consumo_pedidos.csv`, `consumo_itens_pedido.csv` e `consumo_eventos_logisticos.csv` precisam estar em `portal/dados/`. Eles não vêm no GitHub: baixe com **`pnpm export:dados`** (~1 min; precisa das credenciais do Databricks, veja os "Primeiros passos").
 2. No `portal/.env`: `DATA_SOURCE=file`.
 3. `pnpm dev`. O servidor leva ~15 s para carregar os 65.752 pedidos.
 
@@ -83,7 +156,7 @@ Se o Databricks falhar (token vencido, sem internet, warehouse sem cota), o serv
 
 ```bash
 docker compose up --build                                                        # exemplos
-docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build      # CSVs
+docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build      # CSVs (rode pnpm export:dados antes)
 docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build # Databricks
 docker compose down
 ```
@@ -93,7 +166,7 @@ Com o Databricks, as credenciais saem do `portal/.env` na hora de ligar o contai
 ### O assistente
 
 - `AGENT=mock` (padrão): assistente **simulado**, com respostas prontas a partir dos dados do pedido. Funciona sempre, sem IA, e é o plano B da banca.
-- `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001`: o **agente de IA do Marco**, que precisa estar ligado.
+- `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001`: o **agente de IA do Marco**, que precisa estar ligado (`pnpm agent:up`) e lê os CSVs de `portal/dados/`: sem eles, ou com um export antigo, ele diz que a fonte está indisponível.
 
 Ao abrir outro pedido, a conversa continua, com um aviso "Alternado para o pedido #N" separando os assuntos. O botão "Nova conversa" limpa tudo e começa do zero. O nome do assistente é **LogBot**.
 
