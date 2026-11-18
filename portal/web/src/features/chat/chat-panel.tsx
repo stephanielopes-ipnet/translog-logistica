@@ -1,57 +1,68 @@
 import { ASSISTANT_NAME, type Order } from "@translog/contracts";
-import { Info, MessageSquareText, RotateCcw, Tag } from "lucide-react";
+import { ChevronsRight, Info, MessageSquareText, RotateCcw, Tag } from "lucide-react";
 import { ChatInput } from "./chat-input.tsx";
 import { ChatMessages } from "./chat-messages.tsx";
 import type { ChatMessageItem } from "./chat-session.ts";
+import { LOGBOT_INPUT_ID, LOGBOT_PANEL_ID } from "./logbot-dock.tsx";
 
 interface ChatPanelProps {
   activeOrder: Order | null;
-  connected: boolean;
   messages: readonly ChatMessageItem[];
   typing: boolean;
   onSendMessage: (text: string) => void;
   onRetryMessage: (id: number) => void;
   onNewChat: () => void;
+  /** Minimiza o painel lateral (o painel desliza para a direita e deixa uma aba). */
+  onMinimize: () => void;
 }
 
 export function ChatPanel({
   activeOrder,
-  connected,
   messages,
   typing,
   onSendMessage,
   onRetryMessage,
   onNewChat,
+  onMinimize,
 }: ChatPanelProps) {
   const canClearChat = messages.length > 0 || typing;
 
   return (
-    <aside className="min-h-0 flex flex-col bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col bg-white border border-slate-300/90 rounded-lg shadow-sm overflow-hidden">
       {/* Cabeçalho do Assistente */}
-      <div className="shrink-0 px-5 py-3.5 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3">
+      <div className="shrink-0 px-5 py-3.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-2">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-md bg-primary text-white grid place-items-center shadow-sm relative">
             <MessageSquareText className="w-4 h-4" />
             <span
-              title={connected ? "Assistente disponível" : "Sem conexão com o servidor"}
-              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
-                connected ? "bg-accent" : "bg-red-500"
-              }`}
+              aria-hidden="true"
+              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white bg-accent"
             />
           </div>
-          <div className="leading-tight">
+          <div className="leading-tight min-w-0">
             <h2 className="text-sm font-semibold text-slate-900">{ASSISTANT_NAME}</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Pergunte sobre sua entrega</p>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">Pergunte sobre sua entrega</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onNewChat}
           disabled={!canClearChat}
-          className="h-8 px-2.5 rounded border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 disabled:hover:bg-white disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition"
+          className="ml-auto shrink-0 whitespace-nowrap h-8 px-2.5 rounded border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 disabled:hover:bg-white disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           Nova conversa
+        </button>
+        <button
+          type="button"
+          onClick={onMinimize}
+          aria-expanded={true}
+          aria-controls={LOGBOT_PANEL_ID}
+          aria-label={`Minimizar a conversa com o ${ASSISTANT_NAME}`}
+          title="Minimizar"
+          className="-mr-1.5 w-8 h-8 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 grid place-items-center transition"
+        >
+          <ChevronsRight aria-hidden="true" className="w-4 h-4" />
         </button>
       </div>
 
@@ -88,7 +99,12 @@ export function ChatPanel({
       />
 
       {/* Input de mensagem */}
-      <ChatInput disabled={typing} hasOrder={activeOrder !== null} onSend={onSendMessage} />
-    </aside>
+      <ChatInput
+        id={LOGBOT_INPUT_ID}
+        disabled={typing}
+        hasOrder={activeOrder !== null}
+        onSend={onSendMessage}
+      />
+    </div>
   );
 }

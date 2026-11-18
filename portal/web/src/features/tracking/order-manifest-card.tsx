@@ -1,18 +1,6 @@
 import type { Order } from "@translog/contracts";
-import {
-  Ban,
-  Check,
-  Clock,
-  Copy,
-  Headset,
-  MapPin,
-  MapPinCheck,
-  PackageX,
-  Plane,
-  Truck,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { formatDate, formatManifestCode, splitPlace } from "@/lib/format.ts";
+import { Ban, Clock, Headset, MapPin, MapPinCheck, PackageX, Plane, Truck } from "lucide-react";
+import { formatDate, splitPlace } from "@/lib/format.ts";
 import { DeadlinesBlock } from "./deadlines-block.tsx";
 import {
   type DeadlineStatus,
@@ -30,7 +18,8 @@ import { StageTimelineView } from "./stage-timeline-view.tsx";
 
 interface OrderManifestCardProps {
   order: Order;
-  onAskAssistant: (question: string) => void;
+  /** "Perguntar ao assistente" no motivo provável; ausente na Área do colaborador (sem chat). */
+  onAskAssistant?: (question: string) => void;
 }
 
 const TONE_BADGE: Record<StatusTone, { cls: string; dot: string }> = {
@@ -56,25 +45,6 @@ function accentClass(order: Order): string {
 }
 
 export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardProps) {
-  const [copiedCode, setCopiedCode] = useState(false);
-
-  useEffect(() => {
-    if (!copiedCode) return;
-    const t = setTimeout(() => setCopiedCode(false), 1800);
-    return () => clearTimeout(t);
-  }, [copiedCode]);
-
-  const manifestCode = formatManifestCode(order);
-
-  async function handleCopyManifest() {
-    try {
-      await navigator.clipboard.writeText(manifestCode);
-      setCopiedCode(true);
-    } catch {
-      setCopiedCode(false);
-    }
-  }
-
   const badge = TONE_BADGE[STATUS_TONE[order.status]];
   const deadline = deliveryDeadline(order);
   const headline = statusHeadline(order);
@@ -112,19 +82,6 @@ export function OrderManifestCard({ order, onAskAssistant }: OrderManifestCardPr
         </div>
         <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500">
           <span>Pedido em {formatDate(order.orderDate)}</span>
-          <button
-            type="button"
-            onClick={() => void handleCopyManifest()}
-            title="Copiar código da guia de remessa"
-            className="px-2.5 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900 inline-flex items-center gap-1.5 transition"
-          >
-            <span>{manifestCode}</span>
-            {copiedCode ? (
-              <Check className="w-3 h-3 text-emerald-600" />
-            ) : (
-              <Copy className="w-3 h-3 text-slate-400" />
-            )}
-          </button>
         </div>
       </div>
 

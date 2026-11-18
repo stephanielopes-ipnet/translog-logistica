@@ -1,15 +1,17 @@
-import { CHAT_MESSAGE_MAX_LENGTH } from "@translog/contracts";
+import { ASSISTANT_NAME, CHAT_MESSAGE_MAX_LENGTH } from "@translog/contracts";
 import { SendHorizontal } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useRef, useState } from "react";
 
 interface ChatInputProps {
+  /** Id do campo (o painel lateral foca nele ao reabrir). */
+  id: string;
   disabled: boolean;
   /** Sem pedido aberto, o campo convida a informar o número. */
   hasOrder: boolean;
   onSend: (text: string) => void;
 }
 
-export function ChatInput({ disabled, hasOrder, onSend }: ChatInputProps) {
+export function ChatInput({ id, disabled, hasOrder, onSend }: ChatInputProps) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -58,7 +60,9 @@ export function ChatInput({ disabled, hasOrder, onSend }: ChatInputProps) {
         className="flex items-end gap-2 rounded-md border border-slate-300 bg-white p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition"
       >
         <textarea
+          id={id}
           ref={textareaRef}
+          aria-label={`Mensagem para o ${ASSISTANT_NAME}`}
           rows={1}
           maxLength={CHAT_MESSAGE_MAX_LENGTH}
           value={text}

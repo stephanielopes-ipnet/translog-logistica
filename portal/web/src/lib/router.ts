@@ -6,13 +6,17 @@ export type Route =
   | { name: "home" }
   /** `orderParam` é o texto de `?pedido=` como veio (pode ser inválido: a tela mostra "não encontrado"). */
   | { name: "tracking"; orderParam: string | null }
-  /** `returnTo` é a página da Área do colaborador pedida antes do login (já validada). */
-  | { name: "staffLogin"; returnTo: string | null }
+  /**
+   * `returnTo` é a página da Área do colaborador pedida antes do login (já validada);
+   * `expired` = a sessão expirou (a tela mostra o aviso).
+   */
+  | { name: "staffLogin"; returnTo: string | null; expired: boolean }
   | { name: "staffTower" }
   | { name: "staffOrder"; orderParam: string }
   | { name: "notFound" };
 
-export type AreaTab = "tracking" | "staff" | null;
+/** Cabeçalho da página: público (cliente e login) ou da Área do colaborador (com sessão). */
+export type HeaderKind = "public" | "staff";
 
 export const STAFF_LOGIN_PATH = "/colaborador/entrar";
 export const STAFF_HOME_PATH = "/colaborador";
@@ -30,7 +34,11 @@ export function matchRoute(pathname: string, search: string): Route {
     return { name: "tracking", orderParam: params.get("pedido") };
   }
   if (path === STAFF_LOGIN_PATH) {
-    return { name: "staffLogin", returnTo: safeReturnPath(params.get("voltar")) };
+    return {
+      name: "staffLogin",
+      returnTo: safeReturnPath(params.get("voltar")),
+      expired: params.get("expirou") === "1",
+    };
   }
   if (path === STAFF_HOME_PATH) {
     return { name: "staffTower" };
@@ -55,13 +63,24 @@ export function staffOrderHref(orderId: number): string {
   return `/colaborador/pedidos/${orderId}`;
 }
 
-/** Login do colaborador, lembrando a página pedida (só se for da Área do colaborador). */
-export function staffLoginHref(returnTo?: string | null): string {
+/**
+ * Login do colaborador, lembrando a página pedida (só se for da Área do colaborador) e, se for o
+ * caso, avisando que a sessão expirou.
+ */
+export function staffLoginHref(
+  returnTo?: string | null,
+  options: { expired?: boolean } = {},
+): string {
+  const params = new URLSearchParams();
   const safe = safeReturnPath(returnTo);
-  if (safe === null || safe === STAFF_HOME_PATH) {
-    return STAFF_LOGIN_PATH;
+  if (safe !== null && safe !== STAFF_HOME_PATH) {
+    params.set("voltar", safe);
   }
-  return `${STAFF_LOGIN_PATH}?${new URLSearchParams({ voltar: safe }).toString()}`;
+  if (options.expired) {
+    params.set("expirou", "1");
+  }
+  const query = params.toString();
+  return query ? `${STAFF_LOGIN_PATH}?${query}` : STAFF_LOGIN_PATH;
 }
 
 /**
@@ -87,19 +106,21 @@ export function isStaffRoute(route: Route): boolean {
   return route.name === "staffTower" || route.name === "staffOrder";
 }
 
-/** Aba do cabeçalho marcada como ativa. O Início não tem aba (a marca leva a ele). */
-export function activeTab(route: Route): AreaTab {
-  if (route.name === "tracking") {
-    return "tracking";
-  }
-  if (route.name === "staffLogin" || isStaffRoute(route)) {
-    return "staff";
-  }
-  return null;
+/**
+ * Qual cabeçalho mostrar. O login usa o público: a Área do colaborador não aparece no menu
+ * público, só no link discreto "Acesso colaborador".
+ */
+export function headerKind(route: Route): HeaderKind {
+  return isStaffRoute(route) ? "staff" : "public";
 }
 
 /** Estado da sessão do colaborador visto pela guarda de rota. */
 export type SessionState = "loading" | "authenticated" | "anonymous";
+
+/** Destino do link "Acesso colaborador": com sessão, a Torre; sem sessão, o formulário de login. */
+export function staffAccessHref(session: SessionState): string {
+  return session === "authenticated" ? STAFF_HOME_PATH : STAFF_LOGIN_PATH;
+}
 
 /**
  * Guarda da Área do colaborador. Devolve o endereço para onde redirecionar, ou `null` para

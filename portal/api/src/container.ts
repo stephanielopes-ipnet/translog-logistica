@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
+import { type AuthService, createAuthService } from "./auth/auth-service.ts";
 import { createAdkAgent } from "./chat/adk-agent.ts";
 import { type ChatLogger, type ChatService, createChatService } from "./chat/chat-service.ts";
 import { createMockAgent } from "./chat/mock-agent.ts";
@@ -9,7 +10,7 @@ import { type LoadLogger, loadFileRepository } from "./orders/file-repository.ts
 import { createFixturesRepository } from "./orders/fixtures-repository.ts";
 import type { OrderRepository } from "./orders/order-repository.ts";
 import { createOrderService, type OrderService } from "./orders/order-service.ts";
-import { NO_PROMISE_SCENARIO } from "./orders/promise-scenario.ts";
+import { ADJUSTED_PROMISE_SCENARIO } from "./orders/promise-scenario.ts";
 
 /**
  * Dependências da aplicação. A escolha dos adapters (`DATA_SOURCE` e `AGENT`) acontece só aqui.
@@ -18,6 +19,7 @@ export interface Container {
   config: Config;
   orderService: OrderService;
   chatService: ChatService;
+  authService: AuthService;
   /** Para as tarefas em segundo plano (chamado quando o Fastify encerra). */
   close(): void;
 }
@@ -44,8 +46,9 @@ export async function createContainer(
   const orderService = createOrderService({
     orders,
     sampleOrderIds: config.sampleOrderIds,
-    // Tarefa 2 do escopo novo: o cenário "Promessa ajustada" passa a vir da Gold nos 3 modos.
-    promiseScenario: NO_PROMISE_SCENARIO,
+    // Cenário "Promessa ajustada" da Gold, copiado como constantes (ler a tabela é pendência).
+    promiseScenario: ADJUSTED_PROMISE_SCENARIO,
+    dashboardUrl: config.dashboardUrl,
   });
   const chatLog = log.child({ agent: config.agent });
   const agent = overrides.supportAgent ?? createSupportAgent(config, orderService, chatLog);
@@ -53,6 +56,11 @@ export async function createContainer(
     config,
     orderService,
     chatService: createChatService({ agent, orders: orderService, log: chatLog }),
+    authService: createAuthService({
+      users: config.auth.users,
+      secret: config.auth.sessionSecret,
+      demo: config.auth.demo,
+    }),
     close: () => orders.close?.(),
   };
 }

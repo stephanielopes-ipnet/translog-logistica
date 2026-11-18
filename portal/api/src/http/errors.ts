@@ -1,6 +1,11 @@
 import type { ErrorResponse } from "@translog/contracts";
 import type { FastifyInstance, FastifyReply, FastifySchemaValidationError } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
+import {
+  InvalidCredentialsError,
+  TooManyAttemptsError,
+  UnauthenticatedError,
+} from "../auth/auth-service.ts";
 import { ChatBusyError } from "../chat/chat-service.ts";
 import { AgentTimeoutError, AgentUnavailableError } from "../chat/support-agent.ts";
 import { OrderNotFoundError } from "../orders/order-service.ts";
@@ -10,6 +15,11 @@ const CHAT_BUSY_MESSAGE = "Aguarde a resposta anterior antes de enviar outra men
 const AGENT_UNAVAILABLE_MESSAGE =
   "O assistente está indisponível no momento. Tente novamente em instantes.";
 const AGENT_TIMEOUT_MESSAGE = "O assistente demorou demais para responder. Tente novamente.";
+
+const INVALID_CREDENTIALS_MESSAGE = "E-mail ou senha inválidos.";
+const TOO_MANY_ATTEMPTS_MESSAGE =
+  "Muitas tentativas de login. Aguarde um minuto e tente novamente.";
+const UNAUTHENTICATED_MESSAGE = "Sua sessão expirou ou não existe. Entre novamente.";
 
 const clientErrorMessages: Record<number, string> = {
   400: "Requisição inválida.",
@@ -24,6 +34,8 @@ const clientErrorMessages: Record<number, string> = {
  * - erros de domínio: `OrderNotFoundError` → `404 ORDER_NOT_FOUND`, `ChatBusyError` →
  *   `409 CHAT_BUSY`, `AgentUnavailableError` → `502 AGENT_UNAVAILABLE`, `AgentTimeoutError` →
  *   `504 AGENT_TIMEOUT` (o chat-service já registrou o motivo técnico no log);
+ * - login: `InvalidCredentialsError` → `401 INVALID_CREDENTIALS`, `TooManyAttemptsError` →
+ *   `429 TOO_MANY_ATTEMPTS`, `UnauthenticatedError` (rotas `/api/staff/*`) → `401 UNAUTHENTICATED`;
  * - validação Zod: `400 VALIDATION_ERROR`, citando os campos;
  * - outros 4xx do Fastify: mesmo status, `VALIDATION_ERROR` (400) ou `BAD_REQUEST`;
  * - qualquer outro erro: `500 INTERNAL_ERROR` genérico, com o detalhe só no log;
@@ -42,6 +54,16 @@ export function registerErrorHandler(app: FastifyInstance): void {
     }
     if (error instanceof AgentTimeoutError) {
       return sendError(reply, 504, "AGENT_TIMEOUT", AGENT_TIMEOUT_MESSAGE);
+    }
+
+    if (error instanceof InvalidCredentialsError) {
+      return sendError(reply, 401, "INVALID_CREDENTIALS", INVALID_CREDENTIALS_MESSAGE);
+    }
+    if (error instanceof TooManyAttemptsError) {
+      return sendError(reply, 429, "TOO_MANY_ATTEMPTS", TOO_MANY_ATTEMPTS_MESSAGE);
+    }
+    if (error instanceof UnauthenticatedError) {
+      return sendError(reply, 401, "UNAUTHENTICATED", UNAUTHENTICATED_MESSAGE);
     }
 
     if (hasZodFastifySchemaValidationErrors(error)) {

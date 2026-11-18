@@ -1,7 +1,13 @@
 import type { Order } from "@translog/contracts";
 import { describe, expect, it } from "vitest";
 import { findFixtureOrder } from "@/api/fixture-orders.ts";
-import { deliveryDeadline, STATUS_TONE, statusHeadline, supportReason } from "./order-status.ts";
+import {
+  deliveryDeadline,
+  dispatchSentence,
+  STATUS_TONE,
+  statusHeadline,
+  supportReason,
+} from "./order-status.ts";
 
 function fixture(orderId: number): Order {
   const order = findFixtureOrder(orderId);
@@ -62,5 +68,42 @@ describe("prazo e central", () => {
     [8, null],
   ] as const)("pedido %i: motivo da central %j", (orderId, reason) => {
     expect(supportReason(fixture(orderId))).toBe(reason);
+  });
+});
+
+describe("dispatchSentence", () => {
+  const dispatch = (actualDate: string | null, delayDays: number | null) =>
+    ({ actualDate, delayDays }) as Order["dispatch"];
+
+  it("diz como o envio saiu, em linguagem simples", () => {
+    expect(dispatchSentence({ status: "Em trânsito", dispatch: dispatch("2018-01-29", 1) })).toBe(
+      "O envio saiu com 1 dia de atraso.",
+    );
+    expect(
+      dispatchSentence({ status: "Entregue com atraso", dispatch: dispatch("2015-01-12", 4) }),
+    ).toBe("O envio saiu com 4 dias de atraso.");
+    expect(
+      dispatchSentence({ status: "Entregue no prazo", dispatch: dispatch("2015-01-01", 0) }),
+    ).toBe("O envio saiu no prazo.");
+    expect(
+      dispatchSentence({ status: "Entregue no prazo", dispatch: dispatch("2015-01-01", -1) }),
+    ).toBe("O envio saiu antes do previsto.");
+  });
+
+  it("explica por que o envio ainda não saiu", () => {
+    expect(
+      dispatchSentence({ status: "Aguardando pagamento", dispatch: dispatch(null, null) }),
+    ).toBe("O envio sai depois da confirmação do pagamento.");
+    expect(dispatchSentence({ status: "Cancelado", dispatch: dispatch(null, null) })).toBe(
+      "O pedido foi cancelado antes do envio.",
+    );
+    expect(
+      dispatchSentence({ status: "Não pago (expirado)", dispatch: dispatch(null, null) }),
+    ).toBe("O pedido não foi enviado: o pagamento não foi confirmado.");
+  });
+
+  it("vale para os pedidos da demo", () => {
+    const order = findFixtureOrder(76902);
+    expect(order && dispatchSentence(order)).toBe("O envio saiu com 1 dia de atraso.");
   });
 });

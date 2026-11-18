@@ -1,31 +1,30 @@
-import { BrandMark } from "./brand-mark.tsx";
+import { StaffAccessLink } from "./app-header.tsx";
 
-/** Rodapé: empresa fictícia do Projeto Integrador + "Desenvolvido por" com o logo da IPNET. */
-export function AppFooter() {
+/**
+ * Rodapé discreto: uma faixa baixa com o aviso de empresa fictícia, o link "Acesso colaborador"
+ * (só nas páginas públicas) e "Desenvolvido por" com o logo da IPNET.
+ */
+export function AppFooter({ staffAccessHref }: { staffAccessHref: string | null }) {
   return (
-    <footer className="shrink-0 border-t border-slate-200 bg-white text-slate-500">
-      <div className="mx-auto max-w-[1440px] px-6 py-5 flex items-center justify-between gap-8">
-        <div className="flex items-center gap-3">
-          <BrandMark size={30} />
-          <div>
-            <p className="text-[14.5px] font-semibold text-slate-900">
-              TransLog International Logistics
-            </p>
-            <p className="text-[12.5px]">
-              Empresa fictícia criada para o Projeto Integrador IPNET Academy 2026 · Grupo 3
-            </p>
-          </div>
-        </div>
-        <p className="flex items-center gap-2.5 text-[13px] whitespace-nowrap">
-          Desenvolvido por
-          <img
-            src="/ipnet.svg"
-            alt="IPNET"
-            width={52}
-            height={28}
-            className="h-7 w-auto brightness-0 opacity-80"
-          />
+    <footer className="shrink-0 border-t border-slate-200 bg-white text-[12px] text-slate-400">
+      <div className="mx-auto max-w-[1440px] px-6 h-11 flex items-center gap-6">
+        <p className="truncate">
+          <span className="font-medium text-slate-500">TransLog International Logistics</span>
+          {" · "}Empresa fictícia criada para o Projeto Integrador IPNET Academy 2026 · Grupo 3
         </p>
+        <div className="ml-auto flex items-center gap-6 shrink-0">
+          {staffAccessHref && <StaffAccessLink href={staffAccessHref} />}
+          <p className="flex items-center gap-2 whitespace-nowrap">
+            Desenvolvido por
+            <img
+              src="/ipnet.svg"
+              alt="IPNET"
+              width={37}
+              height={20}
+              className="h-5 w-auto brightness-0 opacity-45"
+            />
+          </p>
+        </div>
       </div>
     </footer>
   );

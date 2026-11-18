@@ -1,26 +1,34 @@
-import { type ReactNode, useCallback, useEffect, useMemo } from "react";
-import { useHealth, useOrderQuery } from "@/api/queries.ts";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { useOrderQuery } from "@/api/queries.ts";
 import { useLogout, useSession } from "@/api/session.ts";
 import { AppFooter } from "@/components/app-footer.tsx";
 import { AppHeader } from "@/components/app-header.tsx";
-import {
-  CheckingSessionPage,
-  NotFoundPage,
-  PrimaryLink,
-  SimplePage,
-} from "@/components/simple-page.tsx";
+import { CheckingSessionPage, NotFoundPage } from "@/components/simple-page.tsx";
 import { ChatPanel } from "@/features/chat/chat-panel.tsx";
+import { LOGBOT_INPUT_ID, LogBotDock } from "@/features/chat/logbot-dock.tsx";
+import { askLogBot, browserStorage, createLogBotPanelStore } from "@/features/chat/logbot-panel.ts";
 import { useChatConversation } from "@/features/chat/use-chat-conversation.ts";
+import { HomePage } from "@/features/home/home-page.tsx";
+import { StaffLoginPage } from "@/features/staff/staff-login-page.tsx";
+import { StaffOrderPage } from "@/features/staff/staff-order-page.tsx";
+import { TowerPage } from "@/features/staff/tower-page.tsx";
 import { TrackingPage } from "@/features/tracking/tracking-page.tsx";
 import {
-  activeTab,
   guardRedirect,
+  headerKind,
   isStaffRoute,
   matchRoute,
   pageTitle,
-  type Route,
   type SessionState,
   STAFF_LOGIN_PATH,
+  staffAccessHref,
   trackingHref,
 } from "@/lib/router.ts";
 import { parseOrderId } from "@/lib/url-state.ts";
@@ -63,9 +71,6 @@ export function App() {
     logout.mutate(undefined, { onSettled: () => navigate(STAFF_LOGIN_PATH) });
   }, [logout]);
 
-  const healthQuery = useHealth();
-  const isConnected = !healthQuery.isError;
-
   // Pedido do rastreio do cliente: fica aqui para o chat saber de qual pedido se fala.
   const trackingOrderId = route.name === "tracking" ? parseOrderId(route.orderParam) : null;
   const orderQuery = useOrderQuery(trackingOrderId);
@@ -86,83 +91,99 @@ export function App() {
     onMentionedOrder: handleMentionedOrder,
   });
 
+  // Painel do LogBot (aberto ou minimizado), o mesmo no Início e no Rastreamento.
+  const [panel] = useState(() => createLogBotPanelStore(browserStorage()));
+  const panelOpen = useSyncExternalStore(panel.subscribe, panel.isOpen, () => true);
+  const { sendMessage } = chat;
+  const ask = useCallback(
+    (text: string) => askLogBot(panel, sendMessage, text),
+    [panel, sendMessage],
+  );
+  const openLogBot = useCallback(() => {
+    panel.setOpen(true);
+    requestAnimationFrame(() => document.getElementById(LOGBOT_INPUT_ID)?.focus());
+  }, [panel]);
+
   const staffEmail = sessionQuery.data?.authenticated ? sessionQuery.data.email : null;
-  const showStaffUser = isStaffRoute(route) && session === "authenticated";
+  const accessHref = staffAccessHref(session);
+  const kind = headerKind(route);
+
+  /** Páginas do cliente: conteúdo à esquerda e o painel do LogBot à direita. */
+  const customerLayout = (content: ReactNode, background = "") => (
+    <div className={background}>
+      <div className="mx-auto max-w-[1440px] pl-6 flex gap-6">
+        <div className="flex-1 min-w-0">{content}</div>
+        <LogBotDock open={panelOpen} onOpen={() => panel.setOpen(true)}>
+          <ChatPanel
+            activeOrder={activeOrder}
+            messages={chat.messages}
+            typing={chat.typing}
+            onSendMessage={ask}
+            onRetryMessage={chat.retryMessage}
+            onNewChat={chat.newConversation}
+            onMinimize={() => panel.setOpen(false)}
+          />
+        </LogBotDock>
+      </div>
+    </div>
+  );
+
+  let page: ReactNode;
+  if (redirect !== null || (isStaffRoute(route) && session === "loading")) {
+    page = <CheckingSessionPage />;
+  } else {
+    switch (route.name) {
+      case "home":
+        page = customerLayout(
+          <HomePage onOpenLogBot={openLogBot} staffAccessHref={accessHref} />,
+          "hero-grid",
+        );
+        break;
+      case "tracking":
+        page = customerLayout(
+          <TrackingPage
+            orderParam={route.orderParam}
+            orderQuery={orderQuery}
+            onAskAssistant={ask}
+          />,
+        );
+        break;
+      case "staffLogin":
+        page = <StaffLoginPage expired={route.expired} />;
+        break;
+      case "staffTower":
+        page = <TowerPage />;
+        break;
+      case "staffOrder":
+        page = <StaffOrderPage orderParam={route.orderParam} />;
+        break;
+      case "notFound":
+        page = <NotFoundPage />;
+        break;
+    }
+  }
 
   return (
     <div className="min-h-full min-w-[1280px] flex flex-col bg-slate-100/80 text-slate-900 antialiased">
-      <AppHeader
-        tab={activeTab(route)}
-        connected={isConnected}
-        staff={
-          showStaffUser
-            ? {
-                email: staffEmail ?? "Colaborador",
-                onLogout: handleLogout,
-                loggingOut: logout.isPending,
-              }
-            : null
-        }
-      />
+      {kind === "staff" ? (
+        <AppHeader
+          kind="staff"
+          towerPage={route.name === "staffTower"}
+          email={staffEmail ?? "Colaborador"}
+          onLogout={handleLogout}
+          loggingOut={logout.isPending}
+        />
+      ) : (
+        <AppHeader
+          kind="public"
+          trackingActive={route.name === "tracking"}
+          staffAccessHref={accessHref}
+        />
+      )}
 
-      <main className="flex-1">
-        {redirect !== null || (isStaffRoute(route) && session === "loading") ? (
-          <CheckingSessionPage />
-        ) : (
-          <Page
-            route={route}
-            tracking={
-              route.name === "tracking" ? (
-                <TrackingPage
-                  orderParam={route.orderParam}
-                  orderQuery={orderQuery}
-                  onAskAssistant={chat.sendMessage}
-                  chat={
-                    <ChatPanel
-                      activeOrder={activeOrder}
-                      connected={isConnected}
-                      messages={chat.messages}
-                      typing={chat.typing}
-                      onSendMessage={chat.sendMessage}
-                      onRetryMessage={chat.retryMessage}
-                      onNewChat={chat.newConversation}
-                    />
-                  }
-                />
-              ) : null
-            }
-          />
-        )}
-      </main>
+      <main className="flex-1">{page}</main>
 
-      <AppFooter />
+      <AppFooter staffAccessHref={kind === "public" ? accessHref : null} />
     </div>
   );
-}
-
-/** Página de cada rota. Início e Área do colaborador ganham o conteúdo nas tarefas 2 e 4. */
-function Page({ route, tracking }: { route: Route; tracking: ReactNode }) {
-  switch (route.name) {
-    case "home":
-      return (
-        <SimplePage label="TransLog · Início" title="Sua carga pelo mundo. Cada etapa visível.">
-          <p>Acompanhe despacho, voo, alfândega e entrega do seu pedido.</p>
-          <PrimaryLink href="/rastreio">Rastrear um pedido</PrimaryLink>
-        </SimplePage>
-      );
-    case "tracking":
-      return tracking;
-    case "staffLogin":
-      return (
-        <SimplePage label="Área do colaborador" title="Acesso restrito à equipe TransLog.">
-          <p>O formulário de entrada chega na próxima etapa.</p>
-        </SimplePage>
-      );
-    case "staffTower":
-      return <SimplePage label="Área do colaborador" title="Torre de controle" />;
-    case "staffOrder":
-      return <SimplePage label="Visão do colaborador" title={`Pedido #${route.orderParam}`} />;
-    case "notFound":
-      return <NotFoundPage />;
-  }
 }

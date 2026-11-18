@@ -122,6 +122,8 @@ function allUrls(orderIds: readonly number[]): string[] {
   return [
     "/api/health",
     "/api/orders/samples",
+    "/api/orders/summary",
+    "/api/auth/session",
     ...orderIds.map((id) => `/api/orders/${id}`),
     "/api/orders/1", // 404
     "/api/orders/abc", // 400
@@ -303,6 +305,27 @@ describe("visão do cliente × visão do colaborador", () => {
         expect(Object.keys(staffOrder), where).toEqual(
           expect.arrayContaining(INTERNAL_KEYS.filter((key) => key !== "daysToDispatch")),
         );
+      }
+    },
+  );
+
+  it.each([...SOURCES])(
+    "a Torre e o pedido do colaborador (com sessão) não têm chave ou valor proibido (fonte $source)",
+    async ({ env }) => {
+      const app = await buildTestServer({
+        ...(await env()),
+        AUTH_DEMO: "true",
+        SESSION_SECRET: "segredo-de-teste-com-mais-de-32-caracteres",
+      });
+      const demo = await app.inject({ method: "POST", url: "/api/auth/demo", payload: {} });
+      const cookie = String(demo.headers["set-cookie"]).split(";")[0] ?? "";
+
+      const urls = ["/api/staff/tower", ...ALL_IDS.map((id) => `/api/staff/orders/${id}`)];
+      for (const url of urls) {
+        const response = await app.inject({ method: "GET", url, headers: { cookie } });
+        expect(response.statusCode, url).toBe(200);
+        expect(forbiddenKeys(response.json()), url).toEqual([]);
+        expect(response.body, url).not.toMatch(/FICTICIO|SEM-USO/);
       }
     },
   );

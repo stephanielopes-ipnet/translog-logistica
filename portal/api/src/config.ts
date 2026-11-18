@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { agentModeSchema, dataSourceSchema } from "@translog/contracts";
 import { z } from "zod";
+import { isPasswordHash } from "./auth/password.ts";
 
 /** Pasta `portal/`: caminhos relativos em `DATA_DIR` partem daqui, de onde quer que a API rode. */
 const PORTAL_DIR = fileURLToPath(new URL("../../", import.meta.url));
@@ -61,8 +62,36 @@ const databricksWarehouseId = z.string().regex(/^[\w-]+$/);
 /** `catalogo.schema` das tabelas consumo_* (vai no SQL: só letras, números e `_`). */
 const databricksCatalogSchema = z.string().regex(/^[A-Za-z_]\w*\.[A-Za-z_]\w*$/);
 
+/**
+ * Usuários do colaborador: `email:hash` separados por vírgula, com o hash gerado por
+ * `pnpm staff:add <email>` (`scrypt.<sal>.<chave>`). E-mail guardado em minúsculas.
+ */
+const staffUsers = z.string().transform((value, ctx) => {
+  const users = new Map<string, string>();
+  for (const entry of value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)) {
+    const separator = entry.lastIndexOf(":");
+    const email = entry.slice(0, separator).trim().toLowerCase();
+    const hash = entry.slice(separator + 1).trim();
+    if (separator <= 0 || !/^[^\s@]+@[^\s@]+$/.test(email) || !isPasswordHash(hash)) {
+      ctx.addIssue({ code: "custom", message: "lista de usuários inválida" });
+      return z.NEVER;
+    }
+    users.set(email, hash);
+  }
+  return users;
+});
+
+const booleanFlag = z.enum(["true", "false"]).transform((value) => value === "true");
+
 /** Variáveis que nunca aparecem nas mensagens de erro, nem o valor recebido. */
-const SECRET_ENV: ReadonlySet<string> = new Set(["DATABRICKS_TOKEN"]);
+const SECRET_ENV: ReadonlySet<string> = new Set([
+  "DATABRICKS_TOKEN",
+  "SESSION_SECRET",
+  "STAFF_USERS",
+]);
 
 /** Variáveis de ambiente aceitas, com os padrões que funcionam sem `.env`. */
 const envSchema = z
@@ -80,8 +109,20 @@ const envSchema = z
     DATABRICKS_TOKEN: z.string().optional(),
     DATABRICKS_CATALOG_SCHEMA: databricksCatalogSchema.default("workspace.silver"),
     DATABRICKS_REFRESH_MINUTES: databricksRefreshMinutes.default(10),
+    STAFF_USERS: staffUsers.optional(),
+    SESSION_SECRET: z.string().min(32).optional(),
+    AUTH_DEMO: booleanFlag.default(false),
+    DASHBOARD_URL: z.url({ protocol: /^https?$/ }).optional(),
     NODE_ENV: z.string().optional(),
   })
+  .refine(
+    (env) => env.SESSION_SECRET !== undefined || (env.STAFF_USERS === undefined && !env.AUTH_DEMO),
+    {
+      path: ["SESSION_SECRET"],
+      message: "obrigatória com STAFF_USERS ou AUTH_DEMO=true",
+      when: () => true,
+    },
+  )
   .superRefine((env, ctx) => {
     if (env.DATA_SOURCE !== "databricks") {
       return;
@@ -131,6 +172,12 @@ const expectations: Record<EnvName, string> = {
   DATABRICKS_TOKEN: "é obrigatória com DATA_SOURCE=databricks (token de acesso, só no portal/.env)",
   DATABRICKS_CATALOG_SCHEMA: "deve ser catalogo.schema (ex.: workspace.silver)",
   DATABRICKS_REFRESH_MINUTES: "deve ser um número inteiro de minutos entre 0 (só ao subir) e 1440",
+  STAFF_USERS:
+    "deve ser uma lista email:hash separada por vírgula, com o hash gerado por pnpm staff:add <email>",
+  SESSION_SECRET:
+    "deve ter pelo menos 32 caracteres e é obrigatória com STAFF_USERS ou AUTH_DEMO=true (gere com: openssl rand -base64 48)",
+  AUTH_DEMO: oneOf(["true", "false"]),
+  DASHBOARD_URL: "deve ser o endereço http(s) do painel de performance",
   NODE_ENV: "deve ser um texto",
 };
 
@@ -165,6 +212,14 @@ const configSchema = envSchema.transform((env) => {
             refreshIntervalMs: env.DATABRICKS_REFRESH_MINUTES * 60_000,
           }
         : undefined,
+    /** Login do colaborador: usuários, segredo do cookie e entrada de demonstração. */
+    auth: {
+      users: env.STAFF_USERS ?? new Map<string, string>(),
+      sessionSecret: env.SESSION_SECRET,
+      demo: env.AUTH_DEMO,
+    },
+    /** Painel completo de performance (link da Torre); `null` = a definir. */
+    dashboardUrl: env.DASHBOARD_URL ?? null,
     nodeEnv: env.NODE_ENV,
   };
 });

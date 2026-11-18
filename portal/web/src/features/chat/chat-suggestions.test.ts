@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FIXTURE_ORDERS, findFixtureOrder } from "@/api/fixture-orders.ts";
-import { CHAT_SUGGESTIONS, getChatSuggestions } from "./chat-suggestions.ts";
+import { CHAT_SUGGESTIONS, getChatSuggestions, SUPPORT_SUGGESTION } from "./chat-suggestions.ts";
 
 describe("chat-suggestions", () => {
   it("adapts suggested questions to the active order context", () => {
@@ -23,5 +23,11 @@ describe("chat-suggestions", () => {
       expect(first).toContain(`#${order.orderId}`);
       expect(second).toContain(`#${order.orderId}`);
     }
+  });
+
+  it("offers 'Quero falar com a central' for late and lost orders", () => {
+    expect(getChatSuggestions(findFixtureOrder(76902))).toContain(SUPPORT_SUGGESTION);
+    expect(getChatSuggestions(findFixtureOrder(34))).toContain(SUPPORT_SUGGESTION);
+    expect(getChatSuggestions(findFixtureOrder(8))).not.toContain(SUPPORT_SUGGESTION);
   });
 });

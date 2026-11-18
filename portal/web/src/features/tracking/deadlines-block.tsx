@@ -2,14 +2,16 @@ import type { Order } from "@translog/contracts";
 import { MessageSquareMore, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatDate, pluralize } from "@/lib/format.ts";
+import { dispatchSentence } from "./order-status.ts";
 
 interface DeadlinesBlockProps {
   order: Order;
-  onAskAssistant: (question: string) => void;
+  onAskAssistant?: (question: string) => void;
 }
 
 /**
- * Despacho e entrega lado a lado (previsto, realizado e atraso de cada um) e, abaixo, o motivo
+ * Entrega (previsto, realizado e atraso, em destaque) e o envio numa frase simples ("o envio
+ * saiu com 1 dia de atraso", sem o prazo de despacho em números) e, abaixo, o motivo
  * provável de cada etapa, já em linguagem do cliente (vem pronto da API). O rótulo da causa é
  * sempre "Motivo provável", nunca certeza.
  */
@@ -19,15 +21,7 @@ export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <DeadlineColumn
-          title="Despacho"
-          subtitle={`Prazo prometido: ${pluralize(dispatch.promisedDays, "dia", "dias")} (${order.shippingMode})`}
-          expected={dispatch.expectedDate}
-          actual={dispatch.actualDate}
-          actualFallback={order.status === "Aguardando pagamento" ? "Aguardando pagamento" : "—"}
-          delayDays={dispatch.delayDays}
-        />
+      <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-3">
         <DeadlineColumn
           title="Entrega"
           subtitle={
@@ -40,6 +34,24 @@ export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
           actualFallback={deliveryFallback(order)}
           delayDays={delivery.delayDays}
         />
+        <section className="rounded-md border border-slate-200 bg-white">
+          <header className="px-3.5 py-2 border-b border-slate-100 flex items-baseline justify-between gap-2">
+            <h3 className="label-mono !text-slate-700 font-semibold">Envio</h3>
+            <span className="text-[11px] text-slate-500 truncate">{order.shippingMode}</span>
+          </header>
+          <div className="px-3.5 py-2.5 text-sm">
+            <p className="text-slate-900 font-medium">{dispatchSentence(order)}</p>
+            {dispatch.actualDate && (
+              <p className="mt-1 text-xs text-slate-500">
+                Saiu da expedição em{" "}
+                <span className="font-mono tabular text-slate-700">
+                  {formatDate(dispatch.actualDate)}
+                </span>
+                .
+              </p>
+            )}
+          </div>
+        </section>
       </div>
 
       {hasCause ? (
@@ -68,16 +80,18 @@ export function DeadlinesBlock({ order, onAskAssistant }: DeadlinesBlockProps) {
               )}
             </p>
           </div>
-          <div className="px-4 py-3 grid place-items-center shrink-0">
-            <button
-              type="button"
-              onClick={() => onAskAssistant(`Por que o pedido #${order.orderId} atrasou?`)}
-              className="h-9 px-3.5 rounded-md bg-slate-900 text-xs font-semibold text-white shadow-sm hover:bg-primary inline-flex items-center gap-2 transition"
-            >
-              <MessageSquareMore className="w-4 h-4" />
-              <span>Perguntar ao assistente</span>
-            </button>
-          </div>
+          {onAskAssistant && (
+            <div className="px-4 py-3 grid place-items-center shrink-0">
+              <button
+                type="button"
+                onClick={() => onAskAssistant(`Por que o pedido #${order.orderId} atrasou?`)}
+                className="h-9 px-3.5 rounded-md bg-slate-900 text-xs font-semibold text-white shadow-sm hover:bg-primary inline-flex items-center gap-2 transition"
+              >
+                <MessageSquareMore className="w-4 h-4" />
+                <span>Perguntar ao assistente</span>
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
     </div>

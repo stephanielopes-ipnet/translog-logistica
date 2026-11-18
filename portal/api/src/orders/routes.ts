@@ -2,9 +2,11 @@ import {
   errorResponseSchema,
   type Order,
   type OrderSamplesResponse,
+  type OrdersSummaryResponse,
   orderIdParamsSchema,
   orderSamplesResponseSchema,
   orderSchema,
+  ordersSummaryResponseSchema,
 } from "@translog/contracts";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import type { OrderService } from "./order-service.ts";
@@ -27,6 +29,21 @@ export const orderRoutes: FastifyPluginAsyncZod<{ orderService: OrderService }> 
       },
     },
     async (): Promise<OrderSamplesResponse> => ({ orderIds: await orderService.sampleOrderIds() }),
+  );
+
+  app.get(
+    "/orders/summary",
+    {
+      schema: {
+        summary: "Pedidos por mercado",
+        description:
+          "Total de pedidos e quantos vão para cada mercado (mapa do Início). Só números " +
+          "agregados, calculados na carga.",
+        tags: ["pedidos"],
+        response: { 200: ordersSummaryResponseSchema },
+      },
+    },
+    async (): Promise<OrdersSummaryResponse> => orderService.getSummary(),
   );
 
   app.get(

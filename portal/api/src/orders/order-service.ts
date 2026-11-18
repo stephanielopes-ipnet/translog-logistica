@@ -1,7 +1,8 @@
-import type { Order, StaffOrder } from "@translog/contracts";
+import type { Order, OrdersSummaryResponse, StaffOrder, TowerResponse } from "@translog/contracts";
 import type { OrderRepository } from "./order-repository.ts";
 import { toCustomerOrder, toStaffOrder } from "./order-views.ts";
 import type { PromiseScenario } from "./promise-scenario.ts";
+import { buildOrdersSummary, buildTower } from "./tower-stats.ts";
 
 /** Erro de domínio: o pedido não existe na fonte. Vira `404` em `http/errors.ts`. */
 export class OrderNotFoundError extends Error {
@@ -25,6 +26,10 @@ export interface OrderService {
   sampleOrderIds(): Promise<number[]>;
   /** Quantos pedidos a fonte tem. */
   count(): Promise<number>;
+  /** Torre de controle (números calculados na carga). */
+  getTower(): TowerResponse;
+  /** Pedidos por mercado, para o mapa do Início (público, só números). */
+  getSummary(): OrdersSummaryResponse;
 }
 
 export interface OrderServiceDeps {
@@ -33,12 +38,15 @@ export interface OrderServiceDeps {
   sampleOrderIds: readonly number[];
   /** Prazo de despacho sugerido por modalidade (Promessa ajustada, da Gold). */
   promiseScenario: PromiseScenario;
+  /** Painel completo de performance (`DASHBOARD_URL`), ou `null`. */
+  dashboardUrl?: string | null;
 }
 
 export function createOrderService({
   orders,
   sampleOrderIds,
   promiseScenario,
+  dashboardUrl = null,
 }: OrderServiceDeps): OrderService {
   async function getRecord(orderId: number) {
     const record = await orders.findById(orderId);
@@ -68,5 +76,16 @@ export function createOrderService({
     },
 
     count: () => orders.count(),
+
+    getTower() {
+      const stats = orders.stats();
+      return buildTower(stats.tower, {
+        scenario: promiseScenario,
+        deliveryByRoute: stats.deliveryByRoute,
+        dashboardUrl,
+      });
+    },
+
+    getSummary: () => buildOrdersSummary(orders.stats().tower),
   };
 }

@@ -6,15 +6,18 @@ Este documento explica o portal para todo o grupo, de forma simples. Os detalhes
 
 ## O que é
 
-O site em que o cliente da TransLog digita o número do pedido e vê, sem ligar para a central:
+O site da TransLog, com três partes:
 
-- a **situação** do pedido (entregue, em trânsito, extraviado, cancelado, não pago…);
-- **onde ele está agora** e cada etapa da viagem (coleta, voo, alfândega, transferência, última milha);
-- os prazos de **despacho** e de **entrega**, com o atraso de cada um;
-- o **motivo provável** de um atraso (nunca como certeza);
-- um **aviso da central de atendimento** quando o caso precisa dela (atraso de entrega de 3 dias ou mais, ou extravio; central de segunda a sexta, das 9h às 18h).
+- **Início:** a página de entrada, com a busca pelo número do pedido, um mapa animado das rotas (com quantos pedidos vão para cada mercado), as modalidades de envio e a central de atendimento.
+- **Rastreamento:** o cliente digita o número do pedido e vê, sem ligar para a central:
+  - a **situação** do pedido (entregue, em trânsito, extraviado, cancelado, não pago…);
+  - **onde ele está agora** e cada etapa da viagem (coleta, voo, alfândega, transferência, última milha);
+  - a **entrega** (prevista, realizada e o atraso) e, numa frase simples, como saiu o envio ("o envio saiu com 1 dia de atraso");
+  - o **motivo provável** de um atraso, em linguagem do cliente (nunca como certeza);
+  - um **aviso da central** quando o caso precisa dela (atraso de entrega de 3 dias ou mais, ou extravio; segunda a sexta, das 9h às 18h).
+- **Área do colaborador** (com login): a **Torre de controle**, com os números da operação e os pedidos que precisam de atenção, e a **visão do colaborador** de cada pedido, com o diagnóstico completo (o que falhou, onde, quanto, e o que é dado real ou simulado).
 
-Ao lado, um **assistente** responde perguntas como "Por que meu pedido atrasou?".
+No Início e no Rastreamento, o **LogBot** (o assistente) fica num painel à direita, que pode ser minimizado e reaberto. A conversa é a mesma nas duas páginas.
 
 A TransLog é uma operadora logística fictícia que despacha pedidos dos EUA e de Porto Rico para cinco mercados, em quatro modalidades (Standard Class, Second Class, First Class e Same Day). A dor central do projeto é a **promessa irreal**: o prazo de despacho das modalidades rápidas quase nunca é cumprido.
 
@@ -92,16 +95,31 @@ Com o Databricks, as credenciais saem do `portal/.env` na hora de ligar o contai
 - `AGENT=mock` (padrão): assistente **simulado**, com respostas prontas a partir dos dados do pedido. Funciona sempre, sem IA, e é o plano B da banca.
 - `AGENT=adk` com `AGENT_URL=http://127.0.0.1:8001`: o **agente de IA do Marco**, que precisa estar ligado.
 
-Ao abrir outro pedido, a conversa continua, com um aviso "Alternado para o pedido #N" separando os assuntos. O botão "Nova conversa" limpa tudo e começa do zero.
+Ao abrir outro pedido, a conversa continua, com um aviso "Alternado para o pedido #N" separando os assuntos. O botão "Nova conversa" limpa tudo e começa do zero. O nome do assistente é **LogBot**.
 
-O nome do assistente ("Assistente TransLog") ainda não foi confirmado pelo grupo; muda num lugar só.
+### Área do colaborador: como entrar
+
+O link fica discreto, no canto do cabeçalho e no rodapé: **"Acesso colaborador"** (com um cadeado). Ele abre o formulário de login.
+
+- **Entrada de demonstração (para a banca):** com `AUTH_DEMO=true` e um `SESSION_SECRET` no `portal/.env`, aparece o botão **"Entrar como demonstração"**. Ele entra como `demo@translog.local`, sem senha. Desligado (o padrão), o botão some e a entrada não existe no servidor.
+- **Usuário de verdade:** rode `pnpm staff:add ana@translog.com`. O comando pede a senha (sem mostrar na tela) e imprime uma linha `STAFF_USERS=...` para colar no `portal/.env`. Vários usuários: separe por vírgula na mesma linha. A senha nunca fica gravada; só um código embaralhado dela.
+- `SESSION_SECRET` é um texto aleatório de pelo menos 32 caracteres (gere com `openssl rand -base64 48`). Sem ele, ninguém entra.
+- A sessão dura 8 horas. "Sair" encerra na hora. Se a sessão vencer, a tela volta ao login com um aviso.
+- O link "Painel completo de performance" da Torre usa `DASHBOARD_URL`; enquanto não houver, aparece "link a definir".
+
+Depois de mudar o `.env`, reinicie o `pnpm dev`.
 
 ## Roteiro da banca
 
-1. Abrir o portal. O chat cumprimenta e pede o número do pedido.
-2. Digitar **76902** (ou clicar no atalho): pedido **em trânsito**, First Class, de San Jose (EUA) para Jacarta (Indonésia), parado na **Alfândega Jacarta**, com **5 dias de atraso**. Motivo provável no despacho: **Promessa irreal**. Aviso da central.
-3. Clicar em **"Perguntar ao assistente"** ("Por que o pedido #76902 atrasou?"). O assistente explica o motivo provável de cada etapa e avisa que o caso é acompanhado pela central.
-4. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
+Com `DATA_SOURCE=file` (ou `databricks`) e `AUTH_DEMO=true`:
+
+1. **Início** (`http://localhost:5173`): o mapa animado mostra as rotas dos EUA e de Porto Rico para os 5 mercados, com o número de pedidos de cada um. O LogBot está aberto à direita; mostrar que ele minimiza (desliza para a direita) e reabre pela aba.
+2. Digitar **76902** na busca e clicar em **Rastrear**: pedido **em trânsito**, First Class, de San Jose (EUA) para Jacarta (Indonésia), parado na **Alfândega Jacarta**, com **5 dias de atraso**. "O envio saiu com 1 dia de atraso." Motivo provável em linguagem do cliente. Aviso da central.
+3. Clicar em **"Perguntar ao assistente"**: o LogBot (a mesma conversa do Início) explica o motivo provável e avisa que o caso é acompanhado pela central. Mostrar a sugestão "Quero falar com a central".
+4. Clicar em **"Acesso colaborador"** → **"Entrar como demonstração"** → **Torre de controle**: 42,7% dos despachos no prazo, 74,7% das entregas, 197 em trânsito, 8.337 na central, 7.222 extravios. Filtrar a tabela por **Alfândega**.
+5. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho de 2 dias contra 1 prometido; com a "Promessa ajustada" de 2 dias estaria no prazo), as causas nos termos da base e de onde vem cada dado (real ou simulado). Comparar com "Ver como o cliente vê".
+6. **Sair**.
+7. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
 
 Pedidos de exemplo para mostrar cada situação:
 
@@ -117,15 +135,16 @@ Pedidos de exemplo para mostrar cada situação:
 | **31298** | Entregue no prazo, rota dentro dos EUA por caminhão | Sem voo nem alfândega |
 | **76385** | Em trânsito, em voo para a Austrália, 6 dias de atraso | Outro caso em trânsito |
 
-Os atalhos da tela são 76902, 375, 34 e 8 (`SAMPLE_ORDER_IDS`). Qualquer pedido pode ser aberto direto pelo endereço, por exemplo `http://localhost:5173/?pedido=76902`.
+Os atalhos da tela são 76902, 375, 34 e 8 (`SAMPLE_ORDER_IDS`). Qualquer pedido pode ser aberto direto pelo endereço, por exemplo `http://localhost:5173/rastreio?pedido=76902` (o endereço antigo `/?pedido=76902` continua funcionando).
 
 ## Privacidade
 
-Nenhuma resposta do portal traz dados do cliente (id, segmento) nem valores internos (preço unitário, valor bruto, desconto, id do produto). Essas colunas **nem são lidas**: a consulta ao Databricks lista só as colunas permitidas, e a leitura dos CSVs descarta as demais. Testes automáticos conferem todas as respostas.
+Nenhuma resposta do portal traz dados do cliente (id, segmento) nem valores internos (preço unitário, valor bruto, desconto, id do produto). O cliente também não vê a frase técnica da base, as causas nos termos internos nem o mercado logístico: isso fica só na visão do colaborador, que exige login. Essas colunas **nem são lidas**: a consulta ao Databricks lista só as colunas permitidas, e a leitura dos CSVs descarta as demais. Testes automáticos conferem todas as respostas.
 
 ## Pontos em aberto
 
-- Nome do assistente (citado "Login" na reunião de 16/11).
+- Link do painel de performance do Marcelo (`DASHBOARD_URL`).
+- A "Promessa ajustada" está copiada da tabela da Gold no código; ler a tabela direto do Databricks fica para depois.
 - Regra da central: "3 dias ou mais" (como está) ou "mais de 3 dias".
 - Telefone ou e-mail da central para o aviso da tela.
 - A explicação da base diz "cumprido em apenas 0.0%" (ponto decimal, número estranho): ajuste pedido ao Mateus.
@@ -160,5 +179,6 @@ Nenhuma resposta do portal traz dados do cliente (id, segmento) nem valores inte
 | `api/` | O servidor (Node + Fastify) e o assistente simulado |
 | `contracts/` | O formato combinado dos dados entre tela e servidor |
 | `dados/` | CSVs das tabelas (só no seu computador, nunca no GitHub) |
+| `web/public/ipnet.svg` | Logo da IPNET do rodapé |
 | `docs/backend.md` | Documentação técnica completa |
 | `tasks.md` | Checklist do que foi feito |

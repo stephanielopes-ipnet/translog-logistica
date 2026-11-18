@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  activeTab,
   guardRedirect,
+  headerKind,
   matchRoute,
   pageTitle,
   safeReturnPath,
+  staffAccessHref,
   staffLoginHref,
   staffOrderHref,
   trackingHref,
@@ -23,7 +24,11 @@ describe("matchRoute", () => {
       name: "staffOrder",
       orderParam: "76902",
     });
-    expect(matchRoute("/colaborador/entrar", "")).toEqual({ name: "staffLogin", returnTo: null });
+    expect(matchRoute("/colaborador/entrar", "")).toEqual({
+      name: "staffLogin",
+      returnTo: null,
+      expired: false,
+    });
   });
 
   it("keeps the old address /?pedido=N opening the tracking page", () => {
@@ -49,11 +54,14 @@ describe("matchRoute", () => {
     expect(matchRoute("/colaborador/entrar", "?voltar=%2Fcolaborador%2Fpedidos%2F34")).toEqual({
       name: "staffLogin",
       returnTo: "/colaborador/pedidos/34",
+      expired: false,
     });
     expect(matchRoute("/colaborador/entrar", "?voltar=https://evil.example")).toEqual({
       name: "staffLogin",
       returnTo: null,
+      expired: false,
     });
+    expect(matchRoute("/colaborador/entrar", "?expirou=1")).toMatchObject({ expired: true });
   });
 });
 
@@ -68,6 +76,10 @@ describe("hrefs", () => {
     );
     expect(staffLoginHref("/colaborador")).toBe("/colaborador/entrar");
     expect(staffLoginHref(null)).toBe("/colaborador/entrar");
+    expect(staffLoginHref("/colaborador", { expired: true })).toBe("/colaborador/entrar?expirou=1");
+    expect(staffLoginHref("/colaborador/pedidos/34", { expired: true })).toBe(
+      "/colaborador/entrar?voltar=%2Fcolaborador%2Fpedidos%2F34&expirou=1",
+    );
   });
 });
 
@@ -87,21 +99,29 @@ describe("safeReturnPath", () => {
   });
 });
 
-describe("activeTab", () => {
-  it("marks the tab of the current area", () => {
-    expect(activeTab({ name: "home" })).toBeNull();
-    expect(activeTab({ name: "tracking", orderParam: null })).toBe("tracking");
-    expect(activeTab({ name: "staffLogin", returnTo: null })).toBe("staff");
-    expect(activeTab({ name: "staffTower" })).toBe("staff");
-    expect(activeTab({ name: "staffOrder", orderParam: "1" })).toBe("staff");
-    expect(activeTab({ name: "notFound" })).toBeNull();
+describe("headerKind", () => {
+  it("keeps the staff area out of the public header until signed in", () => {
+    expect(headerKind({ name: "home" })).toBe("public");
+    expect(headerKind({ name: "tracking", orderParam: null })).toBe("public");
+    expect(headerKind({ name: "staffLogin", returnTo: null, expired: false })).toBe("public");
+    expect(headerKind({ name: "notFound" })).toBe("public");
+    expect(headerKind({ name: "staffTower" })).toBe("staff");
+    expect(headerKind({ name: "staffOrder", orderParam: "1" })).toBe("staff");
+  });
+});
+
+describe("staffAccessHref", () => {
+  it("opens the login form directly, or the Tower when already signed in", () => {
+    expect(staffAccessHref("anonymous")).toBe("/colaborador/entrar");
+    expect(staffAccessHref("loading")).toBe("/colaborador/entrar");
+    expect(staffAccessHref("authenticated")).toBe("/colaborador");
   });
 });
 
 describe("guardRedirect", () => {
   const tower = { name: "staffTower" } as const;
   const order = { name: "staffOrder", orderParam: "76902" } as const;
-  const login = { name: "staffLogin", returnTo: null } as const;
+  const login = { name: "staffLogin", returnTo: null, expired: false } as const;
 
   it("sends anonymous visitors of staff pages to the login, remembering the page", () => {
     expect(guardRedirect(tower, "/colaborador", "anonymous")).toBe("/colaborador/entrar");
@@ -119,7 +139,7 @@ describe("guardRedirect", () => {
     expect(guardRedirect(login, "/colaborador/entrar", "authenticated")).toBe("/colaborador");
     expect(
       guardRedirect(
-        { name: "staffLogin", returnTo: "/colaborador/pedidos/34" },
+        { name: "staffLogin", returnTo: "/colaborador/pedidos/34", expired: false },
         "/colaborador/entrar?voltar=%2Fcolaborador%2Fpedidos%2F34",
         "authenticated",
       ),

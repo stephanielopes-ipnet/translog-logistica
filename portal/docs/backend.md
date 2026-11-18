@@ -96,6 +96,9 @@ portal/
 │       ├── orders.ts        # Order, enums, params e resposta de samples
 │       ├── orders.test.ts   # testes do contrato do pedido
 │       ├── chat.ts          # corpo e resposta de POST /api/chat, AgentMode
+│       ├── staff-orders.ts  # StaffOrder (visão do colaborador, com o diagnóstico)
+│       ├── auth.ts          # login e sessão do colaborador
+│       ├── tower.ts         # Torre de controle e resumo por mercado do Início
 │       ├── health.ts        # resposta do health, DataSource
 │       └── errors.ts        # formato padrão de erro
 ├── api/                     # @translog/api
@@ -103,7 +106,8 @@ portal/
 │   ├── vitest.config.ts     # isolate: false, TZ=America/Sao_Paulo
 │   ├── scripts/
 │   │   ├── export-dados.ts    # pnpm export:dados: Databricks → portal/dados/*.csv
-│   │   └── generate-fixtures.ts # pnpm --filter @translog/api fixtures: pedidos da demo
+│   │   ├── generate-fixtures.ts # pnpm --filter @translog/api fixtures: pedidos da demo
+│   │   └── staff-add.ts       # pnpm staff:add <email>: hash da senha para STAFF_USERS
 │   └── src/
 │       ├── main.ts          # bootstrap: .env → config → servidor → listen
 │       ├── server.ts        # Fastify, swagger, error handler, container, rotas (health inline)
@@ -114,6 +118,15 @@ portal/
 │       ├── testing/
 │       │   └── fake-databricks.ts # Databricks falso para os testes (fora da imagem Docker)
 │       ├── privacy.test.ts  # varredura de chaves e valores proibidos em todas as respostas (pedidos e chat)
+│       ├── auth/
+│       │   ├── routes.ts              # /api/auth/login, logout, session e demo (só com AUTH_DEMO)
+│       │   ├── auth-service.ts        # login, demonstração, sessão + erros de login
+│       │   ├── password.ts            # hash scrypt e comparação em tempo constante
+│       │   ├── session-token.ts       # conteúdo do cookie assinado (HMAC)
+│       │   ├── session-cookie.ts      # leitura e gravação do cookie HttpOnly
+│       │   └── login-limiter.ts       # 5 erros por minuto por IP (memória)
+│       ├── staff/
+│       │   └── routes.ts              # /api/staff/orders/:id e /api/staff/tower, com o guarda de sessão
 │       ├── chat/
 │       │   ├── routes.ts              # POST /api/chat
 │       │   ├── chat-service.ts        # pedido de contexto, trava por conversa, log sem conteúdo, ChatBusyError
@@ -133,31 +146,45 @@ portal/
 │           ├── databricks-client.ts   # SQL Statement Execution API (fetch, EXTERNAL_LINKS, CSV)
 │           ├── databricks-repository.ts # adapter databricks (3 consultas no boot → mesma leitura do file)
 │           ├── escalation.ts          # regra única de encaminhamento à central
+│           ├── order-views.ts         # projeções Order (cliente) e StaffOrder (colaborador)
+│           ├── order-stats.ts         # números da carga (contexto do colaborador)
+│           ├── tower-stats.ts         # Torre e resumo por mercado (mesma passada da carga)
+│           ├── promise-scenario.ts    # "Promessa ajustada" da Gold (constantes)
 │           └── fixtures/
 │               ├── orders.json        # 9 pedidos da demo (vão para a imagem)
 │               └── consumo/           # amostra das 3 tabelas para testes (não vai para a imagem)
 └── web/                     # @translog/web (React 19 + Vite 8 + Tailwind v4)
     ├── index.html           # ponto de entrada HTML (pt-BR, título e fontes IBM Plex Mono)
+    ├── public/ipnet.svg     # logo do rodapé ("Desenvolvido por")
     ├── package.json
     ├── tsconfig.json        # bundler resolution, jsx: react-jsx, noEmit
     ├── vite.config.ts       # plugin React + Tailwind, proxy /api → http://127.0.0.1:3333
     └── src/
         ├── main.tsx         # QueryClientProvider + montagem do App
-        ├── app.tsx          # composição geral: URL state, queries, troca de pedido, atalhos e chat
+        ├── app.tsx          # rotas, guarda da Área do colaborador, conversa e painel do LogBot
         ├── index.css        # @theme inline, @custom-variant dark, classes .label-mono, .perf-t, .route-line
         ├── api/
         │   ├── client.ts    # getJson/postJson + validação Zod com @translog/contracts + classe ApiError
         │   ├── fixtures.ts  # pedidos de exemplo padrão e dicas dos atalhos
         │   ├── fixture-orders.ts # lê api/src/orders/fixtures/orders.json, só nos testes da tela
-        │   └── queries.ts   # useHealth, useOrderSamples, useOrderQuery, useSendChatMessage e shouldRetry
+        │   ├── queries.ts   # useOrderSamples, useOrdersSummary, useOrderQuery, useSendChatMessage
+        │   └── session.ts   # sessão, login, demonstração, logout, Torre e pedido do colaborador
         ├── lib/
-        │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD), formatManifestCode
-        │   ├── url-state.ts # leitura e escrita de ?pedido= e presets de apresentação (?t, ?c, ?s, ?n, ?bar)
+        │   ├── format.ts    # formatDate (sem new Date), formatCurrency (USD)
+        │   ├── router.ts    # rotas, guarda, links de acesso e títulos (lógica pura)
+        │   ├── use-location.tsx # URL ↔ React (navigate, Link)
+        │   ├── url-state.ts # parseOrderId
         │   └── utils.ts     # utilitário cn() para classes condicionais
         ├── components/
-        │   └── app-header.tsx # cabeçalho com marca TransLog, manifesto e badge de status da API
+        │   ├── app-header.tsx # cabeçalho público e da Área do colaborador
+        │   ├── app-footer.tsx # rodapé discreto
+        │   ├── brand-mark.tsx # marca TransLog
+        │   └── simple-page.tsx # 404 e "conferindo o acesso"
         └── features/
+            ├── home/                      # Início: herói, mapa animado (route-map.tsx), seções
+            ├── staff/                     # login, Torre, rastreio do colaborador e formatação
             ├── tracking/
+            │   ├── tracking-page.tsx      # rastreio do cliente (pedido vindo da URL)
             │   ├── order-status.ts        # regras puras: tom do badge, mensagem principal, prazo, motivo da central
             │   ├── stage-timeline.ts      # regras puras: etapas da rota e estado de cada uma (buildStageTimeline)
             │   ├── stage-timeline-view.tsx# linha do tempo por etapas, com os eventos de cada uma
@@ -173,7 +200,10 @@ portal/
             │   ├── rich-text.ts           # **negrito**, títulos e listas das respostas, sem HTML
             │   ├── chat-messages.tsx      # mensagens, divisor de troca, "digitando…" e falha com "Tentar novamente"
             │   ├── chat-input.tsx         # chips de sugestão contextual + textarea com Enter / Shift+Enter
-            │   └── chat-panel.tsx         # coluna direita fixa (400 px) com contexto do pedido ativo
+            │   ├── chat-panel.tsx         # conversa (cabeçalho com minimizar, contexto do pedido, mensagens)
+            │   ├── use-chat-conversation.ts # conversa acima das páginas (mesma no Início e no Rastreamento)
+            │   ├── logbot-panel.ts        # estado aberto/minimizado (localStorage)
+            │   └── logbot-dock.tsx        # painel lateral minimizável
 ```
 
 Testes ficam ao lado do arquivo testado (`*.test.ts`) tanto em `api/src/` quanto em `web/src/`.
@@ -363,6 +393,10 @@ Pacote só com código-fonte (`exports` → `src/index.ts`, sem build). Os esque
 | `chatResponseSchema` / `ChatResponse` | Resposta de `POST /api/chat` |
 | `chatSessionIdSchema`, `CHAT_MESSAGE_MAX_LENGTH` | UUID da conversa; limite de 1000 caracteres da mensagem |
 | `errorResponseSchema` | `{ error: { code, message } }` |
+| `staffOrderSchema` / `StaffOrder` | Resposta de `GET /api/staff/orders/:orderId`: o `Order` com causas da base, `explanation`, `market`, `routeService` e o diagnóstico |
+| `loginRequestSchema`, `sessionResponseSchema`, `DEMO_STAFF_EMAIL` | Login do colaborador (`contracts/src/auth.ts`): `{ email, password }` e `{ authenticated, email, demoAvailable }` |
+| `towerResponseSchema` / `TowerResponse` | Torre de controle (`contracts/src/tower.ts`): indicadores, fila de atenção, promessa × realidade, etapas, rotas, `dashboardUrl` |
+| `ordersSummaryResponseSchema` | `{ totalOrders, markets: [{ market, orders }] }` (mapa do Início, público) |
 
 ### `Order`
 
@@ -413,7 +447,25 @@ O OpenAPI de `/docs` traz um exemplo de corpo e as respostas `200`, `400`, `409`
 | `GET /api/orders/samples` | `200 { orderIds }`: ids de `SAMPLE_ORDER_IDS` que existem na fonte, na ordem configurada | |
 | `GET /api/orders/:orderId` | `200 Order` | `400 VALIDATION_ERROR`, `404 ORDER_NOT_FOUND` |
 | `POST /api/chat` | `200 { sessionId, reply, mentionedOrderId }` | `400 VALIDATION_ERROR`, `409 CHAT_BUSY`, `502 AGENT_UNAVAILABLE`, `504 AGENT_TIMEOUT` |
+| `GET /api/orders/summary` | `200 { totalOrders, markets }`: pedidos por mercado (só números, calculados na carga) | |
+| `POST /api/auth/login` | `204` + cookie de sessão | `401 INVALID_CREDENTIALS` (mesma resposta para e-mail ou senha errados), `429 TOO_MANY_ATTEMPTS`, `415` sem JSON |
+| `POST /api/auth/logout` | `204` (apaga o cookie) | |
+| `GET /api/auth/session` | `200 { authenticated, email, demoAvailable }` | |
+| `POST /api/auth/demo` | `204` + cookie de `demo@translog.local` | só existe com `AUTH_DEMO=true` (senão `404`) |
+| `GET /api/staff/orders/:orderId` | `200 StaffOrder` | `401 UNAUTHENTICATED`, `400`, `404 ORDER_NOT_FOUND` |
+| `GET /api/staff/tower` | `200 TowerResponse` | `401 UNAUTHENTICATED` |
 | `GET /docs` | Swagger UI (`/docs/json` = OpenAPI) | |
+
+**Login do colaborador (`api/src/auth/`, 17/11).** A proteção é na API, não só na tela:
+
+- usuários em `STAFF_USERS` (`email:hash`, separados por vírgula; hash `scrypt.<sal>.<chave>` gerado por `pnpm staff:add <email>`, que pede a senha sem ecoar); comparação em tempo constante e o mesmo trabalho para e-mail inexistente;
+- sessão num cookie `translog_session` assinado com HMAC-SHA256 (`SESSION_SECRET`, mínimo de 32 caracteres), `HttpOnly`, `SameSite=Lax`, `Path=/`, 8 h, `Secure` com `NODE_ENV=production`. Sem banco de sessões; feito com `node:crypto` (sem `@fastify/cookie`);
+- `/api/staff/*` passa por um único hook (`staff/routes.ts`) que exige sessão válida;
+- 5 logins errados em 1 minuto do mesmo IP → `429` (em memória; zera ao reiniciar a API e após um login certo);
+- `POST` de `/api/auth/*` só com `Content-Type: application/json` (com `SameSite=Lax`, cobre CSRF neste escopo);
+- log do login só com o resultado (`ok`, `rejected`, `demo`): sem e-mail, senha ou cookie.
+
+**Torre e resumo (`orders/tower-stats.ts`).** Acumulados na mesma passada da carga que já calcula o contexto do colaborador (`computeOrderStats`), nos 3 modos. Definições: despacho avaliado = tem data real, no prazo = `dispatch.delayDays <= 0`; entrega avaliada = tem atraso calculado (entregues e em trânsito; extraviados fora); fila de atenção = todos os em trânsito, mais atrasados primeiro; rotas com mais atraso = `rota_servico` com 300+ entregas avaliadas (8 primeiras). Conferido com os CSVs reais (17/11): 42,7% (15.739/36.866), 74,7% (22.130/29.644), 197 em trânsito (43 atrasados, 23 com 3+ dias), 8.337 na central, 7.222 extravios. A "Promessa ajustada" vem de `orders/promise-scenario.ts` (`ADJUSTED_PROMISE_SCENARIO`, constantes copiadas de `workspace.gold.param_cenario_prazo`: First 2, Same Day 1, Second 4, Standard 4); ler a tabela da Gold é pendência.
 
 O `orderId` aceita só dígitos (1 a 10), maior que zero; zeros à esquerda passam (`00375` → 375). `1e3`, `0x1F`, `-1`, `1.5`, espaços e 11 dígitos são recusados.
 
@@ -541,7 +593,11 @@ curl -X POST localhost:3333/api/chat -H 'content-type: application/json' \
 | `AGENT_URL` | vazio | Endereço http(s) do agente; obrigatório com `adk` (dev: `http://127.0.0.1:8001`). Barra final removida |
 | `AGENT_APP_NAME` | `translog_agent` | Nome do app no ADK; só letras, números, `_` e `-` (vai no caminho da URL) |
 | `AGENT_TIMEOUT_MS` | `90000` | Limite por resposta do agente, de 1000 a 600000 ms (o agente já levou 54 s) |
-| `NODE_ENV` | vazio | `production` = log em JSON; ausente = legível (pino-pretty) |
+| `STAFF_USERS` | vazio | Usuários do colaborador: `email:hash` separados por vírgula (`pnpm staff:add <email>`). Nunca aparece na mensagem de erro |
+| `SESSION_SECRET` | vazio | Segredo do cookie de sessão (32+ caracteres); obrigatório com `STAFF_USERS` ou `AUTH_DEMO=true`. Nunca aparece na mensagem de erro |
+| `AUTH_DEMO` | `false` | `true` liga "Entrar como demonstração" (`POST /api/auth/demo`); só para o desenvolvimento e a banca |
+| `DASHBOARD_URL` | vazio | Link "Painel completo de performance" da Torre; vazio = "link a definir" |
+| `NODE_ENV` | vazio | `production` = log em JSON e cookie `Secure`; ausente = legível (pino-pretty) |
 | `WEB_PORT` | `5173` | Porta do Vite dev server (só o frontend em dev); o proxy `/api` usa `API_PORT` |
 
 Regras (`api/src/config.ts`):
@@ -872,7 +928,7 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
 
 - **Tipografia técnica dupla:**
   - `Inter Variable` (`--font-sans`, via `@fontsource-variable/inter`) para leitura fluida de títulos, rótulos principais e mensagens do assistente;
-  - `IBM Plex Mono` (`--font-mono`) para códigos de manifesto (`TL-000375-LATAM`), datas, contagens de dias, preços em dólar e cabeçalhos rotulados (`.label-mono`).
+  - `IBM Plex Mono` (`--font-mono`) para números de pedido, datas, contagens de dias, preços em dólar e cabeçalhos rotulados (`.label-mono`).
   - Números tabulares forçados com `.tabular { font-variant-numeric: tabular-nums; }` para evitar deslocamento horizontal ao alternar pedidos.
 - **Paleta, contraste e interatividade (`@theme inline` + `@layer base`):**
   - Azul-petróleo `#0F4C81` (`--color-primary`) como cor primária de autoridade e foco;
@@ -884,84 +940,72 @@ A interface web foi construída em React 19 + Vite 8 + Tailwind CSS v4 implement
 - **Detalhes gráficos de manifesto internacional:**
   - `.perf-t`: divisor horizontal com serrilhado de manifesto logístico no rodapé de total da fatura;
   - `.route-line`: conector horizontal tracejado ligando origem e destino no cabeçalho da rota;
-  - Fita superior semântica de `3px` no `OrderManifestCard` e botão copiável no código de guia (`TL-000375-LATAM`).
+  - Fita superior semântica de `3px` no `OrderManifestCard`.
 
-### 13.2. Layout, estrutura de tela e ergonomia (`src/app.tsx`)
+### 13.2. Rotas e telas (`src/app.tsx`, `src/lib/router.ts`)
 
-- **Desktop-first (`min-w-[1280px]`):**
-  - **Cabeçalho (`AppHeader`, `h-16`):** marca TransLog (`International Logistics · Rastreamento de pedidos`), fita institucional e indicador de conexão que reflete `GET /api/health` (`Conectado` ou `Sem conexão`).
-  - **Coluna esquerda (`TrackingPanel`, `flex-1`):**
-    - `OrderSearchForm`: aceita apenas dígitos (1 a 10), oferece pílulas rápidas vindas de `GET /api/orders/samples`, atalho global de teclado `/` para focar a busca, botão `X` para limpar e retornar ao estado inicial, e indicador de carregamento (`Consultando`) no submit;
-    - Estados dedicados (`tracking-states.tsx`): tela inicial com resumo em 3 blocos (`01 · Situação e prazo`, `02 · Motivo provável`, `03 · Rota e manifesto`), skeleton animado, pedido não encontrado com botão *"Tentar outro número"* e erro de rede com retentativa;
-    - `OrderManifestCard`: grade de 4 colunas (`Previsão/Entrega`, `Cumprimento do prazo`, `Modalidade contratada`, `Pedido realizado em` com contagem de itens e total em `US$`), alerta de motivo provável com CTA *"Perguntar ao assistente"* e bloco integrado de rota (com truncamento seguro para cidades longas) + linha do tempo;
-    - `OrderItemsTable`: exibe itens, categorias, quantidades e soma distinta de itens e unidades totais no cabeçalho.
-  - **Coluna direita (`ChatPanel`, `w-[400px]` fixa na altura da viewport):** assistente TransLog com indicador de conexão no avatar, faixa de contexto do pedido ativo (`Falando sobre o pedido #375` ou `Nenhum pedido selecionado`), botão *"Nova conversa"* desabilitado quando o chat está vazio, sugestões contextuais e caixa de envio (`Enter` envia, `Shift+Enter` quebra linha).
+Roteador feito à mão com a History API (URLs limpas): são cinco rotas fixas, sem aninhamento nem carregamento por rota, e uma dependência (`react-router`) traria mais do que usamos. A lógica é pura e testada (`router.ts`); `use-location.tsx` liga a URL ao React (`useLocationHref`, `navigate`, `Link`). O Vite serve o `index.html` em qualquer caminho.
 
-### 13.3. Cliente HTTP, validação Zod e cache (`src/api/`)
+| Endereço | Tela |
+|---|---|
+| `/` | Início do cliente (herói com busca e mapa animado, números, como funciona, modalidades, central) |
+| `/rastreio?pedido=N` | Rastreio do cliente. `/?pedido=N` (endereço antigo) abre o rastreio e vira `/rastreio?pedido=N` |
+| `/colaborador/entrar` | Login do colaborador (`?voltar=` = página pedida, só caminhos de `/colaborador`; `?expirou=1` = aviso de sessão expirada) |
+| `/colaborador` | Torre de controle |
+| `/colaborador/pedidos/:id` | Rastreio do colaborador (visão do `StaffOrder`) |
 
-- **`client.ts`:**
-  - Toda chamada HTTP passa por `getJson(path, schema)` ou `postJson(path, body, schema)`, que usam a mesma função (`requestJson`).
-  - Se o `fetch` falhar na rede (`TypeError`), lança `ApiError` com `status: 0` e `code: "NETWORK_ERROR"`, ativando automaticamente o card de **Sem conexão com o servidor** na tela.
-  - Se a resposta não for `2xx`, tenta decodificar o envelope `errorResponseSchema` (`@translog/contracts`) para preservar `code` (`ORDER_NOT_FOUND`, `VALIDATION_ERROR`, etc.) e `message` vindos do Fastify.
-  - Se for `200 OK`, valida o corpo com `schema.safeParse(body)` usando o próprio esquema Zod de `@translog/contracts` (`orderSchema`, `orderSamplesResponseSchema`, `healthResponseSchema`, `chatResponseSchema`). Respostas fora do contrato lançam `INVALID_RESPONSE`.
-- **`queries.ts` (`@tanstack/react-query`):**
-  - `useHealth()`: consulta `/api/health` com `staleTime: 30_000`.
-  - `useOrderSamples()`: consulta `/api/orders/samples` e usa fallback `[76902, 375, 34, 8]` caso a API ainda não tenha respondido.
-  - `useOrderQuery(orderId)`: consulta `/api/orders/:orderId` apenas quando `orderId !== null`.
-  - `useSendChatMessage()`: `useMutation` de `POST /api/chat` com `retry: false` (o agente pode já ter processado a mensagem; reenvio só manual).
-  - `shouldRetry(failureCount, error)`: política testada unitariamente que **nunca repete erros 4xx** (`404 ORDER_NOT_FOUND` ou `400 VALIDATION_ERROR` falham na hora) e faz **1 retentativa rápida** em erros de rede (`status: 0`) ou `5xx`.
+- **Guarda (`guardRedirect`):** sem sessão, as páginas da área vão ao login lembrando a página; já com sessão, o login leva à página pedida ou à Torre. A tela pergunta `GET /api/auth/session` (nunca lê o cookie `HttpOnly`).
+- **Sessão expirada:** qualquer `401` em `/api/staff/*` volta ao login com `?expirou=1` (`useExpireOn401` em `api/session.ts`).
+- **Cabeçalho (`app-header.tsx`):** público = marca (Início), "Rastreamento", "Atendimento 24h" (ponto âmbar) e o link discreto "Acesso colaborador" (cadeado; abre o login, ou a Torre com sessão). Na área com sessão = marca + "Área do colaborador", "Torre de controle", e-mail, "Sair" e "Voltar ao site". A Área do colaborador não aparece no menu público. Sem indicador "Conectado" (a consulta a `/api/health` saiu da tela em 17/11).
+- **Rodapé (`app-footer.tsx`):** faixa baixa com o aviso de empresa fictícia, "Acesso colaborador" (páginas públicas) e "Desenvolvido por" + logo IPNET esmaecida (`public/ipnet.svg`).
 
-### 13.4. Formatação segura de datas e valores (`src/lib/format.ts`)
+### 13.3. Painel lateral do LogBot (`features/chat/logbot-dock.tsx`, `logbot-panel.ts`)
 
-- **`formatDate(isoDate)`:** converte `"2015-01-08"` em `"08/01/2015"` operando exclusivamente por regex e corte de string (`/^(\d{4})-(\d{2})-(\d{2})/`), **sem jamais instanciar `new Date()`**. Isso garante que o frontend preserve a mesma regra de calendário do backend em qualquer fuso horário do navegador.
-- **`formatCurrency(value)`:** usa `Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" })` para produzir `US$ 91,34`.
-- **`formatManifestCode(order)`:** gera o código de etiqueta internacional no formato `TL-<ORDER_ID_6_DIGITOS>-<MARKET>` (ex.: `TL-000375-LATAM`, `TL-020322-PACIFICASIA`).
+- Nas páginas do cliente (Início e Rastreamento), o LogBot fica à direita, ao lado do conteúdo (não por cima), com 400 px e a altura útil abaixo do cabeçalho (fixo ao rolar o Início). Não é botão flutuante.
+- **Minimizar:** botão no cabeçalho do chat. O painel desliza para a direita (250 ms, largura + `transform`) e deixa uma aba fina vertical ("LogBot" + ícone) para reabrir; o conteúdo ocupa o espaço com a mesma transição. Sem animação com `prefers-reduced-motion` (`motion-safe:`).
+- **Estado:** aberto por padrão; a escolha vale entre Início e Rastreamento e fica no `localStorage` (`translog.logbot.aberto`, leitura e escrita com `try/catch`). `askLogBot` reabre o painel quando a página pergunta ("Perguntar ao assistente", sugestões); "Perguntar ao LogBot" do Início abre e foca o campo.
+- **Acessibilidade:** botões com `aria-expanded` e `aria-controls`; painel como região "Conversa com o LogBot"; o painel fechado fica `inert`; o foco vai para o campo ao reabrir e para a aba ao minimizar.
+- **Mesma conversa** em todas as páginas do cliente: `use-chat-conversation.ts` fica no `App`, acima das rotas. Sem chat na Área do colaborador.
 
-### 13.5. Pedido na tela (`order-manifest-card.tsx`, refeito em 16/11)
+### 13.4. Cliente HTTP e consultas (`src/api/`)
 
-De cima para baixo, só com campos do `Order` (nenhuma regra de negócio nova na tela):
+- `client.ts`: `getJson`, `postJson` e `postNoContent` (para `204`), todos com `credentials: "same-origin"`; erro vira `ApiError` (`status: 0` = rede; envelope `{ error }` preservado; resposta fora do contrato = `INVALID_RESPONSE`).
+- `queries.ts`: `useOrderSamples`, `useOrdersSummary` (mapa do Início), `useOrderQuery`, `useSendChatMessage` (sem retry).
+- `session.ts`: `useSession` (`404` = sem sessão), `useLogin`, `useDemoLogin`, `useLogout`, `useTower`, `useStaffOrder`.
 
-1. **Guia de remessa:** número, badge da situação (7 situações, cor por tom em `order-status.ts`), badge do prazo de entrega (`Atrasado`/`No Prazo`/`Adiantado`, só quando há `delivery.delayDays`), data do pedido e código.
-2. **Mensagem principal** (`statusHeadline`): ex.: "Em trânsito, com 5 dias de atraso / Entrega prevista para 01/02/2018"; "Volume extraviado na etapa Alfândega"; "Pagamento não confirmado".
-3. **Destaque ao lado:** "Onde está agora · <etapa>" com `currentLocation` (em trânsito; vermelho se a entrega atrasou), "Extraviado na etapa X" com o último local conhecido, ou o local da entrega. Pedidos sem despacho não têm destaque.
-4. **Aviso da central** quando `escalateToSupport` (regra calculada na API), com o motivo ("a entrega está 5 dias atrasada" / "o volume foi extraviado") e o horário (segunda a sexta, das 9h às 18h; texto em `SUPPORT_HOURS`). Telefone ou e-mail da central ainda não confirmados.
-5. **Despacho x entrega** (`deadlines-block.tsx`): previsto, realizado e atraso de cada um (prazo prometido da modalidade no despacho; em trânsito, "atraso contado até" a data de referência). Abaixo, a faixa âmbar **"Motivo provável"** com a causa de cada etapa ("No despacho: Promessa irreal · Na entrega: …"), a `explanation` da base e o botão "Perguntar ao assistente". Sem causa, só a explicação, discreta. Cancelado e não pago mostram "Sem despacho nem entrega".
-6. **Rota:** origem, destino, mercado, região, modalidade, modal (ícone de avião ou caminhão) e tipo de rota.
-7. **Linha do tempo por etapas** (`stage-timeline.ts` + `stage-timeline-view.tsx`).
+### 13.5. Formatação (`src/lib/format.ts`, `features/staff/tower-format.ts`)
 
-**Linha do tempo por etapas.** `plannedStages(order)` decide as etapas da rota: Pedido e Coleta sempre; Voo só se o modal for aéreo; Alfândega só em rota internacional; Transferência e Última milha sempre (conferido nos dados: rota internacional sempre tem voo e alfândega; doméstica nunca tem alfândega). Uma etapa com evento sempre aparece. Cancelado e não pago mostram só "Pedido". `buildStageTimeline(order)` marca cada etapa:
+- `formatDate` só corta o texto `AAAA-MM-DD` (nunca `new Date(texto)`); `formatCurrency` em `US$`.
+- Área do colaborador: `formatInt`, `formatPercent` (pt-BR, 1 casa), `formatSignedDays`, `routeLabel` e `filterByStage` (filtro da fila de atenção), com testes.
+
+### 13.6. Pedido na tela do cliente (`order-manifest-card.tsx`)
+
+De cima para baixo: número, situação e prazo (sem o código de manifesto `TL-…`, interno, removido em 17/11); mensagem principal (`statusHeadline`); "Onde está agora" / local da entrega / extravio; aviso da central quando `escalateToSupport`; **Entrega** (previsto, realizado, atraso) em destaque e **Envio** numa frase simples (`dispatchSentence`: "O envio saiu com 1 dia de atraso.", "no prazo", "antes do previsto" ou por que não saiu); faixa "Motivo provável" em linguagem do cliente (vem pronta da API) com "Perguntar ao assistente"; rota (país e região, sem o mercado interno); linha do tempo por etapas (`stage-timeline.ts`, tabela de estados abaixo); itens.
 
 | Estado | Quando | Visual |
 |---|---|---|
 | `done` | antes da etapa atual, ou pedido entregue | quadrado escuro, "Concluída" |
 | `current` | etapa atual, em trânsito no prazo | azul, "Agora", caixa destacada |
 | `delayed` | etapa atual, em trânsito com entrega atrasada | vermelho, "Agora · com atraso (+N dias)" |
-| `lost` | etapa do extravio | vermelho, ícone de pacote extraviado, "Extraviado aqui" |
+| `lost` | etapa do extravio | vermelho, "Extraviado aqui" |
 | `pending` | ainda não alcançada | tracejado, "Aguardando" |
 | `not_reached` | depois de um extravio | tracejado claro, "Não alcançada" |
 
-Cada etapa lista seus eventos (data `DD/MM/AAAA`, descrição e local), na ordem da base. O evento `EXTRAVIO_CONFIRMADO` aparece em vermelho.
+### 13.7. Chat (`src/features/chat/`)
 
-### 13.6. Chat ligado à API (`src/features/chat/`)
+- Respostas só da API (`POST /api/chat`); a regra do simulado vive em `api/src/chat/mock-agent.ts`. `sessionId` por conversa (UUID), pedido aberto como contexto, pedido citado abre o rastreio dele (a conversa continua, com o divisor `Alternado para o pedido #N`). Falha = "Tentar novamente" manual; `504` com texto próprio.
+- Sugestões (`chat-suggestions.ts`): sem pedido, "Quero acompanhar meu pedido", modalidades e central; com pedido, 3 perguntas pela situação, e **"Quero falar com a central"** nos atrasados e extraviados.
+- `rich-text.ts` mostra títulos, listas e negrito das respostas sem HTML.
 
-A tela não tem mais regra de respostas: tudo vem de `POST /api/chat` (a regra do simulado vive só em `api/src/chat/mock-agent.ts`).
+### 13.8. Início (`features/home/`)
 
-- **Envio (`app.tsx`):** a pergunta entra na conversa, o "digitando…" aparece (sem tempo artificial) e `useSendChatMessage` envia `{ sessionId, message, orderId }`, com o `orderId` do pedido exibido (o mesmo do chip "Falando sobre o pedido"). Enquanto espera, a caixa de texto fica bloqueada.
-- **`sessionId` por conversa (`chat-session.ts`):** criado na primeira mensagem (`createSessionId`, UUID v4). Volta a vazio (conversa nova) em "Nova conversa", na troca de pedido com "Zerar" (`startsNewConversation`) e ao aplicar uma conversa de exemplo da barra. A resposta que chega depois de a conversa mudar é descartada.
-- **Pedido citado:** `mentionedOrderId` diferente do pedido aberto abre esse pedido pela mesma função do formulário (`handleSelectOrder`), que insere o divisor de troca no chat.
-- **Falha:** a pergunta fica "Não enviada · Tentar novamente"; no `504`, "O assistente demorou demais · Tentar novamente" (`chatFailureLabel`). Reenvio só manual.
-- **Formatação (`rich-text.ts`):** `parseRichText` transforma o texto em linhas (texto, título `#`/`##`/`###`, item de lista `*`/`-`/`•` com até 2 níveis, linha em branco) com trechos em `**negrito**`; `chat-messages.tsx` monta os elementos React, sem `dangerouslySetInnerHTML`. Tabelas, links, `---`, `*itálico*` e crases aparecem como texto.
-- **Sem pedido aberto:** o estado vazio diz "Olá! <nome> por aqui." e convida a informar o número; o campo de texto mostra "Digite o número do pedido (ex.: 76902)"; as sugestões são "Quero acompanhar meu pedido" (o assistente pede o número), as modalidades e a central.
-- **Sugestões (`chat-suggestions.ts`):** com pedido aberto e a conversa vazia, 3 perguntas adaptadas à situação; sempre citam o número do pedido.
-- **Nome do assistente:** `ASSISTANT_NAME` em `contracts/src/chat.ts` (cabeçalho, mensagens e respostas do simulado). Ainda não confirmado pelo grupo.
-- **Limite:** a caixa de texto aceita até `CHAT_MESSAGE_MAX_LENGTH` (1000) caracteres. `Enter` envia, `Shift+Enter` quebra linha.
-- **Troca de pedido (decidido em 17/11):** a conversa continua, no mesmo `sessionId`, com um divisor `Alternado para o pedido #N` (`messagesAfterOrderSwitch`). "Nova conversa" limpa e começa outra no backend.
+Herói em fundo claro com grade sutil (`.hero-grid`): sobretítulo, "Sua carga pelo mundo." + "Cada etapa visível." (âmbar), busca com a mesma validação do rastreio (vai para `/rastreio?pedido=N`) e os exemplos; à direita o **mapa animado** (`route-map.tsx`, animação do protótipo 01 em cores claras: rotas tracejadas que fluem de "EUA · Porto Rico" aos 5 mercados, azul → âmbar, com a contagem de pedidos de cada mercado vinda de `GET /api/orders/summary`; parado com `prefers-reduced-motion`). Abaixo: números (5 mercados, 4 modalidades, LogBot 24h, central seg–sex 9h–18h), como funciona (3 passos), as 4 modalidades com o prazo de despacho, central de atendimento com "Perguntar ao LogBot" e a linha "É da equipe TransLog? Acesso colaborador".
 
-### 13.7. Estado na URL (`src/lib/url-state.ts`)
+### 13.9. Área do colaborador (`features/staff/`)
 
-- **URL limpa por padrão:** ao abrir `http://localhost:5173`, a tela abre no estado inicial vazio. Ao buscar um pedido, `?pedido=<id>` é gravado via `window.history.replaceState` (e removido ao limpar a busca).
-- **Abrir um pedido pelo endereço:** `?pedido=76902` abre direto o pedido informado.
-- A barra de protótipo (presets `?t=`, `?c=`, `?s=`, `?n=`, `?bar=`) saiu em 17/11: o design foi fechado e a banca não deve ver a barra. Os estados de carregamento, não encontrado e erro aparecem naturalmente (número inexistente, API parada).
+- **Login (`staff-login-page.tsx`):** e-mail e senha; erro genérico ("E-mail ou senha inválidos."), aviso de `429`, aviso de sessão expirada; "Entrar como demonstração" só com `demoAvailable`.
+- **Torre (`tower-page.tsx`):** cabeçalho com a data de referência e o total; 5 indicadores; "Pedidos que precisam de atenção" (12 primeiros + "Mostrar todos"; filtro por etapa com `aria-pressed`; o número do pedido é um link, então Tab + Enter abre, e a linha toda é clicável); promessa × realidade por modalidade com o prazo sugerido; em trânsito e extravios por etapa (selo "rastreio simulado"); rotas com mais atraso; "Painel completo de performance" (`dashboardUrl`) ou "link a definir", desabilitado.
+- **Rastreio do colaborador (`staff-order-page.tsx`):** faixa escura "Visão do colaborador" (voltar à Torre, abrir outro pedido, "Ver como o cliente vê" em outra aba, para quem atende a central conferir a tela do cliente); blocos de diagnóstico (despacho prometido × real × sugerido, transporte padrão × real e dias recuperados, dias em cada etapa, contexto da modalidade e da rota, origem do dado com selos real/simulado, valor em risco, causas da base com a explicação completa, resumo para a IA e linha do tempo bruta recolhíveis); depois o cartão do pedido e os itens, sem o chat.
 
 ## 14. Testes
 
@@ -995,6 +1039,9 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 | `orders/fixtures-repository.test.ts` | Carga, situações e central dos 9 pedidos da demo, arquivo inválido, campos extras descartados |
 | `orders/consumo-mapper.test.ts` | 375 completo e datas iguais à `linha_do_tempo`; 76902, 34, 9, 31298; linhas x unidades (8); fuso; formato do export; ordem de itens e eventos (10 depois de 9); centavos; "Sem atraso"; casos inválidos; colunas proibidas fora das lidas |
 | `orders/escalation.test.ts` | ≥ 3 dias, 2 dias, extraviado, não pago, cancelado, adiantado |
+| `orders/tower-stats.test.ts` | Torre com os fixtures (indicadores, fila de atenção, promessa × realidade, sem cenário, `DASHBOARD_URL`), resumo por mercado; **integração com os CSVs reais** (42,7%, 74,7%, 197/43/23, 8.337, 7.222) |
+| `auth/auth-units.test.ts` | Hash scrypt (sal novo, formato), token HMAC (vencido, adulterado, outro segredo, malformado), limite de tentativas |
+| `auth/routes.test.ts` | Login certo e errado (mesma resposta), atributos do cookie (`Secure` em produção), `429`, POST sem JSON, sem `STAFF_USERS`, sessão, `401` em `/api/staff/*`, Torre e pedido com sessão, cookie adulterado e vencido, logout, demonstração ligada e desligada |
 | `orders/consumo-sql.test.ts` | SELECT explícito com `coalesce`/`date_format`, nenhuma coluna proibida (leitura e export), export ⊇ leitura, recusa de coluna proibida, schema e nome inválidos |
 | `orders/databricks-client.test.ts` | Contra um servidor HTTP falso: corpo da consulta, token só na API e nunca no link pré-assinado, `PENDING` → `RUNNING` → `SUCCEEDED`, 3 pedaços com cabeçalho uma vez só, download em paralelo entregue em ordem, `401`/`403`, `FAILED` (tabela ausente), timeout com cancelamento, `404`, host inacessível, falha no download |
 | `orders/databricks-repository.test.ts` | Contra o Databricks falso (`testing/fake-databricks.ts`, que serve a amostra e interpreta o `SELECT`): 9 pedidos iguais aos fixtures, 3 consultas sem colunas proibidas, token só na API, `PENDING` → `SUCCEEDED`, vários pedaços, log só com números, linha sem pedido, `401`, tabela ausente, timeout. **Integração com o Databricks real** só com `DATABRICKS_IT=1` (65.752 pedidos, 0 inválidas, 9 da demo iguais) |
@@ -1005,9 +1052,14 @@ Contagem em 16/11: contracts 20, api 294 (+2 desligados: agente real e Databrick
 
 | Arquivo | Cobre |
 |---|---|
-| `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR`, código de manifesto (`TL-000375-LATAM`) e pluralização de dias |
-| `lib/url-state.test.ts` | Leitura de `?pedido=76902`, rejeição de IDs inválidos (`0`, `abc`) e atualização limpa da query string |
-| `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo enviado, `409`/`502`/`504`, resposta fora do contrato) |
+| `lib/format.test.ts` | Formatação `AAAA-MM-DD` → `DD/MM/AAAA` sem `new Date()`, moeda `US$` em `pt-BR` e pluralização de dias |
+| `lib/url-state.test.ts` | Rejeição de IDs inválidos (`0`, `abc`, 11 dígitos) |
+| `lib/router.test.ts` | Rotas, `/?pedido=N`, `?voltar=` sem redirecionamento aberto, `?expirou=1`, guarda, cabeçalho público × colaborador, destino de "Acesso colaborador", títulos |
+| `api/client.test.ts` | `shouldRetry`, `ApiError`, `postJson` (corpo, `credentials`, `409`/`502`/`504`, fora do contrato), `postNoContent` (`204`, `429`) |
+| `features/chat/logbot-panel.test.ts` | Painel aberto por padrão, escolha salva (e armazenamento bloqueado), reabrir ao perguntar |
+| `features/home/markets.test.ts` | Nomes dos mercados e contagem em pt-BR |
+| `features/staff/tower-format.test.ts` | Filtro por etapa, rota em texto, números e percentuais em pt-BR, dias com sinal |
+| `features/staff/login-errors.test.ts` | Erro genérico do login, `429`, rede |
 | `features/tracking/order-status.test.ts` | Mensagem principal das 7 situações (76902, 375, 34, 222, 8, 9, 50, aguardando, adiantado, no prazo), prazo de entrega, motivo da central |
 | `features/tracking/stage-timeline.test.ts` | Etapas e estados: 76902 (alfândega com atraso), 76385 (voo com atraso), 375 (entregue), 34 (extravio + não alcançadas), 31298 (doméstica rodoviária sem voo nem alfândega), 8 (Porto Rico → Brasil), 9 e 50 (só o pedido), doméstica aérea, aguardando pagamento |
 | `features/chat/chat-session.test.ts` | `sessionId` aceito pelo contrato, divisor na troca de pedido (sem repetir), texto de falha por status |

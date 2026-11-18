@@ -1,6 +1,6 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { Order } from "@translog/contracts";
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError } from "@/api/client.ts";
 import { useOrderSamples } from "@/api/queries.ts";
 import { trackingHref } from "@/lib/router.ts";
@@ -14,12 +14,13 @@ interface TrackingPageProps {
   orderQuery: UseQueryResult<Order>;
   /** Pergunta enviada ao LogBot a partir do cartão ("Perguntar ao assistente"). */
   onAskAssistant: (question: string) => void;
-  /** Chat acoplado à direita (400 px). */
-  chat: ReactNode;
 }
 
-/** Rastreio do cliente (`/rastreio?pedido=N`): busca, cartão do pedido e chat acoplado. */
-export function TrackingPage({ orderParam, orderQuery, onAskAssistant, chat }: TrackingPageProps) {
+/**
+ * Rastreio do cliente (`/rastreio?pedido=N`): busca e cartão do pedido, na altura da tela com
+ * rolagem própria. O LogBot fica no painel lateral do layout do cliente.
+ */
+export function TrackingPage({ orderParam, orderQuery, onAskAssistant }: TrackingPageProps) {
   const samplesQuery = useOrderSamples();
   const submittedQuery = orderParam ?? "";
   const selectedOrderId = parseOrderId(orderParam);
@@ -56,7 +57,7 @@ export function TrackingPage({ orderParam, orderQuery, onAskAssistant, chat }: T
   }
 
   return (
-    <div className="mx-auto max-w-[1440px] h-[calc(100dvh-var(--header-h))] min-h-[640px] px-6 py-5 grid grid-cols-[minmax(0,1fr)_400px] grid-rows-[minmax(0,1fr)] gap-6">
+    <div className="h-[calc(100dvh-var(--header-h))] min-h-[560px] py-5 grid grid-rows-[minmax(0,1fr)]">
       <TrackingPanel
         view={view}
         queryValue={queryValue}
@@ -69,7 +70,6 @@ export function TrackingPage({ orderParam, orderQuery, onAskAssistant, chat }: T
         activeOrder={activeOrder}
         onAskAssistant={onAskAssistant}
       />
-      {chat}
     </div>
   );
 }

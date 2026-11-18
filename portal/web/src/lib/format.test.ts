@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatCurrency,
-  formatDate,
-  formatManifestCode,
-  onlyDigits,
-  pluralize,
-  splitPlace,
-} from "./format.ts";
+import { formatCurrency, formatDate, onlyDigits, pluralize, splitPlace } from "./format.ts";
 
 describe("format utilities", () => {
   it("formats calendar dates without timezone shift (even before 03:00Z)", () => {
@@ -36,10 +29,5 @@ describe("format utilities", () => {
       city: "San Benito",
       rest: "Texas, Estados Unidos",
     });
-  });
-
-  it("builds manifest codes without the internal market", () => {
-    expect(formatManifestCode({ orderId: 375 })).toBe("TL-000375");
-    expect(formatManifestCode({ orderId: 20322 })).toBe("TL-020322");
   });
 });

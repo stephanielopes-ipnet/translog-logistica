@@ -1,4 +1,5 @@
 import type { OrderRecord } from "./order-record.ts";
+import { createTowerAccumulator, type TowerStats } from "./tower-stats.ts";
 
 // Números agregados calculados uma vez, quando os pedidos são carregados (nos 3 modos). Servem
 // de contexto para a visão do colaborador ("% de despachos atrasados da modalidade", "% de
@@ -15,6 +16,8 @@ export interface OrderStats {
   dispatchByMode: ReadonlyMap<string, LateCount>;
   /** Por rota (`rota_servico`): entregas avaliadas (entregues ou em trânsito) e atrasadas. */
   deliveryByRoute: ReadonlyMap<string, LateCount>;
+  /** Números da Torre de controle e do resumo do Início (`tower-stats.ts`). */
+  tower: TowerStats;
 }
 
 /**
@@ -26,7 +29,9 @@ export interface OrderStats {
 export function computeOrderStats(records: Iterable<OrderRecord>): OrderStats {
   const dispatchByMode = new Map<string, LateCount>();
   const deliveryByRoute = new Map<string, LateCount>();
+  const tower = createTowerAccumulator();
   for (const record of records) {
+    tower.add(record);
     if (record.dispatch.actualDate !== null) {
       add(dispatchByMode, record.shippingMode, (record.dispatch.delayDays ?? 0) > 0);
     }
@@ -34,7 +39,7 @@ export function computeOrderStats(records: Iterable<OrderRecord>): OrderStats {
       add(deliveryByRoute, record.routeService, record.delivery.delayDays > 0);
     }
   }
-  return { dispatchByMode, deliveryByRoute };
+  return { dispatchByMode, deliveryByRoute, tower: tower.finish() };
 }
 
 /** `late` de `total` em %, com 1 casa decimal; `null` sem pedidos. */
