@@ -87,7 +87,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
         <h2 id="em-numeros" className="label-mono !text-accent-200 font-semibold">
           A TransLog em números
         </h2>
-        <dl className="mt-4 grid grid-cols-4 gap-6">
+        <dl className="mt-4 grid grid-cols-2 gap-6 min-[1180px]:grid-cols-4">
           <BigNumber
             icon={PackageCheck}
             value={summary ? countFormatter.format(total) : "…"}
@@ -144,7 +144,7 @@ export function DataBand({ summary }: { summary: OrdersSummaryResponse | undefin
               />
             ))}
           </div>
-          <ul className="mt-3 grid grid-cols-5 gap-3">
+          <ul className="mt-3 grid grid-cols-2 gap-3 min-[1180px]:grid-cols-5">
             {shares.map((share, index) => (
               <li
                 key={share.market}
@@ -251,7 +251,7 @@ export function JourneySection() {
       <div className="mt-5 rounded-xl border border-slate-200 bg-white px-8 pt-8 pb-6 shadow-sm">
         <div className="relative">
           {/* Trilha do centro do primeiro nó ao centro do último: base, progresso e pacote */}
-          <div className="absolute left-12 right-12 top-[19px] h-1">
+          <div className="absolute left-7 right-7 min-[1180px]:left-12 min-[1180px]:right-12 top-[19px] h-1">
             <div className="absolute inset-0 rounded-full bg-slate-100" />
             <div
               className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-accent motion-safe:transition-[width] motion-safe:duration-[1100ms] ease-in-out"
@@ -274,7 +274,10 @@ export function JourneySection() {
               const done = index <= step;
               const Icon = stage.icon;
               return (
-                <li key={stage.label} className="w-24 flex flex-col items-center text-center">
+                <li
+                  key={stage.label}
+                  className="w-14 min-[1180px]:w-24 flex flex-col items-center text-center"
+                >
                   <span
                     style={{ transitionDelay: done ? "700ms" : "0ms" }}
                     className={`w-10 h-10 rounded-full grid place-items-center border-2 motion-safe:transition-colors motion-safe:duration-500 ${
@@ -286,7 +289,7 @@ export function JourneySection() {
                     <Icon aria-hidden="true" className="w-4 h-4" />
                   </span>
                   <span
-                    className={`mt-3 text-sm font-semibold ${done ? "text-slate-900" : "text-slate-400"}`}
+                    className={`mt-3 text-[11px] min-[1180px]:text-sm font-semibold leading-tight ${done ? "text-slate-900" : "text-slate-400"}`}
                   >
                     {stage.label}
                   </span>
@@ -298,7 +301,7 @@ export function JourneySection() {
 
         <p
           aria-live="off"
-          className="mt-6 mx-auto w-fit rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm text-slate-700 flex items-center gap-2"
+          className="mt-6 mx-auto w-fit max-w-full flex-wrap justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm text-slate-700 flex items-center gap-2"
         >
           <span className="w-2 h-2 rounded-full bg-accent motion-safe:animate-pulse" />
           <span className="label-mono !text-slate-500">Agora</span>
@@ -310,7 +313,7 @@ export function JourneySection() {
         </p>
       </div>
 
-      <ol className="mt-4 grid grid-cols-3 gap-4">
+      <ol className="mt-4 grid grid-cols-1 gap-4 min-[1180px]:grid-cols-3">
         {STEPS.map((item, index) => (
           <li
             key={item.title}
@@ -364,7 +367,7 @@ export function ModesSection() {
   return (
     <section ref={ref} className="mt-12" aria-labelledby="modalidades">
       <SectionTitle id="modalidades" eyebrow="Serviços" title="Quatro modalidades de envio" />
-      <ul className="mt-5 grid grid-cols-4 gap-4">
+      <ul className="mt-5 grid grid-cols-2 gap-4 min-[1180px]:grid-cols-4">
         {MODES.map((item, index) => (
           <li
             key={item.mode}
@@ -446,7 +449,7 @@ export function SupportSection({ onOpenLogBot }: { onOpenLogBot: () => void }) {
   return (
     <section
       ref={ref}
-      className="mt-12 grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-4"
+      className="mt-12 grid grid-cols-1 gap-4 min-[1180px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]"
       aria-labelledby="central"
     >
       <div

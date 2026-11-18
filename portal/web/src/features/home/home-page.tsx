@@ -23,7 +23,7 @@ export function HomePage({ onOpenLogBot, staffAccessHref }: HomePageProps) {
   return (
     <div className="pb-10">
       {/* Herói */}
-      <section className="pt-12 pb-10 grid grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-8 items-center">
+      <section className="pt-12 pb-10 grid grid-cols-1 gap-8 items-center min-[1180px]:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
         <div className="min-w-0">
           <p className="label-mono !text-accent-700 !text-[11px] font-semibold">
             Logística internacional · EUA e Porto Rico

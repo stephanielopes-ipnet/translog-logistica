@@ -164,7 +164,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-full min-w-[1280px] flex flex-col bg-slate-100/80 text-slate-900 antialiased">
+    <div className="min-h-full flex flex-col overflow-x-clip bg-slate-100/80 text-slate-900 antialiased">
       {kind === "staff" ? (
         <AppHeader
           kind="staff"

@@ -35,7 +35,7 @@ export function LogBotDock({ open, onOpen, children }: LogBotDockProps) {
   return (
     <aside
       aria-label={`${ASSISTANT_NAME}: assistente`}
-      className="relative shrink-0 self-start sticky top-[var(--header-h)] h-[calc(100dvh-var(--header-h))] min-h-[560px] motion-safe:transition-[width] motion-safe:duration-[250ms] ease-out"
+      className="relative shrink-0 self-start sticky top-[var(--header-h)] overflow-x-clip h-[calc(100dvh-var(--header-h))] min-h-[560px] motion-safe:transition-[width] motion-safe:duration-[250ms] ease-out"
       style={{ width: open ? 424 : 44 }}
     >
       <section

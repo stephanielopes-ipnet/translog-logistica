@@ -38,6 +38,12 @@ body,
   height: 100%;
 }
 
+/* Nada deve criar rolagem lateral sem conteúdo (painéis fora da tela, sombras, grades). */
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   font-feature-settings: "cv11", "ss01";
 }
