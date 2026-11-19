@@ -1,16 +1,28 @@
 """Fronteiras das ferramentas: dados mínimos e falhas explícitas."""
 
+from functools import lru_cache
+from threading import Lock
+
 from .config import Settings
 from .consumption import ConsumptionCsvRepository
 from .knowledge import KnowledgeStore
 from .orders import CsvOrderRepository, PendingSqlRepository, consult_order
 
 
+_repository_lock = Lock()
+
+
+@lru_cache(maxsize=1)
+def _consumption_repository(directory, encoding, delimiter):
+    return ConsumptionCsvRepository(directory, encoding=encoding, delimiter=delimiter)
+
+
 def order_repository(settings):
     if settings.backend == "sql_pending":
         return PendingSqlRepository()
     if settings.backend == "csv_v2":
-        return ConsumptionCsvRepository(settings.consumption_dir, encoding=settings.encoding, delimiter=settings.delimiter)
+        with _repository_lock:
+            return _consumption_repository(settings.consumption_dir, settings.encoding, settings.delimiter)
     return CsvOrderRepository(settings.orders_path, origin=settings.origin, encoding=settings.encoding,
                               delimiter=settings.delimiter, column_map=settings.column_map)
 

@@ -126,6 +126,30 @@ def test_missing_order_is_not_found_only_with_readable_sources(exports):
     assert consultar_pedido("9999")["status"] == "unavailable"
 
 
+def test_lookups_reuse_csv_reads_and_refresh_after_export_changes(exports, monkeypatch):
+    from pathlib import Path
+
+    opened = []
+    open_path = Path.open
+
+    def track_open(path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if path.parent == exports[-1] and path.suffix == ".csv" and mode == "r":
+            opened.append(path)
+        return open_path(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", track_open)
+    assert consultar_pedido("0007")["status"] == "found"
+    assert consultar_pedido("8")["status"] == "found"
+    assert consultar_pedido("9999")["status"] == "not_found"
+    assert len(opened) == 3
+
+    exports[0][1]["destino_cidade"] = "Novo destino"
+    exports[3]()
+    assert consultar_pedido("8")["order"]["destination_city"] == "Novo destino"
+    assert len(opened) == 6
+
+
 @pytest.mark.parametrize("table", [0, 1, 2])
 def test_duplicate_selected_keys_are_rejected(exports, table):
     exports[table].append(exports[table][0].copy())
