@@ -37,7 +37,7 @@ export function TrackingPanel({
   onAskAssistant,
 }: TrackingPanelProps) {
   return (
-    <section className="min-h-0 overflow-y-auto scroll-thin -mr-2 pr-2 pb-2 space-y-4">
+    <section className="space-y-4">
       <OrderSearchForm
         queryValue={queryValue}
         onQueryChange={onQueryChange}

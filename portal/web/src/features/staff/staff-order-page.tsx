@@ -271,7 +271,7 @@ function StaffOrderContent({ order }: { order: StaffOrder }) {
           {order.explanation && <p className="mt-1 text-sm text-slate-700">{order.explanation}</p>}
         </div>
 
-        <div className="px-5 py-3 border-t border-slate-200 grid grid-cols-2 gap-4">
+        <div className="px-5 py-3 border-t border-slate-200 grid grid-cols-2 items-start gap-4">
           <Collapsible title="Resumo para a IA (resumo_pedido)" text={order.aiSummary} />
           <Collapsible title="Linha do tempo bruta (linha_do_tempo)" text={order.rawTimeline} />
         </div>
