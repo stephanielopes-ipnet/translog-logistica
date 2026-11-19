@@ -30,7 +30,7 @@ Marco autorizou em 17/11 atualizar `AGENTS.md`, `Agentes.md` e documentação de
 
 Usar exclusivamente `stephanielopes-ipnet/translog-logistica`, conta `Marco-Leal96`. Conferir estado local/remoto, preservar contribuições, testar mudanças de comportamento e publicar somente arquivos pertinentes. Não criar remoto paralelo ou misturar mudanças dos colegas.
 
-PR atual: **#32**, branch `feat/agente-silver-v2-rag`, rascunho aberto no último estado conferido. PR #30 já integrado. Verificar estado remoto antes de agir: não criar PR duplicado, não fazer force-push e não confundir push com merge. Merge, deploy, exclusões e ações de acesso/cobrança exigem escopo específico. O conector lê o GitHub mas suas escritas retornaram 403; Git local autenticado e navegador foram os caminhos de publicação usados. Não pedir nova autorização por essa limitação técnica quando houver alternativa já autorizada.
+PRs **#30 e #32** integrados. Correção de latência na branch `fix/agente-latencia-consulta`. Verificar estado remoto antes de agir: não criar PR duplicado, não fazer force-push e não confundir push com merge. Merge, deploy, exclusões e ações de acesso/cobrança exigem escopo específico. O conector lê o GitHub mas suas escritas retornaram 403; Git local autenticado e navegador foram os caminhos de publicação usados. Não pedir nova autorização por essa limitação técnica quando houver alternativa já autorizada.
 
 Não publicar `.env`, credenciais, ambiente virtual, CSVs privados completos, índices, caches ou logs privados. Não enviar mensagens ao grupo em nome de Marco sem solicitação. A autorização de atualização do GitHub não amplia automaticamente o escopo de transmissão de dados a serviços externos.
 
@@ -69,13 +69,15 @@ Interface dedicada local de Marco: **http://127.0.0.1:8003**, `translog_agent`, 
 
 Portal/backend/ADK precisam apontar para a máquina e fonte corretas. `localhost` de Marco não é o computador de Matheus. Backend gerencia usuários/sessões; não compartilhar a mesma sessão entre clientes. Prefixo `[Pedido aberto no portal: CÓDIGO]` é pista de contexto: não repetir ao cliente e confirmar dados pela ferramenta.
 
-Última suíte técnica observada: **51 testes passaram**, com 10 avisos de depreciação. Há testes de localização, itens/nulos/negativos, fonte indisponível, Chroma e API nativa com modelo determinístico. Rodar a suíte apropriada após novas mudanças; não confundir testes determinísticos com avaliação Gemini.
+Última suíte técnica observada: **52 testes passaram**, com 10 avisos de depreciação. Há testes de localização, itens/nulos/negativos, fonte indisponível, Chroma e API nativa com modelo determinístico. Rodar a suíte apropriada após novas mudanças; não confundir testes determinísticos com avaliação Gemini.
 
 Marco relatou que gostou do tom e que os testes recentes estão respondendo bem. Isso é feedback do usuário, não aprovação automática de cada caso. Duas conversas Gemini de 1001/12 foram autorizadas/executadas pelo assistente anteriormente; não presumir novas chamadas ilimitadas a partir dessa autorização específica. Registros de omissão de citação nessas conversas são históricos, anteriores à decisão atual de não citar ao cliente.
 
 Guia principal para os testes e banca: **`docs/casos-teste-e-apresentacao-agente.md`** — oito perguntas, cinco sequências de continuidade, 15 adicionais e ficha de evidências. Valores dos CSVs em `docs/roteiro-testes-silver-v2-faq.md`. Estado atual e evidências em `docs/status-implementacao.md`; acordos em `docs/decisoes.md`.
 
 ## 7. Próximos passos
+
+Em 19/11, corrigida a releitura dos CSVs no agente. O processo indexa os arquivos na primeira consulta e recarrega quando muda a exportação. Medir o chat com Matheus usando `durationMs` do backend para pedidos e FAQ, após atualizar e reiniciar o ADK na máquina da demo.
 
 Esclarecimento de Marco nesta retomada de 17/11: houve teste de integração anterior com Matheus, mas a Silver v2/FAQ atual ainda não foi testada junto no portal. Usar `docs/guia-matheus-fullstack.md` atualizado e registrar em `docs/aceite-portal-v2-2026-11-17.md`; não contar esse relato como aceite da v2.
 

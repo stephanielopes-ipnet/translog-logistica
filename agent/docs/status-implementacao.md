@@ -1,6 +1,12 @@
 # Estado verificável da implementação
 
-Atualização documental: 17/11/2026. Os registros datados abaixo preservam o histórico de cada etapa.
+Atualização documental: 19/11/2026. Os registros datados abaixo preservam o histórico de cada etapa.
+
+## Consulta por pedido e latência do chat — 19/11/2026
+
+Marco relatou demora no portal. Na máquina local, a ferramenta do pedido 1001 levava 8,5–11,6 s por consulta porque relia os três CSVs. O agente passou a agrupar somente as colunas necessárias por código, em memória, na primeira consulta de cada processo. Quando a exportação muda, o índice é reconstruído. Arquivo ausente, inválido ou alterado durante a carga gera indisponibilidade.
+
+Na medição local com os três CSVs completos, a primeira consulta levou 5,7 s com a carga. As quatro seguintes, incluindo códigos diferentes e um inexistente, levaram menos de 4 ms cada. Esses tempos medem apenas a ferramenta de pedidos. A suíte passou com 52 testes e 10 avisos de depreciação, sem chamadas ao Gemini. O modelo Gemini, a FAQ e a configuração do portal seguem os acordos existentes. Para medir o tempo total, usar `durationMs` e, em caso de falha, `reason` no backend do portal com a nova versão do agente.
 
 ## Retomada: preparar aceite conjunto da v2 no portal — 17/11
 

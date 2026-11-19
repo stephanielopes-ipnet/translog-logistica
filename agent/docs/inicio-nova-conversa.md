@@ -16,7 +16,7 @@ Estado consolidado em **17/11/2026**. Ler este arquivo junto de `AGENTS.md` e `A
 - Pasta local desta conversa: `C:\Users\marco.leal_ipnet\Documents\Codex\translogbrasil`.
 - Checkout do repositório do grupo: `C:\Users\marco.leal_ipnet\Documents\Codex\translog-logistica`, IA em `agent/`.
 - Repositório único: `stephanielopes-ipnet/translog-logistica`, conta `Marco-Leal96`.
-- Branch: `feat/agente-silver-v2-rag`; [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32), rascunho no último estado conferido. PR #30 já integrado. Conferir remoto antes de agir; não criar PR duplicado ou fazer merge por inferência.
+- PRs #30 e [#32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32) integrados. Correção de latência na branch `fix/agente-latencia-consulta`. Conferir remoto antes de agir.
 - Versão funcional consolidada publicada em `fdd5f31` em 17/11; FAQ completa, atendimento e guias de testes já sincronizados. Descrição do PR atualizada e 51 testes passaram também no destino. Não repetir a publicação sem novas mudanças; os registros posteriores de documentação podem acrescentar commits ao mesmo PR.
 - Marco autorizou manter `AGENTS.md`, `Agentes.md`, documentação e GitHub atualizados com alterações necessárias ao projeto, sem confirmações repetidas para commits/push/PR dentro desse escopo. Não publicar segredos, dados privados, caches, índices ou ambiente virtual.
 - Escritas pelo conector GitHub retornaram 403; Git local já autenticado foi usado para push. PR criado pelo navegador e verificado pelo conector. Não trocar de conta ou criar remoto alternativo por isso.
@@ -30,6 +30,8 @@ Interface local: **http://127.0.0.1:8003**, agente `translog_agent`. Verificar s
 Perguntas/casos para testar e apresentar: [casos-teste-e-apresentacao-agente.md](casos-teste-e-apresentacao-agente.md). Resultados esperados dos CSVs: [roteiro-testes-silver-v2-faq.md](roteiro-testes-silver-v2-faq.md). O 1001 da v2 tem quatro linhas e 14 unidades, entregue no prazo; não usar o 1001 da amostra antiga.
 
 ## Próximo foco de trabalho
+
+Em 19/11, adicionada indexação em memória à consulta `csv_v2` para evitar reler os três arquivos a cada pergunta. Primeiro pedido carrega a exportação no processo do ADK. Medição local da ferramenta: 5,7 s com carga e menos de 4 ms por consulta seguinte. Portal e Gemini ainda precisam ser medidos juntos. Ver [estado da implementação](status-implementacao.md).
 
 Marco esclareceu nesta retomada de 17/11 que já testou uma integração anterior com Matheus, **mas ainda não a Silver v2 e a FAQ atual no portal**. Roteiro atualizado em [guia-matheus-fullstack.md](guia-matheus-fullstack.md), com configuração dos dois processos, mesmos CSVs, teste de contexto/FAQ/sessões e falha de conexão. Evidências e pendências em [aceite-portal-v2-2026-11-17.md](aceite-portal-v2-2026-11-17.md). Não tratar o relato anterior como aceite desta versão nem voltar ao guia antigo do PR #30/amostra.
 

@@ -1,9 +1,11 @@
 """Leitura explícita das tabelas de consumo v2; não é um conector SQL."""
 
 import csv
+from collections import defaultdict
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from threading import Lock
 
 from .orders import IDENTIFIER, SourceError, _text
 
@@ -27,6 +29,10 @@ ITEM_MAP = {"order_id": "id_pedido", "order_item_id": "id_item_pedido", "product
             "quantity": "quantidade_item"}
 EVENT_MAP = {"sequence": "sequencia", "code": "codigo_evento", "description": "descricao_evento",
              "stage": "etapa_desc", "occurred_at": "ts_evento", "location": "local_evento", "is_last": "ultimo_evento"}
+
+ORDER_COLUMNS = ("qtd_itens", *ORDER_MAP.values(), *DISPATCH_MAP.values(), *DELIVERY_MAP.values())
+ITEM_COLUMNS = tuple(ITEM_MAP.values())
+EVENT_COLUMNS = tuple(EVENT_MAP.values())
 
 
 def _integer(value, signed=False):
@@ -62,35 +68,52 @@ class ConsumptionCsvRepository:
         self.directory = Path(directory)
         self.encoding, self.delimiter = encoding, delimiter
         self.paths = [self.directory / f"consumo_{name}.csv" for name in ("pedidos", "itens_pedido", "eventos_logisticos")]
+        self._lock = Lock()
+        self._indexed_fingerprint = None
+        self._index = None
 
-    def _rows(self, path, required):
+    def _index_table(self, path, columns):
+        by_order = defaultdict(list)
         try:
             with path.open(encoding=self.encoding, newline="") as stream:
-                reader = csv.DictReader(stream, delimiter=self.delimiter)
-                headers = reader.fieldnames or []
+                reader = csv.reader(stream, delimiter=self.delimiter)
+                headers = next(reader, [])
+                required = {"id_pedido", *columns}
                 if len(headers) != len(set(headers)) or not set(required).issubset(headers):
                     raise SourceError("Cabeçalho incompatível com consumo v2.")
+                order_column = headers.index("id_pedido")
+                positions = [headers.index(column) for column in columns]
                 for row in reader:
-                    if None in row or any(value is None for value in row.values()):
+                    if not row:
+                        continue
+                    if len(row) != len(headers):
                         raise SourceError("Linha incompleta na exportação de consumo.")
-                    yield row
+                    by_order[_text(row[order_column])].append(tuple(row[i] for i in positions))
         except (OSError, UnicodeError, LookupError, csv.Error) as exc:
             raise SourceError("Não foi possível ler as tabelas de consumo.") from exc
+        return by_order
 
     def _fingerprint(self):
-        return [(path.stat().st_size, path.stat().st_mtime_ns) for path in self.paths]
+        stats = [path.stat() for path in self.paths]
+        return [(st.st_size, st.st_mtime_ns, st.st_ino, st.st_dev) for st in stats]
+
+    def _snapshot(self):
+        with self._lock:
+            before = self._fingerprint()
+            if self._index is None or before != self._indexed_fingerprint:
+                columns = (ORDER_COLUMNS, ITEM_COLUMNS, EVENT_COLUMNS)
+                index = tuple(self._index_table(path, fields) for path, fields in zip(self.paths, columns))
+                if before != self._fingerprint():
+                    raise SourceError("Exportação mudou durante a leitura; repetir após a carga.")
+                self._index = index
+                self._indexed_fingerprint = before
+            return self._index
 
     def read_order(self, code):
-        before = self._fingerprint()
-        required = {"id_pedido", "qtd_itens", *ORDER_MAP.values(), *DISPATCH_MAP.values(), *DELIVERY_MAP.values()}
-        rows = [row for row in self._rows(self.paths[0], required) if _text(row["id_pedido"]) == code]
-        items, events = [], []
-        for path, mapping, target in ((self.paths[1], ITEM_MAP, items), (self.paths[2], EVENT_MAP, events)):
-            for row in self._rows(path, {"id_pedido", *mapping.values()}):
-                if _text(row["id_pedido"]) == code:
-                    target.append(_mapped(row, mapping))
-        if before != self._fingerprint():
-            raise SourceError("Exportação mudou durante a leitura; repetir após a carga.")
+        order_index, item_index, event_index = self._snapshot()
+        rows = order_index.get(code, ())
+        items = [_mapped(dict(zip(ITEM_COLUMNS, row)), ITEM_MAP) for row in item_index.get(code, ())]
+        events = [_mapped(dict(zip(EVENT_COLUMNS, row)), EVENT_MAP) for row in event_index.get(code, ())]
         if len(rows) > 1:
             raise SourceError("Pedido duplicado na tabela de consumo.")
         if not rows:
@@ -99,7 +122,7 @@ class ConsumptionCsvRepository:
             return {"order": None, "items": [], "events": []}
         if not items or not events:
             raise SourceError("Pedido sem itens ou eventos na exportação.")
-        row = rows[0]
+        row = dict(zip(ORDER_COLUMNS, rows[0]))
         order = _mapped(row, ORDER_MAP)
         try:
             reference = date.fromisoformat(order["reference_date"])
