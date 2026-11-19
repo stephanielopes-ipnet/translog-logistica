@@ -393,6 +393,16 @@ describe("mapConsumoOrder: regras de conversão", () => {
     expect(mapSample(375, { causa_atraso_despacho: text }).dispatch.probableCause).toBe(cause);
   });
 
+  it.each([
+    ["Padrão (despacho em 4 dias)", "Standard Class"],
+    ["Rápido (despacho em 2 dias)", "Second Class"],
+    ["Prioritário (despacho em 1 dia)", "First Class"],
+    ["Expresso (despacho no mesmo dia)", "Same Day"],
+    ["First Class", "First Class"],
+  ])("modo de envio %j vira %j", (text, mode) => {
+    expect(mapSample(375, { modo_envio: text }).shippingMode).toBe(mode);
+  });
+
   it("monta origem e destino sem partes vazias", () => {
     const order = mapSample(375, { origem_cliente_estado: "", destino_estado: "" });
 

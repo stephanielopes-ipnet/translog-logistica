@@ -1,10 +1,12 @@
-// pnpm export:dados — baixa as tabelas consumo_* do Databricks para os CSVs do plano B
+// pnpm export:dados [orders|items|events ...] — baixa as tabelas consumo_* do Databricks para os CSVs do plano B
 // (portal/dados/ ou DATA_DIR), já sem as colunas proibidas e com as datas cortadas no SQL.
 //
 // Credenciais do ambiente ou do portal/.env (nunca impressas): DATABRICKS_HOST,
 // DATABRICKS_WAREHOUSE_ID, DATABRICKS_TOKEN; opcional DATABRICKS_CATALOG_SCHEMA
 // (padrão workspace.silver). Cada arquivo é gravado num temporário e só substitui o
 // anterior quando o download termina: uma falha no meio não estraga a cópia que já existe.
+// Sem argumentos exporta as três tabelas; com argumentos, só as indicadas
+// (ex.: pnpm export:dados events).
 
 import { createWriteStream, existsSync } from "node:fs";
 import { mkdir, rename, rm, stat } from "node:fs/promises";
@@ -67,11 +69,25 @@ async function exportTable(table: ConsumoTable) {
   );
 }
 
+function selectedTables(): ConsumoTable[] {
+  const all = Object.keys(CONSUMO_TABLES) as ConsumoTable[];
+  const asked = process.argv.slice(2);
+  if (asked.length === 0) {
+    return all;
+  }
+  const unknown = asked.filter((name) => !all.includes(name as ConsumoTable));
+  if (unknown.length > 0) {
+    console.error(`Tabela desconhecida: ${unknown.join(", ")}. Use: ${all.join(", ")}.`);
+    process.exit(1);
+  }
+  return all.filter((table) => asked.includes(table));
+}
+
 try {
   const startedAt = performance.now();
   await mkdir(dataDir, { recursive: true });
   console.log(`Exportando ${catalogSchema}.consumo_* para ${dataDir}`);
-  for (const table of ["orders", "items", "events"] as const) {
+  for (const table of selectedTables()) {
     await exportTable(table);
   }
   console.log(`Concluído em ${((performance.now() - startedAt) / 1000).toFixed(1)} s.`);
