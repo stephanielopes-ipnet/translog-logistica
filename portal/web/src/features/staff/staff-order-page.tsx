@@ -13,6 +13,7 @@ import { ApiError } from "@/api/client.ts";
 import { useStaffOrder } from "@/api/session.ts";
 import { OrderItemsTable } from "@/features/tracking/order-items-table.tsx";
 import { OrderManifestCard } from "@/features/tracking/order-manifest-card.tsx";
+import { SHOW_DEV_DETAILS } from "@/lib/dev-details.ts";
 import { formatCurrency, onlyDigits } from "@/lib/format.ts";
 import { STAFF_HOME_PATH, staffOrderHref, trackingHref } from "@/lib/router.ts";
 import { parseOrderId } from "@/lib/url-state.ts";
@@ -249,15 +250,17 @@ function StaffOrderContent({ order }: { order: StaffOrder }) {
               label="Entregas atrasadas na rota"
               value={formatPercent(context.route.lateDeliveryPct)}
             />
-            <div className="pt-2 mt-2 border-t border-slate-100">
-              <p className="label-mono mb-1">Origem do dado</p>
-              <ul className="flex flex-wrap gap-1.5">
-                <OriginBadge label="Despacho" origin={order.dataOrigin.dispatch} />
-                <OriginBadge label="Transporte" origin={order.dataOrigin.transport} />
-                <OriginBadge label="Entrega" origin={order.dataOrigin.delivery} />
-                <OriginBadge label="Extravio" origin={order.dataOrigin.loss} />
-              </ul>
-            </div>
+            {SHOW_DEV_DETAILS && (
+              <div className="pt-2 mt-2 border-t border-slate-100">
+                <p className="label-mono mb-1">Origem do dado</p>
+                <ul className="flex flex-wrap gap-1.5">
+                  <OriginBadge label="Despacho" origin={order.dataOrigin.dispatch} />
+                  <OriginBadge label="Transporte" origin={order.dataOrigin.transport} />
+                  <OriginBadge label="Entrega" origin={order.dataOrigin.delivery} />
+                  <OriginBadge label="Extravio" origin={order.dataOrigin.loss} />
+                </ul>
+              </div>
+            )}
           </Diag>
         </div>
 
@@ -271,10 +274,12 @@ function StaffOrderContent({ order }: { order: StaffOrder }) {
           {order.explanation && <p className="mt-1 text-sm text-slate-700">{order.explanation}</p>}
         </div>
 
-        <div className="px-5 py-3 border-t border-slate-200 grid grid-cols-2 items-start gap-4">
-          <Collapsible title="Resumo para a IA (resumo_pedido)" text={order.aiSummary} />
-          <Collapsible title="Linha do tempo bruta (linha_do_tempo)" text={order.rawTimeline} />
-        </div>
+        {SHOW_DEV_DETAILS && (
+          <div className="px-5 py-3 border-t border-slate-200 grid grid-cols-2 items-start gap-4">
+            <Collapsible title="Resumo para a IA (resumo_pedido)" text={order.aiSummary} />
+            <Collapsible title="Linha do tempo bruta (linha_do_tempo)" text={order.rawTimeline} />
+          </div>
+        )}
       </section>
 
       <div className="text-[13px] space-y-4">
@@ -344,6 +349,9 @@ function Pair({ label, value, tone }: { label: string; value: string; tone?: "go
 }
 
 function OriginTag({ origin }: { origin: DataOrigin }) {
+  if (!SHOW_DEV_DETAILS) {
+    return null;
+  }
   return origin === "real" ? (
     <span className="rounded border border-emerald-200 bg-emerald-50 px-1 font-mono text-[9.5px] uppercase tracking-wider text-emerald-700">
       real

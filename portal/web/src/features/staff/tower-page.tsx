@@ -2,6 +2,7 @@ import type { StageCount, TowerResponse } from "@translog/contracts";
 import { ArrowRight, FlaskConical, Loader2, RotateCcw, Search } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useTower } from "@/api/session.ts";
+import { SHOW_DEV_DETAILS } from "@/lib/dev-details.ts";
 import { formatDate } from "@/lib/format.ts";
 import { staffOrderHref, staffSearchHref } from "@/lib/router.ts";
 import { Link, navigate } from "@/lib/use-location.tsx";
@@ -91,7 +92,7 @@ function TowerContent({ data }: { data: TowerResponse }) {
           tone="danger"
           label="Extravios"
           value={formatInt(indicators.lost)}
-          detail="rastreio simulado"
+          detail={SHOW_DEV_DETAILS ? "rastreio simulado" : "pedidos extraviados"}
           href={searchHref({ status: ["Extraviado"] })}
         />
       </section>
@@ -486,7 +487,11 @@ function StageBars({
 }) {
   const max = Math.max(1, ...counts.map((item) => item.count));
   return (
-    <Block title={title} subtitle={subtitle} aside={simulated ? <SimulatedBadge /> : undefined}>
+    <Block
+      title={title}
+      subtitle={subtitle}
+      aside={simulated && SHOW_DEV_DETAILS ? <SimulatedBadge /> : undefined}
+    >
       <ul className="space-y-2">
         {counts.map((item) => (
           <li

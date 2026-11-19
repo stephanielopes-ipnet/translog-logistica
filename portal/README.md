@@ -15,7 +15,7 @@ O site da TransLog, com três partes:
   - a **entrega** (prevista, realizada e o atraso) e, numa frase simples, como saiu o envio ("o envio saiu com 1 dia de atraso");
   - o **motivo provável** de um atraso, em linguagem do cliente (nunca como certeza);
   - um **aviso da central** quando o caso precisa dela (atraso de entrega de 3 dias ou mais, ou extravio; segunda a sexta, das 9h às 18h).
-- **Área do colaborador** (com login): a **Torre de controle**, com os números da operação e os pedidos que precisam de atenção, e a **visão do colaborador** de cada pedido, com o diagnóstico completo (o que falhou, onde, quanto, e o que é dado real ou simulado).
+- **Área do colaborador** (com login): a **Torre de controle**, com os números da operação e os pedidos que precisam de atenção, e a **visão do colaborador** de cada pedido, com o diagnóstico completo (o que falhou, onde e quanto).
 
 No Início e no Rastreamento, o **LogBot** (o assistente) fica num painel à direita, que pode ser minimizado e reaberto. A conversa é a mesma nas duas páginas.
 
@@ -215,7 +215,7 @@ Com `DATA_SOURCE=file` (ou `databricks`) e `AUTH_DEMO=true`:
 3. Clicar em **"Perguntar ao assistente"**: o LogBot (a mesma conversa do Início) explica o motivo provável e avisa que o caso é acompanhado pela central. Mostrar a sugestão "Quero falar com a central".
 4. Clicar em **"Acesso colaborador"** → **"Entrar como demonstração"** → **Torre de controle**: 197 em trânsito, 8.337 na central, 7.222 extravios. Filtrar a tabela por **Alfândega**.
 5. Em **"Pedidos"**, mostrar a busca: digitar `769` (vários pedidos) e depois `76902` (uma linha); clicar em "Extravios" na Torre para ver a lista já filtrada (7.222).
-6. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho em 2 dias contra 1 prometido, entrega 5 dias atrasada), as causas nos termos da base e de onde vem cada dado (real ou simulado). Comparar com "Ver como o cliente vê".
+6. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho em 2 dias contra 1 prometido, entrega 5 dias atrasada), as causas nos termos da base. Comparar com "Ver como o cliente vê".
 7. **Sair**.
 8. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
 
