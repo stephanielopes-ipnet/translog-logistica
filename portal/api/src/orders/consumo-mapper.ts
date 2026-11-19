@@ -109,6 +109,18 @@ export type Intern = (text: string) => string;
 const keepText: Intern = (text) => text;
 
 /**
+ * Desde 19/11 a Silver traz `modo_envio` com o nome em português e o prazo de despacho
+ * ("Padrão (despacho em 4 dias)"). O contrato e a tela seguem com os quatro níveis de serviço
+ * da TransLog; o que não estiver aqui passa como veio e é recusado pelo contrato.
+ */
+const SHIPPING_MODES: Readonly<Record<string, string>> = {
+  "Padrão (despacho em 4 dias)": "Standard Class",
+  "Rápido (despacho em 2 dias)": "Second Class",
+  "Prioritário (despacho em 1 dia)": "First Class",
+  "Expresso (despacho no mesmo dia)": "Same Day",
+};
+
+/**
  * Linha do pedido + linhas dos seus itens e eventos → `OrderRecord` (o que a API guarda; as
  * visões do cliente e do colaborador saem dele em `order-views.ts`), validado.
  * Itens em ordem de `id_item_pedido` e eventos em ordem de `sequencia`, venham como vierem.
@@ -133,7 +145,7 @@ export function mapConsumoOrder(
     orderDate: calendarDate(row.data_pedido, intern),
     referenceDate: calendarDate(row.data_referencia_base, intern),
     status: row.situacao_pedido,
-    shippingMode: row.modo_envio,
+    shippingMode: SHIPPING_MODES[row.modo_envio] ?? row.modo_envio,
     transportMode: optionalText(row.modal_transporte),
     routeType: row.tipo_rota,
     origin: intern(

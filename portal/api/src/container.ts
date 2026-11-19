@@ -45,7 +45,6 @@ export async function createContainer(
   const orderService = createOrderService({
     orders,
     sampleOrderIds: config.sampleOrderIds,
-    dashboardUrl: config.dashboardUrl,
   });
   const chatLog = log.child({ agent: config.agent });
   const agent = overrides.supportAgent ?? createSupportAgent(config, orderService, chatLog);

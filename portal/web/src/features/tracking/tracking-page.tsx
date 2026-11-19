@@ -57,7 +57,7 @@ export function TrackingPage({ orderParam, orderQuery, onAskAssistant }: Trackin
   }
 
   return (
-    <div className="h-[calc(100dvh-var(--header-h))] min-h-[560px] py-5 grid grid-rows-[minmax(0,1fr)]">
+    <div className="min-h-[calc(100dvh-var(--header-h))] py-5">
       <TrackingPanel
         view={view}
         queryValue={queryValue}

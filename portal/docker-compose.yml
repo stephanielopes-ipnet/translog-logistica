@@ -1,5 +1,6 @@
-# Forma oficial de rodar a API: docker compose up --build
-# Este arquivo sobe com os pedidos de exemplo (fixtures), sem nenhum arquivo externo.
+# Forma oficial de rodar o portal (tela + API, na mesma porta): docker compose up --build
+# e abrir http://localhost:3333. Este arquivo sobe com os pedidos de exemplo (fixtures), sem
+# nenhum arquivo externo.
 # Com os CSVs: docker-compose.dados.yml; direto do Databricks: docker-compose.databricks.yml
 # (ver README). Variáveis em .env.example.
 name: translog-portal
@@ -21,7 +22,6 @@ services:
       STAFF_USERS: ${STAFF_USERS:-}
       SESSION_SECRET: ${SESSION_SECRET:-}
       AUTH_DEMO: ${AUTH_DEMO:-false}
-      DASHBOARD_URL: ${DASHBOARD_URL:-}
     ports:
       - "${API_PORT:-3333}:${API_PORT:-3333}"
     healthcheck:

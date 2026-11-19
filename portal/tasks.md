@@ -60,8 +60,8 @@ Revisão do estado em 18/11 (antes de retomar): tarefas 1, 3 e 4 feitas; 2 pende
 Contrato do prompt de 18/11 no lugar do da tarefa 6 da Fase 5 (implementada antes do prompt chegar): `q` até 60 e só em cidade/estado/país de origem ou destino; listas por vírgula em `status`, `shippingMode`, `market` e `stage` (1 a 5); `minDelayDays` ≥ 1; `sort` `delay`/`order`/`date` (padrão `delay` com `minDelayDays`, senão `order`); linha com `delayDays` único, sem `market`, `routeService` e atraso do despacho.
 
 - [x] **1. Contrato e busca na porta**: `contracts/src/staff-search.ts` reescrito (reaproveita `orderStatusSchema`, `shippingModeSchema`, `marketSchema`, `stageSchema`); `OrderRepository.search(query)` no lugar de `records()`, com o índice montado em `createInMemoryRepository` (`orders/order-search.ts`: registros em ordem de número, dicionário dos lugares únicos normalizados e dois `Uint32Array` com a posição da origem e do destino de cada pedido); o wrapper do Databricks repassa ao repositório atual; serviço só delega. `escalated=false` aceito e sem efeito. Testes com os fixtures (39): prefixo e número exato, texto sem acento na origem e no destino, cada filtro, listas, combinações, as 3 ordens e o padrão, paginação (total, última parcial, além do fim), linha sem `aiSummary`/`rawTimeline`, validação da consulta. Memória (`file`, CSVs reais): heap retido 152 → 153 MB; RSS 582–583 → 583–586 MB (dentro da variação).
-- [ ] **2. Serviço, rota e erros**
-- [ ] **3. Verificação, docs e medidas**
+- [x] **2. Serviço, rota e erros**: `GET /api/staff/orders` no plugin protegido (mesmo guarda de sessão), com `401`/`400` e a privacidade da rota no varredor (`privacy.test.ts`).
+- [x] **3. Verificação, docs e medidas**: conferida em 18/11 com os quatro modos do Docker (`q=769` → 109 pedidos; `status=Extraviado` → 7.222); documentada em `docs/backend.md`.
 
 ## Fase 6: escopo novo, frontend (17/11)
 
@@ -93,7 +93,17 @@ Backend pronto em `cd10231`/`0a1a93a` (`GET /api/staff/orders`, contrato `contra
 - [x] **Gold removida (18/11, noite)**, a pedido do Matheus (a simulação de prazos fica no dashboard): visão do colaborador sem "Prazo sugerido" e "Com o sugerido"; API sem ler `workspace.gold.param_cenario_prazo` nos 3 modos (`promise-scenario.ts`, `promise-scenario.json`, a amostra `gold_param_cenario_prazo.csv`, `goldScenarioStatement`, a consulta e a versão da tabela no `databricks`, o CSV no `file` e no `pnpm export:dados`, `DATABRICKS_GOLD_SCHEMA` no config, no compose e no `.env.example`); contratos sem `suggestedDays`, `onTimeWithSuggested` e `lateDispatchPctWithSuggested`; cache do `databricks` no formato 5 (o 4 é descartado e baixado de novo). O modo `file` volta a subir só com as 3 tabelas `consumo_*`. Testes ajustados (459 na API; os 22 a menos eram da Gold). Conferido com a API real em `file`: `dispatchDiagnosis` = prometido/real/atraso, Torre sem prazo sugerido, log sem Gold.
 - [x] **Ajuste fino do Início (18/11)**: rotas do fundo da faixa "A TransLog em números" mais discretas (desenho a ~55% de opacidade, tracejado e brilho dos pacotes mais fracos); jornada do pedido mais lenta (cada etapa ~3,2 s parada, pacote leva 1,8 s até a próxima, etapa acende quando ele chega).
 
+## Ajustes finais (18/11)
+
+- [x] **Link do dashboard removido**: a Torre não aponta mais para o painel do Marcelo. Saíram `DASHBOARD_URL` (config, `.env.example`, compose), `dashboardUrl` (contrato `tower`, `order-service`, `tower-stats`), o botão "Painel completo de performance" e as frases que remetiam a ele, com os testes ajustados.
+- [x] **Narrativa do README da raiz** atualizada: só a versão atual (operadora internacional, 5 mercados, 4 modalidades, portal do cliente, Área do colaborador, LogBot e painel de gestão).
+
+## Docker final (18/11)
+
+- [x] **Portal inteiro num comando**: `api/Dockerfile` em duas etapas (`web` compila a tela com o Vite; `runtime` leva a API e o `web/dist`); a API serve a tela na mesma porta com `@fastify/static` 10.1.8, ativada por `WEB_DIR` (a imagem já define `WEB_DIR=web/dist`; vazia no `pnpm dev`). Endereços da tela caem no `index.html` (`http/errors.ts`), arquivos com hash em cache de um ano, `index.html` sem cache; API e `/docs` intactas. `api/src/web.test.ts` (13 testes). Verificado com o Chrome contra o container (Início, login de demonstração, Torre, busca, visão do colaborador). Imagem de 300 MB, sem `.env`, dados, testes nem Vite.
+
 ## Próximas fases (fora desta etapa)
 
-- [ ] **Agente no Docker Compose**: depende do Dockerfile do agente na `main` (Marco).
+- [x] **Agente no Docker Compose** (`agent.Dockerfile` + `docker-compose.agente.yml`, `pnpm agent:up`): feito, verificado em 18/11.
+- [x] **Tela no Docker**: feita em 18/11 (ver "Docker final" acima).
 - [x] **Tela React** (`portal/web`): pacote `@translog/web` com o design da Direção D (`translog-prototipo-direcao-d.html`), integrado ao `@translog/contracts` e consultando `/api/health`, `/api/orders/samples` e `/api/orders/:orderId` reais, chat com mock (`mock-chat-service`) e barra de controle (`ProtoBar`) com as variantes das pendências.

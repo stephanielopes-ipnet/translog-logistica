@@ -15,7 +15,7 @@ O site da TransLog, com três partes:
   - a **entrega** (prevista, realizada e o atraso) e, numa frase simples, como saiu o envio ("o envio saiu com 1 dia de atraso");
   - o **motivo provável** de um atraso, em linguagem do cliente (nunca como certeza);
   - um **aviso da central** quando o caso precisa dela (atraso de entrega de 3 dias ou mais, ou extravio; segunda a sexta, das 9h às 18h).
-- **Área do colaborador** (com login): a **Torre de controle**, com os números da operação e os pedidos que precisam de atenção, e a **visão do colaborador** de cada pedido, com o diagnóstico completo (o que falhou, onde, quanto, e o que é dado real ou simulado).
+- **Área do colaborador** (com login): a **Torre de controle**, com os números da operação e os pedidos que precisam de atenção, e a **visão do colaborador** de cada pedido, com o diagnóstico completo (o que falhou, onde e quanto).
 
 No Início e no Rastreamento, o **LogBot** (o assistente) fica num painel à direita, que pode ser minimizado e reaberto. A conversa é a mesma nas duas páginas.
 
@@ -154,16 +154,29 @@ Se o Databricks falhar (token vencido, sem internet, warehouse sem cota), o serv
 
 **O token é segredo:** fica só no `portal/.env`, que nunca vai para o GitHub. Não cole o token em mensagens, documentos ou prints.
 
-### Com Docker (só o servidor)
+### Com Docker (o portal inteiro, e se quiser a IA)
+
+**Um comando sobe tudo:** o servidor (API) e a tela, na mesma porta. Depois de ligar, abra **http://localhost:3333** no navegador (use `localhost`: a entrada da Área do colaborador usa um cookie seguro, que o navegador só aceita nesse endereço ou em HTTPS). A documentação interativa do servidor fica em http://localhost:3333/docs.
+
+Para **desenvolver** a tela com recarga automática, não use o Docker: rode `pnpm dev` (tela em http://localhost:5173 e servidor em http://localhost:3333). Os dois não podem rodar juntos, porque disputam a porta 3333.
+
+Escolha **uma** linha para ligar (na pasta `portal/`):
 
 ```bash
-docker compose up --build                                                        # exemplos
-docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build      # CSVs (rode pnpm export:dados antes)
-docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build # Databricks
-docker compose down
+docker compose up --build                                                                              # só os 9 pedidos de exemplo
+docker compose -f docker-compose.yml -f docker-compose.dados.yml up --build                            # CSVs (rode pnpm export:dados antes)
+docker compose -f docker-compose.yml -f docker-compose.databricks.yml up --build                       # direto do Databricks
+docker compose -f docker-compose.yml -f docker-compose.dados.yml -f docker-compose.agente.yml up --build   # CSVs + agente de IA
+docker compose down                                                                                    # desliga
 ```
 
-Com o Databricks, as credenciais saem do `portal/.env` na hora de ligar o container e nunca entram na imagem. No Docker o assistente é sempre o simulado. A documentação interativa do servidor fica em http://localhost:3333/docs.
+- **Esperar subir:** o servidor só fica pronto depois de carregar os pedidos (~15 s com CSVs, ~40 s com o Databricks, até 3 min com o warehouse dormindo). O Docker mostra `healthy` quando termina.
+- **Porta:** `3333`. Para outra, `API_PORT=3340 docker compose up --build` (e abra `http://localhost:3340`).
+- **A tela já vai dentro da imagem:** ela é compilada no `docker compose up --build`. Se mudar o código da tela, rode de novo com `--build`.
+- **Login do colaborador no Docker:** `SESSION_SECRET`, `STAFF_USERS` e `AUTH_DEMO` saem do `portal/.env`.
+- **Databricks:** as credenciais saem do `portal/.env` na hora de ligar e nunca entram na imagem.
+- **Com a IA** (`docker-compose.agente.yml`): precisa da chave do Gemini em `agent/.env` e dos CSVs em `portal/dados/`. O servidor passa a usar o agente (`AGENT=adk`) e só liga depois que ele estiver saudável. O agente fica em `127.0.0.1:8001`. Só o agente, para usar com o `pnpm dev`: `pnpm agent:up` (e `pnpm agent:down`). A cota gratuita do Gemini é pequena: se acabar, use as linhas sem o agente, em que o assistente é o simulado.
+- Sem a linha do agente, o assistente do Docker é sempre o simulado.
 
 ### O assistente
 
@@ -189,7 +202,6 @@ O link fica discreto, no canto do cabeçalho e no rodapé: **"Acesso colaborador
 - **Usuário de verdade:** rode `pnpm staff:add ana@translog.com`. O comando pede a senha (sem mostrar na tela) e imprime uma linha `STAFF_USERS=...` para colar no `portal/.env`. Vários usuários: separe por vírgula na mesma linha. A senha nunca fica gravada; só um código embaralhado dela.
 - `SESSION_SECRET` é um texto aleatório de pelo menos 32 caracteres (gere com `openssl rand -base64 48`). Sem ele, ninguém entra.
 - A sessão dura 8 horas. "Sair" encerra na hora. Se a sessão vencer, a tela volta ao login com um aviso.
-- O link "Painel completo de performance" da Torre usa `DASHBOARD_URL`; enquanto não houver, aparece "link a definir".
 - Para achar um pedido sem saber o número, o servidor tem uma busca (`/api/staff/orders`): por cidade, país, situação, modalidade, etapa, motivo, atraso mínimo ou encaminhados à central.
 
 Depois de mudar o `.env`, reinicie o `pnpm dev`.
@@ -201,9 +213,9 @@ Com `DATA_SOURCE=file` (ou `databricks`) e `AUTH_DEMO=true`:
 1. **Início** (`http://localhost:5173`): o mapa animado mostra as rotas dos EUA e de Porto Rico para os 5 mercados, com o número de pedidos de cada um. O LogBot está aberto à direita; mostrar que ele minimiza (desliza para a direita) e reabre pela aba.
 2. Digitar **76902** na busca e clicar em **Rastrear**: pedido **em trânsito**, First Class, de San Jose (EUA) para Jacarta (Indonésia), parado na **Alfândega Jacarta**, com **5 dias de atraso**. "O envio saiu com 1 dia de atraso." Motivo provável em linguagem do cliente. Aviso da central.
 3. Clicar em **"Perguntar ao assistente"**: o LogBot (a mesma conversa do Início) explica o motivo provável e avisa que o caso é acompanhado pela central. Mostrar a sugestão "Quero falar com a central".
-4. Clicar em **"Acesso colaborador"** → **"Entrar como demonstração"** → **Torre de controle**: 197 em trânsito, 8.337 na central, 7.222 extravios (os percentuais de despacho e entrega no prazo e a simulação de prazos ficam no painel do Marcelo). Filtrar a tabela por **Alfândega**.
+4. Clicar em **"Acesso colaborador"** → **"Entrar como demonstração"** → **Torre de controle**: 197 em trânsito, 8.337 na central, 7.222 extravios. Filtrar a tabela por **Alfândega**.
 5. Em **"Pedidos"**, mostrar a busca: digitar `769` (vários pedidos) e depois `76902` (uma linha); clicar em "Extravios" na Torre para ver a lista já filtrada (7.222).
-6. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho em 2 dias contra 1 prometido, entrega 5 dias atrasada), as causas nos termos da base e de onde vem cada dado (real ou simulado). Comparar com "Ver como o cliente vê".
+6. Clicar no **76902**: a **visão do colaborador** mostra o diagnóstico (despacho em 2 dias contra 1 prometido, entrega 5 dias atrasada), as causas nos termos da base. Comparar com "Ver como o cliente vê".
 7. **Sair**.
 8. Se a banca digitar outro número, qualquer um dos 65.752 pedidos funciona (com `file` ou `databricks`).
 
@@ -229,11 +241,10 @@ Nenhuma resposta do portal traz dados do cliente (id, segmento) nem valores inte
 
 ## Pontos em aberto
 
-- Link do painel de performance do Marcelo (`DASHBOARD_URL`).
 - Regra da central: "3 dias ou mais" (como está) ou "mais de 3 dias".
 - Telefone ou e-mail da central para o aviso da tela.
 - A explicação da base diz "cumprido em apenas 0.0%" (ponto decimal, número estranho): ajuste pedido ao Mateus.
-- Agente do Marco lendo a mesma tabela (`consumo_pedidos` tem o `resumo_pedido`, feito para a IA).
+- Cota do Gemini: o plano gratuito permite poucas perguntas por dia. Para a banca, deixe o assistente simulado (`AGENT=mock`) como plano B.
 
 ## Glossário
 

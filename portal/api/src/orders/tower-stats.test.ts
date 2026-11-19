@@ -7,12 +7,8 @@ import { createFixturesRepository } from "./fixtures-repository.ts";
 import type { OrderRepository } from "./order-repository.ts";
 import { createOrderService } from "./order-service.ts";
 
-function service(orders: OrderRepository, dashboardUrl: string | null = null) {
-  return createOrderService({
-    orders,
-    sampleOrderIds: [],
-    dashboardUrl,
-  });
+function service(orders: OrderRepository) {
+  return createOrderService({ orders, sampleOrderIds: [] });
 }
 
 describe("Torre de controle (fixtures)", () => {
@@ -35,7 +31,6 @@ describe("Torre de controle (fixtures)", () => {
         { stage: 3, label: "Alfândega", count: 1 },
       ],
       lostByStage: [{ stage: 3, label: "Alfândega", count: 1 }],
-      dashboardUrl: null,
     });
   });
 
@@ -70,14 +65,6 @@ describe("Torre de controle (fixtures)", () => {
       evaluatedDeliveries: 2,
       lateDeliveryPct: 100,
     });
-  });
-
-  it("com DASHBOARD_URL, devolve o link", async () => {
-    const orders = await createFixturesRepository();
-    expect(service(orders).getTower().dashboardUrl).toBeNull();
-    expect(service(orders, "https://painel.exemplo/1").getTower().dashboardUrl).toBe(
-      "https://painel.exemplo/1",
-    );
   });
 
   it("resume os pedidos por mercado na ordem do mapa", async () => {
