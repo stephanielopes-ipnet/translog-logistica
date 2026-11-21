@@ -11,6 +11,7 @@
 #     do container, nunca na imagem nem neste arquivo.
 #   - portal/dados/consumo_*.csv (pnpm export:dados): o agente (backend csv_v2) lê as 3 tabelas, mesmo
 #     quando a API lê do Databricks. Atualize o CSV para os dois contarem a mesma história.
+#   - Rede no build para baixar o modelo de embeddings e indexar a FAQ aprovada.
 #
 # Sem esta sobreposição, o chat continua simulado (AGENT=mock), que é o plano B.
 services:
@@ -26,6 +27,8 @@ services:
       TRANSLOG_ORDER_BACKEND: csv_v2
       TRANSLOG_CONSUMPTION_DIR: /data
       TRANSLOG_DATA_ORIGIN: silver
+      TRANSLOG_KNOWLEDGE_DIR: /app/.state/chroma
+      TRANSLOG_MODEL_CACHE: /app/.cache/models
       TRANSLOG_ALLOW_DEMO_KNOWLEDGE: "false"
     volumes:
       # Lê consumo_pedidos.csv, consumo_itens_pedido.csv e consumo_eventos_logisticos.csv (Silver v2).

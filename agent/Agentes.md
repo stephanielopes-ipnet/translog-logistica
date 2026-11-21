@@ -30,7 +30,7 @@ Marco autorizou em 17/11 atualizar `AGENTS.md`, `Agentes.md` e documentação de
 
 Usar exclusivamente `stephanielopes-ipnet/translog-logistica`, conta `Marco-Leal96`. Conferir estado local/remoto, preservar contribuições, testar mudanças de comportamento e publicar somente arquivos pertinentes. Não criar remoto paralelo ou misturar mudanças dos colegas.
 
-PRs **#30 e #32** integrados. Correção de latência na branch `fix/agente-latencia-consulta`. Verificar estado remoto antes de agir: não criar PR duplicado, não fazer force-push e não confundir push com merge. Merge, deploy, exclusões e ações de acesso/cobrança exigem escopo específico. O conector lê o GitHub mas suas escritas retornaram 403; Git local autenticado e navegador foram os caminhos de publicação usados. Não pedir nova autorização por essa limitação técnica quando houver alternativa já autorizada.
+PRs **#30 e #32** integrados. O [PR #34](https://github.com/stephanielopes-ipnet/translog-logistica/pull/34), branch `fix/agente-latencia-consulta`, reúne o cache de pedidos e a correção da FAQ na imagem do portal. Verificar estado remoto antes de agir: não criar PR duplicado, não fazer force-push e não confundir push com merge. Merge, deploy, exclusões e ações de acesso/cobrança exigem escopo específico. O conector lê o GitHub mas suas escritas retornaram 403; Git local autenticado e navegador foram os caminhos de publicação usados. Não pedir nova autorização por essa limitação técnica quando houver alternativa já autorizada.
 
 Não publicar `.env`, credenciais, ambiente virtual, CSVs privados completos, índices, caches ou logs privados. Não enviar mensagens ao grupo em nome de Marco sem solicitação. A autorização de atualização do GitHub não amplia automaticamente o escopo de transmissão de dados a serviços externos.
 
@@ -77,7 +77,7 @@ Guia principal para os testes e banca: **`docs/casos-teste-e-apresentacao-agente
 
 ## 7. Próximos passos
 
-Em 19/11, corrigida a releitura dos CSVs no agente. O processo indexa os arquivos na primeira consulta e recarrega quando muda a exportação. Medir o chat com Matheus usando `durationMs` do backend para pedidos e FAQ, após atualizar e reiniciar o ADK na máquina da demo.
+Em 19/11, corrigida a releitura dos CSVs no agente. O processo indexa os arquivos na primeira consulta e recarrega quando muda a exportação. Em 21/11, o build da imagem passou a gerar e testar o índice da FAQ aprovada. Na máquina da demo, validar o rebuild conforme o guia de integração e medir o chat com Matheus usando `durationMs` do backend para pedidos e FAQ.
 
 Esclarecimento de Marco nesta retomada de 17/11: houve teste de integração anterior com Matheus, mas a Silver v2/FAQ atual ainda não foi testada junto no portal. Usar `docs/guia-matheus-fullstack.md` atualizado e registrar em `docs/aceite-portal-v2-2026-11-17.md`; não contar esse relato como aceite da v2.
 

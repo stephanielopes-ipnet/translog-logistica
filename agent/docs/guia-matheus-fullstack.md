@@ -14,7 +14,7 @@ Fazer primeiro tudo **na máquina de Matheus**, por compartilhamento de tela se 
 
 ## 1. Conferir código e dados
 
-Usar a pasta `agent/` da branch `feat/agente-silver-v2-rag`, [PR #32](https://github.com/stephanielopes-ipnet/translog-logistica/pull/32). O PR #30 é histórico e já foi integrado. Conferir o estado atual do PR #32; publicação da branch não significa merge.
+Para validar a montagem da FAQ na imagem e o cache de pedidos, usar a versão do [PR #34](https://github.com/stephanielopes-ipnet/translog-logistica/pull/34). Depois da integração, usar a `main` atualizada. Os PRs #30 e #32 já foram integrados.
 
 Matheus deve preservar suas alterações locais. Se a cópia de integração já acompanha essa branch e está limpa, pode atualizá-la com `git pull --ff-only`. Se está em outra branch ou tem trabalho próprio, preparar uma cópia de integração preservando esse trabalho; não forçar troca nem substituir componentes do portal.
 
@@ -29,6 +29,17 @@ Colocar em `agent/data/silver/v2-2026-11-17/` e usar cópias dos **mesmos arquiv
 A fonte continua Databricks `consumo_*`; este teste usa a alternativa local exportada já acordada. Se o portal usar Databricks diretamente, comparar versão/exportação e os pedidos antes do aceite: o agente ainda lê CSV e pode divergir de uma tabela atualizada depois.
 
 ## 2. Conferir e executar o agente
+
+Para testar a imagem do portal, rodar em **`portal/`** com o Docker ativo, a chave configurada em `agent/.env` e os CSVs em `portal/dados/`:
+
+```powershell
+pnpm agent:up
+docker compose -f docker-compose.yml -f docker-compose.agente.yml exec agent python -m translog.cli search 'Como funciona a central de atendimento?'
+```
+
+O build precisa de rede para baixar os embeddings. Ele gera o índice aprovado, testa a recuperação sem rede e guarda o índice e o modelo na imagem. A busca deve retornar `retrieved` com `faq-central-horarios`. Esse comando não chama o Gemini. Para conectar o backend local à imagem, usar `AGENT_URL=http://127.0.0.1:8001` no passo 3.
+
+### Alternativa com Python local
 
 Na pasta **`agent/`**, preservar a chave existente em `.env` e conferir as opções abaixo, sem mostrar a chave na tela compartilhada:
 
@@ -85,7 +96,7 @@ pnpm dev
 
 Se já estiver rodando, Matheus reinicia os processos necessários para carregar a configuração. Conferir `http://127.0.0.1:3333/api/health`: esperado `status=ok`, `dataSource=file`, `orders=65752`, `agent=adk`. Health não consulta o agente; ainda falta testar o chat. Abrir o endereço do frontend informado no terminal, normalmente `http://localhost:5173`.
 
-Este roteiro usa processos locais. Dentro de contêiner, `127.0.0.1` aponta para o próprio contêiner e exige outro endereço/configuração. Não é necessário expor o agente na internet.
+Quando a API também roda no Docker, a sobreposição `docker-compose.agente.yml` já configura `AGENT_URL=http://agent:8001` na rede interna do Compose.
 
 O backend já cria sessões e chama `POST /run`; não criar `/chat` adicional no agente. O prefixo `[Pedido aberto no portal: CÓDIGO]` leva contexto da tela; o agente consulta a ferramenta e não repete o prefixo ao cliente.
 
