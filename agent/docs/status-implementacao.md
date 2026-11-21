@@ -1,6 +1,20 @@
 # Estado verificável da implementação
 
-Atualização documental: 17/11/2026. Os registros datados abaixo preservam o histórico de cada etapa.
+Atualização documental: 21/11/2026. Os registros datados abaixo preservam o histórico de cada etapa.
+
+## FAQ na imagem do portal — 21/11/2026
+
+A imagem copiava o JSON aprovado, mas a busca precisava do índice Chroma. O build passa a gerar o índice e a incluir o modelo de embeddings, com diretórios graváveis pelo usuário do serviço. O Compose aponta para os mesmos caminhos no contêiner. Uma etapa do build com rede desativada verifica se a pergunta sobre a central de atendimento recupera o trecho aprovado.
+
+No teste local sem índice, a busca retornou `unavailable`. Após indexar 18 trechos com o modelo já baixado, o mesmo teste recuperou `faq-central-horarios` em primeiro lugar com conexões Python e novos downloads bloqueados. A configuração do Compose passou e os 52 testes do agente passaram, com 10 avisos de depreciação. O Docker Desktop desta máquina falhou ao iniciar o motor Linux (WSL/Plataforma de Máquina Virtual), por isso o build do contêiner e o chat com Gemini ainda precisam ser validados no ambiente da demo.
+
+A correção da imagem e o cache de pedidos de 19/11 estão reunidos no [PR #34](https://github.com/stephanielopes-ipnet/translog-logistica/pull/34). O [guia de integração](guia-matheus-fullstack.md) traz o comando de rebuild e a verificação da FAQ sem Gemini.
+
+## Consulta por pedido e latência do chat — 19/11/2026
+
+Marco relatou demora no portal. Na máquina local, a ferramenta do pedido 1001 levava 8,5–11,6 s por consulta porque relia os três CSVs. O agente passou a agrupar somente as colunas necessárias por código, em memória, na primeira consulta de cada processo. Quando a exportação muda, o índice é reconstruído. Arquivo ausente, inválido ou alterado durante a carga gera indisponibilidade.
+
+Na medição local com os três CSVs completos, a primeira consulta levou 5,7 s com a carga. As quatro seguintes, incluindo códigos diferentes e um inexistente, levaram menos de 4 ms cada. Esses tempos medem apenas a ferramenta de pedidos. A suíte passou com 52 testes e 10 avisos de depreciação, sem chamadas ao Gemini. O modelo Gemini, a FAQ e a configuração do portal seguem os acordos existentes. Para medir o tempo total, usar `durationMs` e, em caso de falha, `reason` no backend do portal com a nova versão do agente.
 
 ## Retomada: preparar aceite conjunto da v2 no portal — 17/11
 

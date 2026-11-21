@@ -5,16 +5,17 @@
 #   docker build -f agent.Dockerfile -t translog-agent ../agent
 # Normalmente sobe pelo docker-compose.agente.yml (ou "pnpm agent:up").
 #
-# Copia só o necessário: nunca agent/.env, .venv/, .state/, .cache/ nem data/
-# (reforçado por agent.Dockerfile.dockerignore). A chave do Gemini e a fonte de pedidos
-# chegam em tempo de execução, por env_file e variáveis TRANSLOG_* (ver o compose).
+# A chave do Gemini e os CSVs chegam em tempo de execução (ver o compose). O índice e
+# os embeddings da FAQ são gerados na imagem, sem usar .state/ ou .cache/ do host.
 
 FROM python:3.12.16-slim-trixie
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app/src \
+    TRANSLOG_KNOWLEDGE_DIR=/app/.state/chroma \
+    TRANSLOG_MODEL_CACHE=/app/.cache/models
 
 WORKDIR /app
 
@@ -28,10 +29,22 @@ RUN grep -viE '^msvc[_-]runtime==' requirements.lock > /tmp/requirements.linux.t
 COPY pyproject.toml ./
 COPY src/ src/
 COPY agents/ agents/
-COPY knowledge/ knowledge/
+COPY knowledge/approved/ knowledge/approved/
 
-RUN useradd --create-home --uid 10001 agente
+RUN useradd --create-home --uid 10001 agente \
+ && install -d -o agente -g agente /app/.state /app/.cache
 USER agente
+
+# O build baixa o modelo de embeddings. A busca abaixo verifica que a imagem
+# consegue recuperar a FAQ como o usuário do serviço, mesmo sem baixar nada.
+RUN python -m translog.cli index --input knowledge/approved
+RUN --network=none python - <<'PY'
+from translog.tools import buscar_faq_e_politicas
+
+resultado = buscar_faq_e_politicas("Como funciona a central de atendimento?")
+assert resultado["status"] == "retrieved", resultado["status"]
+assert any(trecho["id"] == "faq-central-horarios" for trecho in resultado["passages"])
+PY
 
 EXPOSE 8001
 
