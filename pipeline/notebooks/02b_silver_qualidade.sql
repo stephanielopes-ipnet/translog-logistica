@@ -301,8 +301,8 @@ testes AS (
        OR (r.situacao_entrega LIKE 'Entregue%' AND r.data_entrega_realizada IS NULL)
 
     UNION ALL
-    -- Entrega: atraso coerente com as datas; o transporte só recupera (nunca piora o despacho);
-    -- entrega atrasada só existe com despacho atrasado
+    -- Entrega: atraso coerente com as datas; em "Atraso no transporte", transito_real > transito_padrao
+    -- e despacho no prazo; nos demais casos, entrega atrasada só existe com despacho atrasado
     SELECT 'atraso_entrega_coerente_com_despacho_e_datas',
            CONCAT(COUNT(*), ' incoerências'),
            COUNT(*) = 0
@@ -314,8 +314,12 @@ testes AS (
     WHERE e.data_entrega_realizada IS NOT NULL
       AND (e.dias_atraso_entrega <> DATEDIFF(e.data_entrega_realizada, e.data_entrega_prevista)
            OR e.flag_atraso_entrega <> CASE WHEN e.dias_atraso_entrega > 0 THEN 1 ELSE 0 END
-           OR e.dias_atraso_entrega > s.dias_atraso_despacho
-           OR (e.flag_atraso_entrega = 1 AND s.dias_atraso_despacho <= 0))
+           OR (e.resultado_transporte = 'Atraso no transporte'
+               AND (e.transito_real_dias <= e.transito_padrao_dias OR e.flag_atraso_entrega <> 1
+                    OR s.dias_atraso_despacho > 0))
+           OR (e.resultado_transporte <> 'Atraso no transporte'
+               AND (e.dias_atraso_entrega > s.dias_atraso_despacho
+                    OR (e.flag_atraso_entrega = 1 AND s.dias_atraso_despacho <= 0))))
 
     UNION ALL
     -- Fonte única de posição: o local da consumo_pedidos é o local do último evento publicado

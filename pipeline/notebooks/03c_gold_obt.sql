@@ -131,12 +131,13 @@ WITH valores AS (
 principal AS (
     SELECT id_pedido, categoria_produto AS categoria_principal, departamento AS departamento_principal
     FROM gold_base_itens WHERE rn_principal = 1
-),
+)
 SELECT
     i.* EXCEPT (destino_pais, destino_estado, destino_cidade, destino_regiao, modo_envio),
     i.modo_envio                             AS classe_servico,
     COALESCE(tme.valor_pt, i.modo_envio)     AS modo_envio,
     COALESCE(tp.valor_pt,  i.destino_pais)   AS destino_pais,
+    COALESCE(tp.valor_pt,  i.destino_pais)   AS destino_pais_pt,
     COALESCE(te.valor_pt,  i.destino_estado) AS destino_estado,
     COALESCE(tci.valor_pt, i.destino_cidade) AS destino_cidade,
     COALESCE(tr.valor_pt,  i.destino_regiao) AS destino_regiao,
@@ -211,6 +212,7 @@ SELECT
     destino_pais,
     destino_pais_en,
     destino_pais_iso3,
+    destino_pais_pt,
     destino_estado,
     destino_cidade,
     -- Situação em D
@@ -614,6 +616,7 @@ SELECT
     destino_pais,
     destino_pais_en,
     destino_pais_iso3,
+    destino_pais_pt,
     destino_estado,
     destino_cidade,
     etapa_extravio,

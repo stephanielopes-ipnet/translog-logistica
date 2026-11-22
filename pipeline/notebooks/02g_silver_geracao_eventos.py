@@ -85,6 +85,8 @@ def transito_padrao():
 
 # Padrão da entrega (validado com o instrutor), sobre os pedidos concluídos
 PCT_EXTRAVIO, PCT_ATRASO = 20, 20          # resto = entregue no prazo (60)
+PCT_ATRASO_TRANSPORTE = 6.5                # fatia do atraso causada pelo transporte (~6% a 7%)
+PCT_ATRASO_DESPACHO = PCT_ATRASO - PCT_ATRASO_TRANSPORTE  # ~13.5% despacho não recuperado
 TRANSITO_MINIMO_DIAS = 1                   # recuperação nunca deixa o trânsito abaixo disso
 DIAS_PARA_CONFIRMAR_EXTRAVIO = 5           # após a data em que a entrega deveria ocorrer
 
@@ -125,12 +127,14 @@ df_catalogo = spark.createDataFrame(
 # COMMAND ----------
 
 # -----------------------------------------------------------------------------
-# 2. Calibração (base INTEIRA de concluídos, sem collect): fração dos despachos atrasados
-#    RECUPERÁVEIS que não são recuperados, para o atraso na entrega fechar em PCT_ATRASO.
-#    atraso = (1 - extravio) x (irrecuperáveis + p x recuperáveis)
-#    => p = (PCT_ATRASO / (100 - PCT_EXTRAVIO) - irrecuperáveis) / recuperáveis
+# 2. Calibração (base INTEIRA de concluídos, sem collect):
+#    Reparte a cota de PCT_ATRASO (20%) em:
+#      - PCT_ATRASO_DESPACHO (~13,5%): despacho atrasado não recuperado no transporte
+#      - PCT_ATRASO_TRANSPORTE (~6,5%): despacho no prazo com atraso no transporte (+1 a +3d)
+#    Mantém a distribuição global ~60% no prazo / 20% atraso / 20% extravio.
 # -----------------------------------------------------------------------------
 atrasado = c("dias_atraso_despacho") > 0
+elegivel_transp = ~atrasado & (c("dias_atraso_despacho") >= -2)
 recuperavel = atrasado & ((c("transito_padrao_dias") - c("dias_atraso_despacho")) >= TRANSITO_MINIMO_DIAS)
 irrecuperavel = atrasado & ~recuperavel
 
@@ -140,10 +144,14 @@ df_calibracao = (
     .agg(F.avg(irrecuperavel.cast("double")).alias("share_irrecuperavel"),
          F.avg(recuperavel.cast("double")).alias("share_recuperavel"),
          F.avg(atrasado.cast("double")).alias("share_despacho_atrasado"),
+         F.avg(elegivel_transp.cast("double")).alias("share_elegivel_transp"),
          F.count("*").alias("despachados_na_base"))
     .withColumn("p_nao_recuperado",
                 F.greatest(F.lit(0.0), F.least(F.lit(1.0),
-                    (F.lit(PCT_ATRASO / (100.0 - PCT_EXTRAVIO)) - c("share_irrecuperavel")) / c("share_recuperavel"))))
+                    (F.lit(PCT_ATRASO_DESPACHO / (100.0 - PCT_EXTRAVIO)) - c("share_irrecuperavel")) / c("share_recuperavel"))))
+    .withColumn("p_atraso_transporte",
+                F.greatest(F.lit(0.0), F.least(F.lit(1.0),
+                    F.lit(PCT_ATRASO_TRANSPORTE / (100.0 - PCT_EXTRAVIO)) / F.when(c("share_elegivel_transp") > 0, c("share_elegivel_transp")))))
 )
 display(df_calibracao)
 
@@ -153,24 +161,39 @@ display(df_calibracao)
 # 3. Resultado da entrega por pedido (determinístico)
 # -----------------------------------------------------------------------------
 u_recup = sorteio("RECUPERACAO", 10000) / 10000.0
+u_transp = sorteio("ATRASO_TRANSPORTE", 10000) / 10000.0
 resultado_planejado = (
     F.when(c("grupo_status") != "despachado", F.lit(None))
     .when(sorteio("EXTRAVIO") < PCT_EXTRAVIO, "Extraviado")
+    .when(elegivel_transp & (u_transp < c("p_atraso_transporte")), "Atraso no transporte")
     .when(~atrasado, "No prazo")
     .when(irrecuperavel | (u_recup < c("p_nao_recuperado")), "Não recuperou o atraso do despacho")
     .otherwise("Recuperou o atraso do despacho")
 )
-ENTREGUES = ["No prazo", "Recuperou o atraso do despacho", "Não recuperou o atraso do despacho"]
+ENTREGUES = ["No prazo", "Recuperou o atraso do despacho", "Não recuperou o atraso do despacho", "Atraso no transporte"]
 plan_entregue = c("resultado_planejado").isin(*ENTREGUES)
 
+# Delta de atraso de transporte (+1 a +3 dias), garantindo entrega atrasada (dias_atraso_entrega >= 1)
+min_delta_transp = F.least(F.lit(3), F.greatest(F.lit(1), F.lit(1) - c("dias_atraso_despacho")))
+span_delta_transp = F.lit(4) - min_delta_transp
+delta_atraso_transporte = (
+    F.when(
+        c("resultado_planejado") == "Atraso no transporte",
+        (min_delta_transp + F.pmod(F.xxhash64(c("id_pedido"), F.lit("ATRASO_TRANSP_DIAS")), span_delta_transp)).cast("int"),
+    ).otherwise(F.lit(0))
+)
+
 df_ped = (
-    df_pedidos_entrada.crossJoin(df_calibracao.select("p_nao_recuperado"))
+    df_pedidos_entrada.crossJoin(df_calibracao.select("p_nao_recuperado", "p_atraso_transporte"))
     .withColumn("cenario", F.lit(CENARIO))
     .withColumn("transito_padrao_dias", transito_padrao())
     .withColumn("resultado_planejado", resultado_planejado)
+    .withColumn("delta_atraso_transporte", delta_atraso_transporte)
     .withColumn("transito_plan_dias",
                 F.when(c("resultado_planejado") == "Recuperou o atraso do despacho",
                        c("transito_padrao_dias") - c("dias_atraso_despacho"))
+                .when(c("resultado_planejado") == "Atraso no transporte",
+                      c("transito_padrao_dias") + c("delta_atraso_transporte"))
                 .when(plan_entregue, c("transito_padrao_dias")).cast("int"))
     .withColumn("codigo_etapa_extravio", F.when(c("resultado_planejado") == "Extraviado", etapa_extravio()))
     # Desfecho planejado (entrega ou confirmação do extravio) e a foto em D
@@ -241,13 +264,28 @@ u = F.pmod(F.xxhash64(c("id_pedido"), cod, F.lit(CENARIO)), F.lit(10000)) / 1000
 ev = ev.withColumn("_w", F.when((c("ordem") >= 30) & ~especial, c("peso") * (0.7 + 0.6 * u)).otherwise(0.0))
 
 t_envio = F.unix_timestamp("data_envio")
-janela_s = F.coalesce(c("transito_plan_dias"), c("transito_padrao_dias")) * DIA
+# Em "Atraso no transporte", o trânsito padrão é distribuído normalmente pelos trechos e as horas
+# adicionais (+delta_atraso_transporte dias) ficam concentradas na etapa gargalo:
+#   - Rotas internacionais: Etapa 3 - Alfândega (atraso a partir de LIBERACAO_ALFANDEGA, ordem >= 60)
+#   - Rotas domésticas:     Etapa 4 - Transferência (atraso a partir de SAIU_PARA_ENTREGA, ordem >= 90)
+janela_base_s = F.when(
+    c("resultado_planejado") == "Atraso no transporte",
+    c("transito_padrao_dias") * DIA,
+).otherwise(F.coalesce(c("transito_plan_dias"), c("transito_padrao_dias")) * DIA)
+extra_atraso_s = F.when(
+    (c("resultado_planejado") == "Atraso no transporte")
+    & (
+        (c("internacional") & (c("ordem") >= 60))
+        | (~c("internacional") & (c("ordem") >= 90))
+    ),
+    c("delta_atraso_transporte") * DIA,
+).otherwise(F.lit(0.0))
 total_w = F.sum("_w").over(por_pedido)
 ts_seg = (
     F.when(cod == "ENTREGUE", t_envio + c("transito_plan_dias") * DIA)
     .when(cod == "EXTRAVIO_CONFIRMADO", t_envio + (c("transito_padrao_dias") + DIAS_PARA_CONFIRMAR_EXTRAVIO) * DIA)
     # denominador NULL quando 0 (pedido sem jornada): evita divisão por zero no modo ANSI
-    .otherwise(t_envio + F.sum("_w").over(acumulado) / F.when(total_w > 0, total_w) * janela_s)
+    .otherwise(t_envio + F.sum("_w").over(acumulado) / F.when(total_w > 0, total_w) * janela_base_s + extra_atraso_s)
 )
 ev = ev.withColumn(
     "ts_evento",
@@ -369,7 +407,7 @@ df_entregas = (
     .withColumn("data_entrega_realizada",
                 F.when(entregue, F.expr("date_add(to_date(data_envio), transito_real_dias)")))
     .withColumn("dias_recuperados_transporte",
-                F.when(entregue, c("transito_padrao_dias") - c("transito_real_dias")))
+                F.when(entregue, F.greatest(F.lit(0), c("transito_padrao_dias") - c("transito_real_dias"))))
     # Entregue: realizada - prevista. Em trânsito em D: atraso acumulado até D (0 se ainda no prazo).
     .withColumn("dias_atraso_entrega",
                 F.when(entregue, F.datediff("data_entrega_realizada", "data_entrega_prevista"))
@@ -381,7 +419,12 @@ df_entregas = (
     .withColumn("causa_atraso_entrega",
                 F.when(c("flag_atraso_entrega").isNull(), F.lit(None))
                 .when(c("flag_atraso_entrega") == 0, "Sem atraso")
-                .when(c("resultado_planejado") == "Extraviado", "Volume sem atualização de rastreio")
+                .when(c("resultado_transporte") == "Em trânsito",
+                      F.when(c("dias_atraso_despacho") > 0, "Em trânsito com atraso acumulado desde o despacho")
+                      .otherwise("Em trânsito além do prazo previsto"))
+                .when(c("resultado_transporte") == "Atraso no transporte",
+                      F.when(c("internacional"), "Atraso no transporte (desembaraço aduaneiro)")
+                      .otherwise("Atraso no transporte (transferência entre hubs)"))
                 .otherwise("Atraso no despacho não recuperado no transporte"))
     .withColumn("situacao_entrega",
                 F.when(c("grupo_status") == "cancelado", "Cancelado")

@@ -101,6 +101,13 @@ SELECT
                                                     ' dia(s) mais rápido que o padrão) e a entrega ocorreu no prazo.')
             WHEN 'Não recuperou o atraso do despacho' THEN CONCAT(' O transporte seguiu o prazo padrão da rota e a entrega ficou ',
                                                     CAST(ent.dias_atraso_entrega AS STRING), ' dia(s) atrasada.')
+            WHEN 'Atraso no transporte' THEN CONCAT(' O transporte excedeu o prazo padrão da rota em ',
+                                                    CAST(ent.transito_real_dias - ent.transito_padrao_dias AS STRING),
+                                                    ' dia(s) (',
+                                                    CASE WHEN ent.tipo_rota = 'Internacional' THEN 'desembaraço aduaneiro'
+                                                         ELSE 'transferência entre hubs' END,
+                                                    ') e a entrega ficou ',
+                                                    CAST(ent.dias_atraso_entrega AS STRING), ' dia(s) atrasada.')
             WHEN 'Extraviado' THEN CONCAT(' Volume extraviado na etapa ', ent.etapa_extravio, ': ',
                                           ent.motivo_extravio, '.')
             WHEN 'Em trânsito' THEN CASE WHEN ent.flag_atraso_entrega = 1

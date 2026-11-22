@@ -135,9 +135,9 @@ testes AS (
                    OR data_entrega_realizada IS NOT NULL)
 
     UNION ALL
-    -- Regra da entrega: no prazo só com despacho no prazo; recuperado = trânsito encurtado
+    -- Regra da entrega (v4): no prazo só com despacho no prazo; recuperado = trânsito encurtado
     -- (>= 1 dia) e entrega na data prometida; não recuperado = trânsito padrão e atraso igual ao
-    -- do despacho; entrega atrasada só existe com despacho atrasado
+    -- do despacho; atraso no transporte = despacho no prazo com trânsito entre T+1 e T+3 e entrega atrasada
     SELECT 'regra_recuperacao_do_despacho', CONCAT(COUNT(*), ' pedidos fora'), COUNT(*) = 0
     FROM pe
     WHERE (resultado_transporte = 'No prazo'
@@ -148,7 +148,12 @@ testes AS (
        OR (resultado_transporte = 'Não recuperou o atraso do despacho'
            AND (dias_atraso_despacho <= 0 OR transito_real_dias <> transito_padrao_dias
                 OR dias_atraso_entrega <> dias_atraso_despacho))
-       OR (situacao_entrega = 'Entregue com atraso' AND dias_atraso_despacho <= 0)
+       OR (resultado_transporte = 'Atraso no transporte'
+           AND (dias_atraso_despacho > 0 OR transito_real_dias NOT BETWEEN transito_padrao_dias + 1 AND transito_padrao_dias + 3
+                OR dias_atraso_entrega <> dias_atraso_despacho + (transito_real_dias - transito_padrao_dias)
+                OR dias_atraso_entrega <= 0))
+       OR (situacao_entrega = 'Entregue com atraso'
+           AND dias_atraso_despacho <= 0 AND resultado_transporte <> 'Atraso no transporte')
 
     UNION ALL
     -- (antigo T3) em trânsito: nunca entregue, extraviado ou com ocorrência

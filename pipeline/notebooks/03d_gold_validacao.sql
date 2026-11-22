@@ -182,8 +182,8 @@ testes AS (
     FROM it
     UNION ALL
     SELECT 'obt_etapas_grao_unico',
-           CONCAT(COUNT(*), ' linhas x ', COUNT(DISTINCT id_pedido, etapa_num), ' pedido x etapa (esperado 201635)'),
-           COUNT(*) = COUNT(DISTINCT id_pedido, etapa_num) AND COUNT(*) = 201635
+           CONCAT(COUNT(*), ' linhas x ', COUNT(DISTINCT id_pedido, etapa_num), ' pedido x etapa (esperado 201643)'),
+           COUNT(*) = COUNT(DISTINCT id_pedido, etapa_num) AND COUNT(*) = 201643
     FROM et
     UNION ALL
     SELECT 'obt_etapas_todo_pedido_tem_etapa_0_e_1',
@@ -301,17 +301,17 @@ testes AS (
            kp.causa_promessa = 6655 AND kp.causa_operacional = 14472
     FROM kp
     UNION ALL
-    SELECT 'kpi_base_desfecho_36669_e_197_em_transito',
+    SELECT 'kpi_base_desfecho_36671_e_195_em_transito',
            CONCAT(kp.com_desfecho, ' com desfecho (Silver ', k.pedidos_com_desfecho_entrega, ') / ', kp.em_transito, ' em trânsito'),
-           kp.com_desfecho = k.pedidos_com_desfecho_entrega AND kp.com_desfecho = 36669 AND kp.em_transito = 197
+           kp.com_desfecho = k.pedidos_com_desfecho_entrega AND kp.com_desfecho = 36671 AND kp.em_transito = 195
     FROM kp CROSS JOIN k
     UNION ALL
-    SELECT 'kpi_entrega_59_9_20_4_19_7',
+    SELECT 'kpi_entrega_60_0_20_3_19_7',
            CONCAT(kp.pct_no_prazo, ' / ', kp.pct_atrasado, ' / ', kp.pct_extraviado, ' x Silver ',
                   k.pct_entregue_no_prazo, ' / ', k.pct_entregue_com_atraso, ' / ', k.pct_extraviado),
            kp.pct_no_prazo = k.pct_entregue_no_prazo AND kp.pct_atrasado = k.pct_entregue_com_atraso
            AND kp.pct_extraviado = k.pct_extraviado
-           AND kp.pct_no_prazo = 59.9 AND kp.pct_atrasado = 20.4 AND kp.pct_extraviado = 19.7
+           AND kp.pct_no_prazo = 60.0 AND kp.pct_atrasado = 20.3 AND kp.pct_extraviado = 19.7
     FROM kp CROSS JOIN k
     UNION ALL
     SELECT 'kpi_atraso_medio_entrega_1_63',
@@ -319,26 +319,26 @@ testes AS (
            kp.atraso_medio_entrega = 1.63
     FROM kp
     UNION ALL
-    SELECT 'kpi_recuperado_no_transporte_55_8',
+    SELECT 'kpi_recuperado_no_transporte_70_0',
            CONCAT(kp.pct_recuperado, '% x Silver ', k.pct_despacho_atrasado_recuperado_no_transporte, '%'),
-           kp.pct_recuperado = k.pct_despacho_atrasado_recuperado_no_transporte AND kp.pct_recuperado = 55.8
+           kp.pct_recuperado = k.pct_despacho_atrasado_recuperado_no_transporte AND kp.pct_recuperado = 70.0
     FROM kp CROSS JOIN k
     UNION ALL
-    SELECT 'kpi_receita_bruta_20_62M_risco_8_28M',
+    SELECT 'kpi_receita_bruta_20_62M_risco_8_26M',
            CONCAT(ROUND(kp.rb / 1e6, 2), ' M / ', ROUND(kp.rb_risco / 1e6, 2), ' M x Silver ',
                   ROUND(k.receita_despachada / 1e6, 2), ' M / ', ROUND(k.receita_em_risco / 1e6, 2), ' M'),
            ABS(kp.rb - k.receita_despachada) < 0.05 AND ABS(kp.rb_risco - k.receita_em_risco) < 0.05
-           AND ROUND(kp.rb / 1e6, 2) = 20.62 AND ROUND(kp.rb_risco / 1e6, 2) = 8.28
+           AND ROUND(kp.rb / 1e6, 2) = 20.62 AND ROUND(kp.rb_risco / 1e6, 2) = 8.26
     FROM kp CROSS JOIN k
     UNION ALL
-    SELECT 'kpi_receita_liquida_18_53M_risco_7_44M',
+    SELECT 'kpi_receita_liquida_18_53M_risco_7_42M',
            CONCAT(ROUND(kp.rl / 1e6, 2), ' M / ', ROUND(kp.rl_risco / 1e6, 2), ' M'),
-           ROUND(kp.rl / 1e6, 2) = 18.53 AND ROUND(kp.rl_risco / 1e6, 2) = 7.44
+           ROUND(kp.rl / 1e6, 2) = 18.53 AND ROUND(kp.rl_risco / 1e6, 2) = 7.42
     FROM kp
     UNION ALL
-    SELECT 'kpi_lucro_2_27M_risco_0_89M_extraviado_0_44M',
+    SELECT 'kpi_lucro_2_27M_risco_0_91M_extraviado_0_44M',
            CONCAT(ROUND(kp.lu / 1e6, 2), ' M / ', ROUND(kp.lu_risco / 1e6, 2), ' M / ', ROUND(kp.lu_extr / 1e6, 2), ' M'),
-           ROUND(kp.lu / 1e6, 2) = 2.27 AND ROUND(kp.lu_risco / 1e6, 2) = 0.89 AND ROUND(kp.lu_extr / 1e6, 2) = 0.44
+           ROUND(kp.lu / 1e6, 2) = 2.27 AND ROUND(kp.lu_risco / 1e6, 2) = 0.91 AND ROUND(kp.lu_extr / 1e6, 2) = 0.44
     FROM kp
     UNION ALL
     SELECT 'kpi_s1_prazo_honesto_31_4',
@@ -498,18 +498,20 @@ testes AS (
            COUNT(DISTINCT extraviados) = 1 AND COUNT(DISTINCT em_transito) = 1 AND MAX(extraviados) = 7222
     FROM cen_resumo
     UNION ALL
-    SELECT 'cenarios_entrega_atrasada_so_com_despacho_atrasado',
-           CONCAT(SUM(CASE WHEN fl_entregue_atrasado = 1 AND fl_despacho_atrasado = 0 THEN 1 ELSE 0 END),
-                  ' entregas atrasadas sem despacho atrasado no mesmo cenário'),
-           SUM(CASE WHEN fl_entregue_atrasado = 1 AND fl_despacho_atrasado = 0 THEN 1 ELSE 0 END) = 0
-    FROM cv
+    SELECT 'cenarios_entrega_atrasada_so_com_despacho_ou_transporte_atrasado',
+           CONCAT(SUM(CASE WHEN cv.fl_entregue_atrasado = 1 AND cv.fl_despacho_atrasado = 0
+                            AND COALESCE(o.transito_real_dias, 0) <= o.transito_padrao_dias THEN 1 ELSE 0 END),
+                  ' entregas atrasadas sem atraso de despacho nem de transporte no mesmo cenário'),
+           SUM(CASE WHEN cv.fl_entregue_atrasado = 1 AND cv.fl_despacho_atrasado = 0
+                     AND COALESCE(o.transito_real_dias, 0) <= o.transito_padrao_dias THEN 1 ELSE 0 END) = 0
+    FROM cv JOIN o USING (id_pedido)
     UNION ALL
-    SELECT 'cenario_ajustado_referencia_31_4_3952_6_29M',
+    SELECT 'cenario_ajustado_referencia_31_4_4817_6_77M',
            CONCAT(r.pct_despacho_atrasado, '% despacho atrasado / ', r.entregas_atrasadas, ' entregas atrasadas / ',
                   ROUND(r.receita_bruta_em_risco / 1e6, 2), ' M em risco',
                   CASE WHEN NOT si.ok THEN ' (parâmetros editados: informativo)' ELSE '' END),
-           NOT si.ok OR (r.pct_despacho_atrasado = 31.4 AND r.entregas_atrasadas = 3952
-                         AND ROUND(r.receita_bruta_em_risco / 1e6, 2) = 6.29)
+           NOT si.ok OR (r.pct_despacho_atrasado = 31.4 AND r.entregas_atrasadas = 4817
+                         AND ROUND(r.receita_bruta_em_risco / 1e6, 2) = 6.77)
     FROM cen_resumo r CROSS JOIN seed_intacto si
     WHERE r.cenario = 'Promessa ajustada'
 
