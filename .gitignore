@@ -35,3 +35,6 @@ dist/
 
 # SO
 .DS_Store
+
+# Documentacao privada local (nao versionar)
+docs_internos/
