@@ -69,3 +69,4 @@ Cada produto consome a camada adequada ao seu objetivo operacional ou estratégi
 | **Propósito** | Atendimento em tempo real, consulta pública de pedidos, linha do tempo detalhada e respostas em linguagem natural | Avaliação gerencial de performance logística, gargalos por etapa, receita em risco e simulação de SLAs |
 | **Universo de Pedidos** | **Universo completo da loja:** inclui todos os pedidos registrados, inclusive pedidos cancelados ou com pagamento pendente/expirado | **Universo operacional da transportadora:** considera exclusivamente pedidos pagos e efetivamente despachados (e, nos KPIs de desfecho, apenas viagens já encerradas) |
 | **Justificativa de Negócio** | Clientes e atendentes consultam qualquer pedido feito na loja, mesmo que o pagamento não tenha sido aprovado | Falhas de checkout e pagamentos não confirmados nunca chegam à transportadora e não devem distorcer os indicadores de SLA logístico |
+
