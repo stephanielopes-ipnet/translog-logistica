@@ -50,22 +50,35 @@ DataCo (CSV) → Bronze → Silver → Gold → Dashboard (gestão)
 
 ## Marcos
 
-| Data | Marco |
-|---|---|
-| 13/11 | Planejamento e contratos de dados |
-| 16/11 | Gold exportada |
-| 17/11 | Checkpoint: MVP parcial |
-| 19/11 | Code freeze e demo completa |
-| 23/11 | Banca |
+| Data | Marco | Situação |
+|---|---|---|
+| 13/11 | Planejamento e contratos de dados | ✅ |
+| 16/11 | Gold exportada | ✅ em 17/11 (+1 dia) |
+| 17/11 | Checkpoint: MVP parcial | ✅ |
+| 19/11 | Code freeze e demo completa | ✅ |
+| 23/11 | Banca | — |
 
 Tarefas em [Issues](../../issues) e andamento em [Milestones](../../milestones).
 
 ## Documentação
 
-- [Planejamento](docs/planejamento.md): escopo, responsabilidades, dependências, cronograma e acordos
-- [Arquitetura](docs/arquitetura.md): fluxo, contratos de dados, KPIs e arquitetura em Google Cloud
-- [Riscos](docs/riscos.md)
-- [Dailies](docs/dailies/)
+| Documento | Conteúdo |
+|---|---|
+| [Relatório Ágil](docs/relatorio-agil.md) | Dailies D1 a D10, planejado x realizado, decisões e retrospectiva |
+| [Planejamento](docs/planejamento.md) | Escopo, responsabilidades, dependências, cronograma e acordos |
+| [Riscos](docs/riscos.md) | Matriz de riscos com a situação de cada um |
+| [Auditoria do GitHub](docs/auditoria.md) | Commits, PRs, issues e conteúdo por pasta |
+| [Arquitetura](docs/arquitetura.md) | Fluxo do MVP, contratos de dados, KPIs e arquitetura em Google Cloud |
+| [Dados e indicadores](docs/dados-e-indicadores.md) | Real x simulado, regras de negócio e números finais da Gold |
+| [Portal](portal/README.md) | Como rodar o portal, o LogBot e a Área do colaborador |
+| [Agente](agent/README.md) | LogBot: ADK, FAQ e testes |
+
+## Principais resultados
+
+- **57,3%** dos pedidos pagos e despachados saem do armazém depois do prazo prometido (21.127 de 36.866).
+- O atraso só muda de verdade com a **modalidade** (de 39,7% a 100%). Região, mês, cliente e produto mudam menos de 9 pontos.
+- **First Class** promete 1 dia e despacha sempre em 2. **Second Class** despacha como a Standard (média de 4,0 dias).
+- Com o **prazo honesto** por modalidade, o atraso cai para **31,4%**: 9.549 pedidos e US$ 5,3 milhões em vendas deixam de atrasar.
 
 ## Dados
 
