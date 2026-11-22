@@ -1,4 +1,4 @@
-# Arquitetura de dados (Silver v3 + Gold v3): o que é real, o que é simulado e quem usa
+# Arquitetura de dados (Silver v4 + Gold v4): o que é real, o que é simulado e quem usa
 
 **Projeto:** TransLog, Academy, Grupo 3 · **Área:** Engenharia de Dados · **Base:** DataCo (Kaggle) + simulação pós-despacho
 **Premissa:** `04_decisao_premissa_despacho.md` (validada com o instrutor)
@@ -66,17 +66,17 @@ A empresa cresceu sem enxergar a própria operação:
  │ 02i  só a fatia publicada                                     │
  └────┬─────────────────────────────────────────────────────────┘
       ├──► silver.rastreio_pedidos (TABELA, com dado_simulado)  grão: pedido
-      ├──► silver.vw_eventos_logisticos (VIEW, sem marca)       grão: evento  → Portal / IA
-      └──► silver.vw_rastreio_eventos   (VIEW, sem marca)       grão: pedido  → Portal / IA
+      └──► silver.consumo_eventos_logisticos (TABELA, sem marca) grão: evento  → Portal / IA
       ▼
  ┌──────────────────────────────────────────────────────────────┐
- │ 02e  view de consumo (pt-BR, sem PII, sem marca, texto RAG)   │
+ │ 02e  tabelas de consumo finais (pt-BR, sem PII/marca, RAG)   │
  └────┬─────────────────────────────────────────────────────────┘
-      ▼ silver.vw_pedidos_rastreio                               grão: item    → IA (RAG) / Portal
+      ├──► silver.consumo_pedidos (65.752 · CDF ligado)          → IA (RAG) / Portal
+      └──► silver.consumo_itens_pedido (180.519)                 → Portal / IA
  ┌────────────────────────────────────────┐
- │ 03c  Gold OBT (só despachados)         │──► gold.obt_pedidos_logistica · obt_itens_risco ·
+ │ 03c  Gold OBT (só despachados: 36.866) │──► gold.obt_pedidos_logistica · obt_itens_risco ·
  └────────────────────────────────────────┘    obt_eventos_etapas · param_cenario_prazo ·
-                                               vw_cenarios_prazo  → BI (dashboard)
+                                               vw_cenarios_prazo  → BI (dashboard_v2: 36.671 finalizados)
  Testes: 02b (Silver, 37 PASS) · 02h (simulação, 28 PASS, com assert) · 03d (Gold OBT, com assert)
 ```
 
@@ -130,8 +130,7 @@ A empresa cresceu sem enxergar a própria operação:
    | Despacho atrasado, **recuperado** | sorteio ≥ p (e atraso < T) | T − atraso (≥ 1 dia) | entregue **na data prometida** |
    | Despacho atrasado, **não recuperado** | sorteio < p, ou atraso ≥ T | T | entregue com atraso = atraso no despacho |
 
-   **Calibração:** `p = (20/80 − irrecuperáveis) / recuperáveis`, calculado sobre todos os concluídos da base (hoje p = 0,391). Projeção na base completa: **60,0% no prazo · 20,2% com atraso · 19,8% extraviados**; 56,2% dos despachos atrasados (não extraviados) são recuperados no transporte.
-7. **Consequência:** toda entrega atrasada nasce de um despacho atrasado, e o transporte nunca piora o prazo.
+   **Atualização `v4`:** além dos atrasos de despacho não recuperados (`5.066` pedidos), a simulação `v4` introduz ~`6,5%` de **atraso no transporte** (`2.369` pedidos, +1 a +3 dias concentrados em Alfândega internacional e Transferência entre hubs domésticos), fechando os `36.671` concluídos em **60,0% no prazo (`22.014`) · 20,3% com atraso (`7.435`) · 19,7% extraviados (`7.222`)**, com `195` pedidos `Em trânsito` em `D`.
 8. **Horário dos eventos:** o trânsito é repartido por peso (±30% por hash), truncado ao minuto. Tudo é calculado a partir das datas da base: a maior data possível é ~19/02/2018 (último despacho real + trânsito + confirmação de extravio).
 9. **Garantias:** determinístico (hash), versionado (`versao`, `escopo`), idempotente (`replaceWhere`), com quarentena para horário nulo, ordem invertida, hub ausente ou evento antes do despacho.
 
@@ -139,8 +138,8 @@ A empresa cresceu sem enxergar a própria operação:
 
 ## 5. Dicionário
 
-### 5.1 `silver.vw_pedidos_rastreio` (view de consumo, IA e portal)
-**Grão:** item (`id_item_pedido`). Base: `silver.pedidos_rastreio` (02a) + `silver.rastreio_pedidos` (02i). pt-BR, sem PII, sem marca de simulação.
+### 5.1 `silver.consumo_pedidos` e `silver.consumo_itens_pedido` (consumo IA e Portal)
+**Grão:** `consumo_pedidos` = pedido (`65.752` linhas); `consumo_itens_pedido` = item (`180.519` linhas). Base: `silver.pedidos_rastreio` (02a) + `silver.rastreio_pedidos` (02i). pt-BR, sem PII, sem marca de simulação.
 
 | Grupo | Coluna | Significado | NULL quando |
 |---|---|---|---|
@@ -159,7 +158,7 @@ A empresa cresceu sem enxergar a própria operação:
 | | `resultado_transporte` | `No prazo` / `Recuperou o atraso do despacho` / `Não recuperou o atraso do despacho` / `Extraviado` / `Em trânsito` | não despachado |
 | | `situacao_entrega` | `Entregue no prazo` / `Entregue com atraso` / `Extraviado` / `Em trânsito` / `Não despachado` / `Cancelado` | fora da simulação |
 | | `data_entrega_prevista`, `data_entrega_realizada` | Promessa e entrega (DATE) | não despachado / não entregue |
-| | `dias_atraso_entrega`, `flag_atraso_entrega`, `causa_atraso_entrega` | Atraso na entrega (só com despacho atrasado não recuperado) | não entregue |
+| | `dias_atraso_entrega`, `flag_atraso_entrega`, `causa_atraso_entrega` | Atraso na entrega (`v4`: despacho não recuperado ou atraso no transporte) | não entregue |
 | | `etapa_extravio` | Etapa onde o volume se perdeu | não extraviado |
 | Posição | `etapa_atual`, `etapa_atual_desc`, `local_atual`, `id_hub_atual`, `ultimo_codigo_evento`, `ultimo_evento_desc`, `ts_ultimo_evento` | Último evento | não despachado |
 | Texto | `motivo_ocorrencia` | Despacho + transporte em linguagem de operação | não despachado |
@@ -167,10 +166,9 @@ A empresa cresceu sem enxergar a própria operação:
 
 **Só nas tabelas (fora das views):** `nome_cliente` (PII), `status_entrega_original` e `risco_atraso_flag` (rótulos originais), `data_envio`, `avaliado_prazo`, `pedido_cancelado`, linhagem técnica e as marcas de simulação.
 
-### 5.2 `silver.vw_eventos_logisticos` (linha do tempo) e `silver.vw_rastreio_eventos` (situação atual)
-- **`vw_eventos_logisticos`** (grão: evento): `id_pedido`, `sequencia`, `codigo_evento`, `descricao_evento`, `etapa`, `etapa_desc`, `ts_evento`, `id_hub`, `local_evento`, `ultimo_evento`, `status_pedido`, `tipo_rota`, `modal_transporte`, `modo_envio`, `destino_regiao`.
+### 5.2 `silver.consumo_eventos_logisticos` (linha do tempo)
+- **`consumo_eventos_logisticos`** (grão: evento, `350.421` linhas na `v4`): `id_pedido`, `id_cliente`, `sequencia`, `codigo_evento`, `descricao_evento`, `etapa`, `etapa_desc`, `ts_evento`, `id_hub`, `local_evento`, `ultimo_evento`, `tipo_rota`, `modal_transporte`, `modo_envio`, `destino_regiao`.
   Eventos: `PEDIDO_CRIADO`, `PEDIDO_DESPACHADO`, `COLETA_GATEWAY`, `PARTIDA_VOO`, `CHEGADA_ALFANDEGA`, `LIBERACAO_ALFANDEGA`, `CHEGADA_CD`, `CHEGADA_ARMAZEM`, `SAIU_PARA_ENTREGA`, `ENTREGUE`, `EXTRAVIO_CONFIRMADO`.
-- **`vw_rastreio_eventos`** (grão: pedido): despacho (datas, flag, dias, causa) + entrega (resultado, situação, datas, atraso, causa) + posição atual + `motivo_ocorrencia`.
 
 ### 5.3 Tabelas Silver (governança e Gold)
 | Tabela | Grão | Conteúdo |
@@ -190,13 +188,13 @@ A Gold consumida é só a OBT (`gold.obt_*`) e a view de cenários (`gold.vw_cen
 
 ---
 
-## 6. Como cada consumidor usa os dados
+## 6. Como cada consumidor usa os dados (Portal/IA vs. Dashboard)
 
-| Consumidor | O que lê | Perguntas que responde | O que **não** deve fazer |
-|---|---|---|---|
-| **BI / PMO** | Gold OBT (03c) | Quanto atrasa no despacho (real) e na entrega; onde (modalidade, rota, etapa do extravio); por quê (causa do despacho, recuperação no transporte); quanto custa (receita em risco) | Usar `Delivery Status`/`Late delivery`; somar itens como pedidos; ler a Gold legado (03) |
-| **Agente de IA** | `resumo_rastreio_rag`, `vw_rastreio_eventos`, `vw_eventos_logisticos` | "Onde está meu pedido?", "Quando chega?", "Por que atrasou?", "Foi extraviado?", linha do tempo | Ler as tabelas (têm PII e marcas internas); responder sobre pedido não pago como despachado |
-| **Portal FullStack** | `vw_rastreio_eventos` (situação), `vw_eventos_logisticos` (linha do tempo) | Tela de rastreio | Ler as tabelas direto |
+| Consumidor | O que lê | Escopo | Perguntas que responde | O que **não** deve fazer |
+|---|---|---|---|---|
+| **BI / Dashboard (`dashboard_v2`)** | `gold.obt_pedidos_logistica`, `gold.obt_eventos_etapas` (03c) | **36.671** pedidos finalizados (`fl_com_desfecho = 1`, dentre `36.866` despachados) | Quanto atrasa no despacho (real) e na entrega; onde (modalidade, rota, etapa); por quê (despacho vs. transporte); quanto custa | Usar `Delivery Status`/`Late delivery`; somar itens como pedidos; misturar não pagos no KPI logístico |
+| **Agente de IA / RAG** | `silver.consumo_pedidos` (`resumo_pedido`, `linha_do_tempo`), `silver.consumo_eventos_logisticos` | **65.752** pedidos (inclui `28.886` não pagos/cancelados/aguardando) | "Onde está meu pedido?", "Quando chega?", "Por que atrasou?", "Foi extraviado?" | Ler tabelas internas (têm PII e marcas de simulação); responder pedido não pago como despachado |
+| **Portal FullStack** | `silver.consumo_pedidos`, `silver.consumo_itens_pedido`, `silver.consumo_eventos_logisticos` *(e `gold.*` para KPIs da Torre de Controle)* | **65.752** no rastreio individual; **36.671** nos KPIs gerenciais | Tela de rastreio do cliente + Torre de Controle | Agregar `silver.consumo_pedidos` sem filtro para KPI de transportadora (gera divergência com o Dashboard) |
 
 ### Por que a arquitetura com mais informação torna BI e agentes mais robustos
 - **Do "quanto" para o "onde" e o "porquê":** o atraso na entrega se decompõe em **despacho (real)** + **recuperação no transporte**, com etapa e motivo de extravio. A Gold responde onde nasce o problema e qual alavanca atacar.
@@ -250,7 +248,7 @@ A Gold consumida é só a OBT (`gold.obt_*`) e a view de cenários (`gold.vw_cen
 ---
 
 ## 9. Limitações e evolução
-- Trânsito, recuperação e extravio **não são observados**; seguem o padrão combinado com o instrutor (doc 04).
-- "Toda entrega atrasada vem de despacho atrasado" é **premissa da simulação**, não medição.
+- Trânsito, recuperação, gargalos de trânsito (`v4`: Alfândega e Transferência) e extravio **não são observados**; seguem o padrão calibrado com o instrutor (doc 04).
+- A repartição entre atrasos de despacho (`5.066`) e de transporte (`2.369`) na `v4` é **premissa da simulação**, não medição.
 - Malha de hubs e modal são premissas.
-- **Evolução:** com feed real de transportadora, o 02g grava eventos `origem_evento = 'transportadora'` no mesmo formato; o desfecho passa a ser medido. Views, testes e consumidores continuam iguais.
+- **Evolução:** com feed real de transportadora, o 02g grava eventos `origem_evento = 'transportadora'` no mesmo formato; o desfecho passa a ser medido. Tabelas de consumo, testes e consumidores continuam iguais.

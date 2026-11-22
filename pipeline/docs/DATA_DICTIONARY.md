@@ -13,9 +13,9 @@ Documentação técnica de todas as tabelas e views do pipeline Medallion no Dat
   - **Derivado do real:** métricas de atraso no despacho (`flag_atraso_despacho`, `dias_atraso_despacho`, `causa_atraso_despacho`), `tipo_rota`, `situacao_rastreio`.
   - **Simulado (pós-despacho):** malha de hubs (`silver.dim_hubs`), `modal_transporte`, eventos logísticos pós-despacho, datas e atraso de entrega, recuperação de atraso no transporte e extravios (padrão calibrado de ~60% entregue no prazo / ~20% com atraso / ~20% extraviado nos pedidos concluídos, determinístico via `xxhash64(id_pedido, ...)`).
 - **LGPD:** colunas pessoais (`Customer Email`, `Customer Password`, `Customer Street`, `Customer Zipcode`, `Order Zipcode`) são descartadas antes da Silver. `nome_cliente` existe apenas na tabela interna `silver.pedidos_rastreio` e **nunca** é exposta nas tabelas `silver.consumo_*`, textos RAG ou camada `gold.*`.
-- **Separação de consumidores:**
-  - **IA / RAG e Portal FullStack:** leem **exclusivamente** as tabelas `silver.consumo_*` (não expõem marcas de simulação nem lucro/margem interna).
-  - **BI / Gestão (PMO):** lê **exclusivamente** a camada `gold.*` (escopo restrito aos **36.866 pedidos despachados**, com rótulo explícito `origem_dado_despacho` / `origem_dado_entrega` / `rotulo_fonte`).
+- **Separação de consumidores (Portal/IA vs. Dashboard/BI):**
+  - **IA / RAG e Portal FullStack:** leem **exclusivamente** as tabelas `silver.consumo_*` (`65.752` pedidos em `consumo_pedidos`, `180.519` itens em `consumo_itens_pedido`, `350.421` eventos em `consumo_eventos_logisticos`). Mantêm os `28.886` pedidos não pagos/cancelados/aguardando para atendimento ao cliente e não expõem marcas de simulação nem lucro/margem interna.
+  - **BI / Dashboard (`dashboard_v2`):** lê **exclusivamente** a camada `gold.*` (escopo restrito aos **36.866 pedidos despachados**, com rótulo explícito `origem_dado_despacho` / `origem_dado_entrega` / `rotulo_fonte`). Todas as consultas do `dashboard_v2` aplicam `WHERE fl_com_desfecho = 1` (**36.671 pedidos finalizados**, excluindo os `195` em trânsito em `06/02/2018`).
 
 ---
 
@@ -98,7 +98,7 @@ As três tabelas abaixo são tabelas Delta materializadas (recriadas com `CREATE
 | `data_entrega_realizada` | `DATE` | Simulado | `data_despacho_real + transito_real_dias` (`NULL` se não entregue, extraviado ou em trânsito). |
 | `flag_atraso_entrega` | `INT` | Simulado | `1` se entrega atrasada (ou em trânsito além da previsão em `D`), `0` caso contrário, `NULL` se não aplicável. |
 | `dias_atraso_entrega` | `INT` | Simulado | Diferença em dias entre realizada e prevista (ou atraso acumulado até `D` se em trânsito). |
-| `causa_atraso_entrega` | `STRING` | Simulado | `Sem atraso`, `Volume sem atualização de rastreio`, `Atraso no despacho não recuperado no transporte`, ou `NULL`. |
+| `causa_atraso_entrega` | `STRING` | Simulado | `Sem atraso`, `Atraso no despacho não recuperado no transporte`, `Atraso no transporte (desembaraço aduaneiro)`, `Atraso no transporte (transferência entre hubs)`, `Em trânsito com atraso acumulado desde o despacho`, `Em trânsito além do prazo previsto`, ou `NULL`. |
 | `etapa_extravio` | `STRING` | Simulado | Descrição da etapa onde ocorreu o extravio (ex.: `3 - Alfândega`), `NULL` se não extraviado. |
 | `etapa_atual_desc` | `STRING` | Simulado | Última etapa registrada (`1 - Coleta` a `5 - Última milha`), `NULL` se não despachado. |
 | `local_atual` | `STRING` | Simulado | Localização textual do último evento logístico, `NULL` se não despachado. |
@@ -141,7 +141,7 @@ As três tabelas abaixo são tabelas Delta materializadas (recriadas com `CREATE
 - **Gerada por:** [`pipeline/notebooks/02i_silver_consolidacao_rastreio.sql`](pipeline/notebooks/02i_silver_consolidacao_rastreio.sql)
 - **Fontes diretas:** `silver.eventos_logisticos`, `silver.simulacao_publicada`, `silver.pedidos_rastreio`, `silver.dim_traducao`
 - **Propósito:** Linha do tempo detalhada de eventos de rastreamento para a tela de histórico do **Portal FullStack** (e detalhamento opcional na IA). Filtra apenas a fatia publicada em `silver.simulacao_publicada` e omite metadados de simulação (`dado_simulado`, `versao`, `escopo`).
-- **Grão:** 1 linha por evento do pedido (`id_pedido` + `sequencia`, ~350.416 linhas na execução completa).
+- **Grão:** 1 linha por evento do pedido (`id_pedido` + `sequencia`, `350.421` linhas na versão `v4` completa).
 
 | Coluna | Tipo | Origem | Descrição |
 |---|---|---|---|
@@ -245,8 +245,8 @@ Todos os objetos analíticos da Gold são criados em [`pipeline/notebooks/03c_go
 ### 4.3 `gold.obt_eventos_etapas`
 - **Gerada por:** [`pipeline/notebooks/03c_gold_obt.sql`](pipeline/notebooks/03c_gold_obt.sql)
 - **Fontes diretas:** `silver.consumo_eventos_logisticos` + `gold.obt_pedidos_logistica`
-- **Propósito:** Análise de gargalos, tempo de permanência e concentração de extravios por etapa logística (`0` a `5`). Alimenta os gráficos de extravio por etapa no dashboard AI/BI (`ds_etapas`).
-- **Grão:** 1 linha por pedido despachado × etapa percorrida (`id_pedido` + `etapa_num`, 201.635 linhas).
+- **Propósito:** Análise de gargalos, tempo de permanência e concentração de atrasos e extravios por etapa logística (`0` a `5`). Alimenta os gráficos por etapa no dashboard AI/BI (`dashboard_v2`).
+- **Grão:** 1 linha por pedido despachado × etapa percorrida (`id_pedido` + `etapa_num`, `201.643` linhas na `v4`).
 
 | Coluna | Tipo | Origem | Descrição |
 |---|---|---|---|

@@ -88,11 +88,16 @@ WHERE i.id_pedido = 76543 AND i.id_cliente = :id_cliente;
 - **Perguntas de gestão** ("quantos pedidos atrasaram?"): não são do agente de atendimento; use as tabelas `gold.*`.
 - Não pergunte nem exponha nome, e-mail ou endereço: eles não estão nessas tabelas.
 
-## 5. Volumes
-| Tabela | Linhas |
-|---|---|
-| `consumo_pedidos` | 65.752 |
-| `consumo_itens_pedido` | 180.519 |
-| `consumo_eventos_logisticos` | ~350 mil |
+## 5. Volumes e Diferença para o Dashboard (BI)
+| Tabela | Linhas | Escopo |
+|---|---:|---|
+| `silver.consumo_pedidos` | **65.752** | Todos os pedidos (inclui `28.886` não pagos/cancelados/aguardando para atendimento no chat) |
+| `silver.consumo_itens_pedido` | **180.519** | Todos os itens dos `65.752` pedidos |
+| `silver.consumo_eventos_logisticos` | **350.421** | Todos os eventos da fatia publicada (`v4`) |
 
-Dúvidas sobre os dados: Engenharia de Dados (Mateus). Detalhes técnicos: `05_arquitetura_dados_silver.md`.
+> **Atenção ao comparar Portal (`silver.consumo_*`) vs. Dashboard (`gold.obt_*`):**
+> - O **Portal e o Agente de IA** leem `silver.consumo_pedidos` (**65.752** pedidos) para responder ao cliente inclusive sobre pedidos `Cancelado` (`2.855`), `Não pago (expirado)` (`26.008`) ou `Aguardando pagamento` (`23`).
+> - O **Dashboard executivo (`dashboard_v2`)** lê `gold.obt_pedidos_logistica` com `WHERE fl_com_desfecho = 1` (**36.671** pedidos finalizados dentre os `36.866` despachados, excluindo os `195` ainda `Em trânsito` em `06/02/2018`).
+> - **Para painéis gerenciais no Portal (Torre de Controle):** nunca agregue `silver.consumo_pedidos` sem `WHERE`. Para bater exatamente com o Dashboard, consulte `gold.obt_pedidos_logistica WHERE fl_com_desfecho = 1` (ou filtre `situacao_pedido IN ('Entregue no prazo', 'Entregue com atraso', 'Extraviado')`).
+
+Dúvidas sobre os dados: Engenharia de Dados (Mateus). Detalhes técnicos: `05_arquitetura_dados_silver.md` e `07_guia_gold_obt_analista.md`.

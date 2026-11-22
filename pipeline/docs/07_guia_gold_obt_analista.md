@@ -16,19 +16,19 @@ Pedidos não pagos, cancelados e aguardando pagamento ficam fora porque nunca ch
 | Quanto atrasa o despacho e a entrega? Onde? Quanto custa? | `gold.obt_pedidos_logistica` | pedido despachado | 36.866 |
 | E se o prazo prometido fosse outro? (atual × ajustado) | `gold.vw_cenarios_prazo` | pedido × cenário | 73.732 |
 | Qual departamento ou categoria tem mais valor em risco? | `gold.obt_itens_risco` | item do pedido | 101.009 |
-| Em que etapa da jornada o volume se perde ou demora? | `gold.obt_eventos_etapas` | pedido × etapa percorrida | 201.635 |
+| Em que etapa da jornada o volume se perde ou demora? | `gold.obt_eventos_etapas` | pedido × etapa percorrida | 201.643 |
 | Quais prazos cada cenário usa? | `gold.param_cenario_prazo` | cenário × classe de serviço | 4 |
 
-O dashboard atual lê só `vw_cenarios_prazo` (cards, classe, linha do tempo, país) e `obt_eventos_etapas` (extravio por etapa).
+O dashboard atual (`dashboard_v2`) lê `gold.obt_pedidos_logistica` (com `WHERE fl_com_desfecho = 1` → **36.671 pedidos finalizados**) e `gold.obt_eventos_etapas` (gargalos de atraso e extravio por etapa). Ver todas as queries em [`dashboard/queries_data_model_gold.md`](../../dashboard/queries_data_model_gold.md).
 
 ---
 
 ## 2. Regras de ouro (leia antes de montar qualquer gráfico)
 
-1. **Dado real × cenário simulado.** O despacho (datas, atraso, causa, prazo) é **dado real** do DataCo. Transporte, entrega, atraso na entrega, extravio e as etapas 1 a 5 são **cenário simulado** (meta 60% no prazo / 20% atrasado / 20% extraviado aplicada sobre o despacho real). Todo visual com entrega ou extravio precisa do aviso. Use a coluna `rotulo_fonte` ("Despacho: dado real · Entrega/extravio: cenário simulado") ou o comentário da coluna.
+1. **Dado real × cenário simulado.** O despacho (datas, atraso, causa, prazo) é **dado real** do DataCo. Transporte, entrega, atraso na entrega, extravio e as etapas 1 a 5 são **cenário simulado** (meta ~60% no prazo / ~20% atrasado / ~20% extraviado aplicada sobre o despacho real; na `v4`, os atrasos finais incluem atrasos de transporte em Alfândega e Transferência entre hubs). Todo visual com entrega ou extravio precisa do aviso. Use a coluna `rotulo_fonte` ("Despacho: dado real · Entrega/extravio: cenário simulado") ou o comentário da coluna.
 2. **Percentual = SUM / SUM.** As medidas `fl_*` valem 0 ou 1. Não use média de percentuais.
-   - % de **despacho**: denominador = todas as linhas (`COUNT(*)`).
-   - % de **entrega e extravio**: denominador = `SUM(fl_com_desfecho)`. Os 197 pedidos em trânsito em D ficam fora.
+   - % de **despacho** (base completa Gold): denominador = `36.866`; no **`dashboard_v2`** (padronizado em `fl_com_desfecho = 1`), denominador = **`36.671` finalizados**.
+   - % de **entrega e extravio**: denominador = `SUM(fl_com_desfecho)` (`36.671`). Os **`195`** pedidos em trânsito em D ficam fora.
    - % **recuperado no transporte**: `SUM(fl_recuperou_atraso) / SUM(fl_despacho_atrasado_entregue)`.
 3. **Atraso médio = `AVG` direto.** `dias_atraso_despacho` e `dias_atraso_entrega` só são preenchidos quando há atraso (NULL nos demais), então `AVG(coluna)` já é o atraso médio dos atrasados.
 4. **Não some o que está repetido.**
@@ -261,20 +261,17 @@ ORDER BY etapa_num;
 
 ---
 
-## 8. Números de referência
+## 8. Números de referência (`v4` — `dashboard_v2` padronizado em `fl_com_desfecho = 1`)
 
-Se o seu visual não bater com estes números, revise o denominador (regra 2) ou o filtro de cenário (regra 5).
+Se o seu visual não bater com estes números, revise o denominador (regra 2) ou o filtro `WHERE fl_com_desfecho = 1`.
 
-| Indicador | Valor | Origem |
+| Indicador | Valor (`v4`) | Origem |
 |---|---|---|
-| Pedidos despachados | 36.866 (36.669 com desfecho, 197 em trânsito) | real |
-| Despacho atrasado | 57,3% · atraso médio 1,61 dia | real |
-| Causa do atraso no despacho | 6.655 promessa irreal · 14.472 atraso operacional | real |
-| Entrega no prazo / atrasada / extraviada | 59,9% / 20,4% (7.471) / 19,7% (7.222) | simulado |
-| Atraso médio na entrega | 1,63 dia | simulado |
-| Despachos atrasados recuperados no transporte | 55,8% | simulado |
-| Receita bruta / em risco | 20,62 mi / 8,28 mi | real / simulado |
-| Receita líquida / em risco | 18,53 mi / 7,44 mi | real / simulado |
-| Lucro / em risco / extraviado | 2,27 mi / 0,89 mi / 0,44 mi | real / simulado |
-| Promessa ajustada: despacho atrasado / entregas atrasadas / receita em risco | 31,4% / 3.952 (10,8%) / 6,29 mi | real + regra / simulado |
-| Extravios na alfândega | 40,3% dos extravios | simulado |
+| Pedidos despachados (total Gold) | 36.866 (**36.671** finalizados, **195** em trânsito) | real / simulado |
+| Despacho atrasado (nos 36.671 finalizados) | 57,3% (21.010 pedidos) | real |
+| Entrega no prazo / atrasada / extraviada (`36.671`) | **60,0%** (22.014) / **20,3%** (7.435) / **19,7%** (7.222) | simulado |
+| Origem das entregas atrasadas (`7.435`) | 5.066 por despacho não recuperado + 2.369 por atraso no transporte | real + simulado |
+| Receita bruta dos finalizados (`36.671`) | \$ 20,59 mi (`20.585.439,88`) | real |
+| Valor em entregas atrasadas / extraviadas (`36.671`) | \$ 4,19 mi (`4.194.860,24`) / \$ 4,06 mi (`4.061.704,71`) | real s/ desfecho simulado |
+| Nova premissa (`dashboard_v2` — Same +1, First +1, Second +3, Standard +1) | Despacho atrasado: **57,3% → 15,7%** · Entrega atrasada: **20,3% → 6,2%** | real + regra / simulado |
+| Extravios na alfândega | 2.907 de 7.222 (**40,3%** dos extravios) | simulado |

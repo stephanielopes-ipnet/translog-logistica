@@ -43,12 +43,12 @@ Seguindo a orientação do instrutor, procuramos primeiro uma fonte que definiss
 | Desfecho da entrega (no prazo / com atraso / extraviado) | Padrão 60/20/20 nos pedidos concluídos, sorteado de forma determinística | **Simulado** |
 | Data de entrega (`data_entrega_realizada`) | Despacho real + trânsito real | Real + simulado |
 
-### Regra da entrega (como o 60/20/20 convive com 57% de despacho atrasado)
-- **Extraviado (20%)**: sorteio independente do despacho.
-- **Despacho no prazo** → trânsito padrão → **entregue no prazo**.
-- **Despacho atrasado** → o transporte pode **recuperar** o atraso (trânsito mais curto, mínimo de 1 dia) e entregar na data prometida, ou **não recuperar** (trânsito padrão) e a entrega atrasa os mesmos dias do despacho. O transporte nunca piora o prazo.
-- A fração recuperada é calibrada na base inteira para que o atraso na entrega feche em **20%**. Despachos com atraso maior ou igual ao trânsito não têm como ser recuperados e entram sempre no atraso.
-- Consequência para o negócio: **toda entrega atrasada nasce de um despacho atrasado**. O despacho é a etapa crítica, e o transporte é a alavanca de recuperação.
+### Regra da entrega (como o 60/20/20 convive com 57% de despacho atrasado — atualizado na simulação `v4`)
+- **Extraviado (~20% / 7.222 pedidos):** sorteio independente do despacho, concentrado na Alfândega em rotas internacionais.
+- **Despacho no prazo ou adiantado:** maioria segue com trânsito padrão e é **entregue no prazo** (`22.014` no total); na versão `v4`, ~`6,5%` dos concluídos (`2.369` pedidos) sofrem **atraso no transporte** (+1 a +3 dias além do padrão, concentrados em **Alfândega** nas rotas internacionais e **Transferência entre hubs** nas domésticas).
+- **Despacho atrasado:** o transporte pode **recuperar** o atraso (trânsito mais curto, mínimo de 1 dia) e entregar na data prometida, ou **não recuperar** (trânsito padrão) e a entrega atrasa os mesmos dias do despacho (`5.066` pedidos).
+- A fração é calibrada na base inteira para que os pedidos concluídos fechem próximos de **60% no prazo (`60,0%` / `22.014`), 20% com atraso (`20,3%` / `7.435` = `5.066` despacho + `2.369` transporte) e 20% extraviados (`19,7%` / `7.222`)**.
+- **Blindagem de `Em trânsito`:** pedidos cujo desfecho ocorre após a data de corte `D = 06/02/2018` (`195` pedidos) permanecem como `Em trânsito` com `transito_real_dias = NULL` e sem vazar motivo futuro.
 
 ## 6. Regras de geração (o que vale para os dados simulados)
 1. **Nada sobrescreve o DataCo.** Os eventos reais (pedido criado e despacho) mantêm a data original.
@@ -60,6 +60,6 @@ Seguindo a orientação do instrutor, procuramos primeiro uma fonte que definiss
 7. **Durações simuladas não provam gargalo.** O tempo de cada trecho é um parâmetro, não uma medição.
 
 ## 7. Limitações declaradas
-- O tempo de transporte, a recuperação de atraso no transporte e os extravios **não são observados**. Eles seguem o padrão combinado com o instrutor.
-- A relação "toda entrega atrasada vem de despacho atrasado" é uma **premissa da simulação** (o transporte nunca piora o prazo), não uma medição.
+- O tempo de transporte, a recuperação de atraso no transporte, os gargalos de trânsito (`v4`: Alfândega e Transferência entre hubs) e os extravios **não são observados**. Eles seguem o padrão calibrado com o instrutor.
+- Na simulação `v3`, a premissa era 100% despacho; na `v4`, os atrasos finais foram repartidos entre despacho não recuperado (`5.066`) e atraso de transporte (`2.369`), mantendo o total de ~20% (`20,3%`).
 - O `Delivery Status` original continua na base para rastreabilidade, mas não é usado como status de entrega.

@@ -81,17 +81,19 @@ Landing Volume (/Volumes/workspace/default/landing_translog/)
 
 ---
 
-## 3. Propósito das Tabelas de Consumo
+## 3. Propósito das Tabelas de Consumo (Portal/IA vs. Dashboard)
 
-| Objeto | Grão | Consumidor | Propósito |
-|---|---|---|---|
-| `silver.consumo_pedidos` | Pedido | IA (RAG / Vector Search) + Portal | Visão completa do pedido em pt-BR (sem PII nem marca de simulação), com `resumo_pedido` e `linha_do_tempo`. |
-| `silver.consumo_itens_pedido` | Item | Portal FullStack / IA | Produtos, quantidades e valores por item de cada pedido. |
-| `silver.consumo_eventos_logisticos` | Evento | Portal FullStack / IA | Linha do tempo granular (data, etapa, hub e local) da fatia publicada. |
-| `gold.obt_pedidos_logistica` | Pedido despachado | BI / PMO | OBT executiva de despacho (real), entrega/extravio (simulado) e receita/lucro em risco. |
-| `gold.obt_itens_risco` | Item despachado | BI (ad-hoc) | Receita e lucro em risco desdobrados por departamento, categoria e produto. |
-| `gold.obt_eventos_etapas` | Pedido × etapa | BI (Dashboard) | Tempo médio de permanência e concentração de extravios por etapa (`0` a `5`). |
-| `gold.vw_cenarios_prazo` | Pedido × cenário | BI (Dashboard) | Compara cenários de promessa (`Promessa atual` vs. `Promessa ajustada` parametrizada em `gold.param_cenario_prazo`). |
+| Objeto | Grão / Escopo | Linhas | Consumidor | Propósito |
+|---|---|---|---|---|
+| `silver.consumo_pedidos` | Pedido (universo completo) | **65.752** | **IA (RAG / Vector Search) + Portal** | Visão completa do pedido em pt-BR (sem PII nem marca de simulação), com `resumo_pedido` e `linha_do_tempo`. Inclui `28.886` pedidos não pagos/cancelados para atendimento ao cliente. |
+| `silver.consumo_itens_pedido` | Item (universo completo) | **180.519** | **Portal FullStack / IA** | Produtos, quantidades e valores por item de cada pedido. |
+| `silver.consumo_eventos_logisticos` | Evento (universo completo) | **350.421** | **Portal FullStack / IA** | Linha do tempo granular (data, etapa, hub e local) da fatia publicada (`v4`). |
+| `gold.obt_pedidos_logistica` | Pedido despachado (`36.866` total · **`36.671` finalizados**) | **36.866** | **Dashboard (`dashboard_v2`) / PMO** | OBT executiva de despacho (real), entrega/extravio (simulado) e receita/lucro em risco. Exclui pedidos nunca pagos/cancelados (`28.886`). No `dashboard_v2`, todas as consultas padronizam `WHERE fl_com_desfecho = 1` (`36.671` finalizados, excluindo `195` em trânsito). |
+| `gold.obt_itens_risco` | Item despachado | **101.009** | BI (ad-hoc) | Receita e lucro em risco desdobrados por departamento, categoria e produto. |
+| `gold.obt_eventos_etapas` | Pedido × etapa | **201.643** | **Dashboard (`dashboard_v2`)** | Concentração de atrasos não recuperados e extravios por etapa (`1` a `5`). |
+| `gold.vw_cenarios_prazo` | Pedido × cenário | **73.732** | BI (cenários) | Compara cenários de promessa (`Promessa atual` vs. `Promessa ajustada` parametrizada em `gold.param_cenario_prazo`). |
+
+> **Regra de reconciliação Portal × Dashboard:** O **Portal/IA** exibe **`65.752` pedidos** porque responde também sobre pedidos não pagos ou cancelados no e-commerce; já o **Dashboard executivo** analisa apenas os **`36.671` pedidos finalizados** que de fato passaram pela transportadora e já possuem desfecho concluído. Caso o Portal exiba métricas operacionais da transportadora lendo `silver.consumo_pedidos`, deve filtrar apenas pedidos despachados/concluídos (ou ler da `gold.*`).
 
 ---
 

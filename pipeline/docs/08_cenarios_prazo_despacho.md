@@ -67,4 +67,20 @@ Os prazos estão em dias. Trânsito internacional por mercado, em dias:
 | O teto da entrega no prazo é ~80% | Extravio (19,7%) não depende do prazo |
 | O custo é promessa mais longa ao cliente | Cada dia de despacho = +1 dia na entrega prometida |
 
-Fonte: `gold.obt_pedidos_logistica` e `gold.vw_cenarios_prazo` (notebook `03c_gold_obt.sql`).
+Fonte: `gold.obt_pedidos_logistica` e `gold.vw_cenarios_prazo` (notebook `03c_gold_obt.sql`). *(Nota: as tabelas acima documentam os testes iniciais +1/+2 dias na versão `v3`.)*
+
+---
+
+## 6. Nova Premissa Aplicada no `dashboard_v2` (Simulação `v4` · 36.671 Finalizados)
+
+No `dashboard_v2` (Abas 4 e 5), foi adotada a premissa recomendada específica por classe de serviço sobre os **36.671 pedidos finalizados (`fl_com_desfecho = 1`)**, mantendo fixos os tempos reais de despacho e trânsito:
+
+| Classe | Ajuste no SLA de Despacho | Despacho Prometido → Realista | Despacho Atrasado (Atual → Novo) | Entrega Final Atrasada (Atual → Nova) |
+|---|---|---:|---:|---:|
+| `Same Day` | **+1 dia** | 0d → 1d | 48,4% → **0,0%** | 22,2% → **5,6%** |
+| `First Class` | **+1 dia** | 1d → 2d | 100,0% → **0,0%** | 27,4% → **0,0%** |
+| `Second Class` | **+3 dias** | 2d → 5d | 79,8% → **19,9%** | 22,5% → **5,8%** |
+| `Standard Class` | **+1 dia** | 4d → 5d | 39,7% → **19,9%** | 17,5% → **7,9%** |
+| **Total (`36.671`)** | — | — | **57,3% → 15,7%** | **20,3% → 6,2%** |
+
+> O resíduo de `6,2%` na entrega final após o ajuste de SLA corresponde principalmente aos gargalos de trânsito (`v4`: Alfândega e Transferência entre hubs), que não se resolvem apenas aumentando o prazo do armazém.
