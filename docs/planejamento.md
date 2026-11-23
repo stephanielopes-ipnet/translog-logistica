@@ -16,6 +16,8 @@ Premissas:
 
 Hipótese a validar: o atraso depende mais do prazo prometido em cada modal de envio do que da região.
 
+**Resultado (Gold, 22/11): confirmada.** O atraso no despacho varia 60,3 pontos entre modalidades (39,7% a 100%) e menos de 9 pontos entre regiões. Ver [dados-e-indicadores.md](dados-e-indicadores.md).
+
 ## Responsabilidades
 
 **Mateus (Dados)**
@@ -79,19 +81,21 @@ Duplas:
 
 ## Cronograma
 
-| Dia | Data | Foco |
-|---|---|---|
-| D1 | sex 13/11 | Planejamento, contratos, acessos e amostra |
-| D2 | sáb 14/11 | Bronze |
-| D3 | dom 15/11 | Validação da hipótese |
-| D4 | seg 16/11 | Silver e Gold exportada |
-| D5 | ter 17/11 | Assistente com endpoint e dashboard v1 (checkpoint) |
-| D6 | qua 18/11 | Portal com chat, SLA e custos |
-| D7 | qui 19/11 | Code freeze, demo completa e vídeos de backup |
-| — | sex 20/11 | Feriado |
-| D8 | sáb 21/11 | Ensaio 1 |
-| D9 | dom 22/11 | Ensaio 2 |
-| D10 | seg 23/11 | Banca e entrega do Relatório Ágil |
+| Dia | Data | Foco planejado | Realizado |
+|---|---|---|---|
+| D1 | sex 13/11 | Planejamento, contratos, acessos e amostra | No prazo |
+| D2 | sáb 14/11 | Bronze | No prazo; cenário internacional aprovado pelo mentor |
+| D3 | dom 15/11 | Validação da hipótese | No prazo |
+| D4 | seg 16/11 | Silver e Gold exportada | Silver no prazo; Gold atrasou 1 dia |
+| D5 | ter 17/11 | Assistente com endpoint e dashboard v1 (checkpoint) | Gold concluída; agente e portal integrados; dashboard v1 atrasou 1 dia |
+| D6 | qua 18/11 | Portal com chat, SLA e custos | Portal com chat e Área do colaborador; dashboard v1; custo GCP fora do escopo |
+| D7 | qui 19/11 | Code freeze, demo completa e vídeos de backup | Code freeze cumprido; portal publicado como plano B |
+| — | sex 20/11 | Feriado | — |
+| D8 | sáb 21/11 | Ensaio 1 | Apresentação com o texto de cada integrante |
+| D9 | dom 22/11 | Ensaio 2 | Painel com dados da Gold e documentação final |
+| D10 | seg 23/11 | Banca e entrega do Relatório Ágil | — |
+
+Detalhe diário em [relatorio-agil.md](relatorio-agil.md).
 
 ## Acordos
 
@@ -104,8 +108,4 @@ Duplas:
 
 ## Decisões
 
-| Data | Decisão | Motivo |
-|---|---|---|
-| 13/11 | DataCo como base da operação | Definido no briefing |
-| 13/11 | Indicadores de frota fora do MVP | O dataset não tem km nem combustível |
-| | Assistente com SQL para status e Chroma para FAQ | Consulta por código precisa ser exata |
+Registro completo, com data e motivo, em [relatorio-agil.md](relatorio-agil.md#4-decisões-do-projeto).

@@ -36,5 +36,16 @@ dist/
 # SO
 .DS_Store
 
+<<<<<<< HEAD
 # Documentacao privada local (nao versionar)
 docs_internos/
+=======
+# Contexto local de desenvolvimento do portal (não versionar)
+portal/_contexto/
+
+# Cópia local da Silver para desenvolvimento do portal (grande e com dados de cliente)
+portal/dados/
+
+# Mockup antigo do portal: só referência local, tem repositório Git próprio (não versionar)
+portal/prototipos/TransLog_old/
+>>>>>>> origin/main

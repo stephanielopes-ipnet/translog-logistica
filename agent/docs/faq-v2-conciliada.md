@@ -1,0 +1,77 @@
+# FAQ e políticas TransLog — versão 2 conciliada
+
+Fechamento do grupo confirmado por Marco em 17/11/2026. Conciliação técnica com os três CSVs v2 e as ferramentas disponíveis. Material do projeto acadêmico; o histórico e os eventos simulados continuam identificados. O documento original de Stephanie foi preservado e não foi editado no Google Docs.
+
+## 1. Como acompanhar meu pedido
+
+Informe o código do pedido no portal ou no chat. A consulta mostra a situação registrada, os itens e a sequência de eventos, além das datas e locais disponíveis. A Silver v2 combina histórico com eventos simulados e tem referência em 06/02/2018. Identifique esse cenário; cidade, hub e centro de distribuição não são GPS em tempo real. Não invente previsão quando o campo estiver ausente.
+
+## 2. O que significa Entregue
+
+Na Silver v2, Entregue no prazo e Entregue com atraso indicam conclusão da entrega no cenário, conforme o evento ENTREGUE e a data_entrega_realizada. Informe a data registrada e identifique histórico/simulação. Não confunda despacho concluído com entrega concluída; não trate somente a chegada a uma cidade ou a um hub intermediário como entrega.
+
+## 3. O que significa Em trânsito
+
+Em trânsito significa que o pedido foi despachado e ainda percorre o trajeto no cenário consultado. Informe a etapa, local e último evento registrados em relação à data de referência da base. A data_entrega_prevista, quando presente, é a previsão histórica/simulada, não uma promessa a partir de hoje.
+
+## 4. Aguardando liberação, pagamento e pedido expirado
+
+Aguardando liberação é uma descrição de atendimento, não um status adicional a inventar na Silver v2. Se a situação registrada for Aguardando pagamento, explique que falta confirmação para liberar o envio. Não pago (expirado) significa que o pagamento não foi confirmado e o pedido expirou; não descreva esse status como pagamento ainda em andamento. Preserve diferenças e nulos da fonte. Não mapeie um pedido para análise ou verificação sem informação explícita.
+
+## 5. O que significa Cancelado
+
+Cancelado indica que o pedido não seguirá para entrega no cenário. Não informe atraso nem invente o motivo individual do cancelamento. O cliente pode procurar a central de atendimento para esclarecer o motivo ou solicitar avaliação de reembolso; essa orientação não confirma direito, valor ou prazo de reembolso. Se houver motivo de segurança explícito, use verificação de segurança, sem acusar o cliente.
+
+## 6. Prazos de despacho e diferença para entrega
+
+Os prazos das classes são de DESPACHO: Standard Class 4 dias, Second Class 2 dias, First Class 1 dia e Same Day 0 dias (despacho no mesmo dia). Valores conferidos na Silver v2 e correção confirmada por Marco. Não são prazos de chegada ao cliente. Para o pedido, use prazo_despacho_dias, data_despacho_prevista e data_despacho_real; entrega tem data_entrega_prevista e data_entrega_realizada separadas. Não invente dias úteis/corridos ou um início de contagem na liberação: use as datas efetivamente registradas.
+
+## 7. Como o pedido chega ao destino e modalidade de transporte
+
+Descreva a rota pelos eventos estruturados de cada pedido: origem operacional quando comprovada, gateway, transporte, alfândega, centros intermediários e última milha, se presentes. A v2 pode ter vários eventos e etapas; não imponha limite de quatro eventos ou trechos. Informe modal_transporte somente se preenchido, como componente do cenário simulado. Classe de serviço não permite deduzir modal. Campos de origem do cliente não comprovam local de expedição.
+
+## 8. Horário da central e atendimento humano
+
+A política acordada do projeto prevê atendimento automatizado 24 horas por dia e central humana de segunda a sexta, das 9h às 18h. Isso é o horário de atendimento previsto, não garantia de disponibilidade técnica do serviço. Oriente procurar a central nos casos indicados. O agente atual não transfere conversa, abre chamado, agenda retorno ou notifica a equipe. Fora do horário, oriente buscar a central no próximo dia útil, sem afirmar que alguém fará contato. Não invente telefone, e-mail, link, fuso horário ou calendário de feriados.
+
+## 9. Quando um pedido é considerado atrasado
+
+Despacho e entrega têm avaliações distintas: use os indicadores e valores registrados, sem recalcular nem misturar etapas. Diferenças negativas representam adiantamento na respectiva etapa; zero é ausência de atraso avaliado; nulo é não avaliado ou ausente. Para aguardando pagamento, não pago expirado e cancelado, não invente atraso. Informação sobre verificação não pode ser deduzida só do nulo. Relate causas somente se constarem na fonte, com identificação de simulação.
+
+## 10. Atraso de entrega de três dias e volume extraviado
+
+A orientação de atendimento para atraso crítico usa ATRASO DE ENTREGA de 3 dias ou mais (>=3), não atraso de despacho. Volume Extraviado também requer orientação para procurar a central. Essa regra corresponde à implementação do portal. Informe o atraso e a data prevista original quando disponíveis; não invente novo prazo. Oriente atendimento humano, mas não afirme que encaminhou, transferiu ou registrou uma solicitação. Pedidos cancelados, em verificação e solicitações de cancelamento, endereço ou reembolso também podem exigir orientação à central conforme a FAQ.
+
+## 11. Como explicar a causa ou motivo do atraso
+
+Se houver causa registrada, apresente-a como motivo indicado no cenário/simulação, sem certeza causal no mundo real. Não afirmar que foi comprovada por análise de rotas ou por ocorrência operacional individual se não houver evidência desse método. Se faltar causa, diga que a base não a informa. Não invente clima, greve, alfândega, promessa irreal ou outra justificativa a partir do prazo ou da rota.
+
+## 12. Pedido com pagamento não confirmado
+
+Para Aguardando pagamento, explique que a confirmação é necessária para a liberação. Oriente conferir o pagamento ou procurar a central. Não efetue cobrança nem peça cartão, senha ou documento. Para Não pago (expirado), preserve a informação de expiração. Não informe atraso ou data de entrega onde a fonte não os avalia e não invente uma regra de início do prazo após a liberação.
+
+## 13. Pedido retido ou cancelado por verificação de segurança
+
+Quando a fonte declarar retenção ou cancelamento por verificação de segurança, use apenas essa expressão e oriente procurar a central. Nunca use o termo fraude ao cliente nem sugira má-fé. O status genérico Cancelado ou atraso nulo não comprova verificação de segurança; se o motivo não estiver disponível, reconheça isso. Não afirmar encaminhamento realizado.
+
+## 14. Cancelamento, reembolso e indenização
+
+O agente não cancela pedidos nem executa reembolso ou indenização. Consulte a situação e oriente solicitar avaliação pela central de atendimento, segunda a sexta, das 9h às 18h. Não confirme que abriu chamado ou cancelou. A FAQ não define indenização automática, aprovação de reembolso, valor ou prazo de pagamento; não prometa essas condições.
+
+## 15. Como solicitar alteração de endereço de entrega
+
+O agente não altera endereço. Oriente solicitar a alteração pela central de atendimento, segunda a sexta, das 9h às 18h. A possibilidade depende da situação/etapa do pedido e de avaliação humana, portanto não garanta que a alteração será possível. Não afirme que transferiu a conversa ou registrou solicitação; nenhuma ferramenta atual faz isso. Não peça endereço completo no chat para realizar uma mudança que o agente não executa.
+
+## 16. Número de pedido não encontrado
+
+Após retorno not_found da consulta, peça que o cliente confira o código e tente novamente. Não invente informações. Falha da fonte ou do provedor é indisponibilidade, não pedido inexistente. Não misture pedidos de mesmo código entre amostra e Silver v2.
+
+## 17. Pedido com vários itens
+
+Preserve todos os itens e quantidades. Na v2 a situação logística está no pedido; não existem status individuais de entrega na tabela de itens. Não invente diferenças por item. Só explique situações distintas por item quando uma fonte futura efetivamente as fornecer.
+
+## 18. Dados necessários para consultar um pedido
+
+Para consulta, peça somente o código do pedido. Nunca solicite senha, cartão ou documentos. Não exponha nome, endereço completo, contato ou identificador de cliente. Informe apenas os campos necessários ao rastreio. Trate a pessoa com respeito, empatia e linguagem simples.
+
+Fonte: FAQ de Stephanie fornecida por Marco, confirmação de fechamento em 17/11, CSVs Silver v2 e regra `portal/api/src/orders/escalation.ts`.

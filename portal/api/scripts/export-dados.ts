@@ -1,0 +1,97 @@
+// pnpm export:dados [orders|items|events ...] — baixa as tabelas consumo_* do Databricks para os CSVs do plano B
+// (portal/dados/ ou DATA_DIR), já sem as colunas proibidas e com as datas cortadas no SQL.
+//
+// Credenciais do ambiente ou do portal/.env (nunca impressas): DATABRICKS_HOST,
+// DATABRICKS_WAREHOUSE_ID, DATABRICKS_TOKEN; opcional DATABRICKS_CATALOG_SCHEMA
+// (padrão workspace.silver). Cada arquivo é gravado num temporário e só substitui o
+// anterior quando o download termina: uma falha no meio não estraga a cópia que já existe.
+// Sem argumentos exporta as três tabelas; com argumentos, só as indicadas
+// (ex.: pnpm export:dados events).
+
+import { createWriteStream, existsSync } from "node:fs";
+import { mkdir, rename, rm, stat } from "node:fs/promises";
+import { resolve } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { fileURLToPath } from "node:url";
+import { CONSUMO_TABLES, type ConsumoTable } from "../src/orders/consumo-mapper.ts";
+import { EXPORT_COLUMNS, selectStatement } from "../src/orders/consumo-sql.ts";
+import { createDatabricksClient } from "../src/orders/databricks-client.ts";
+import { consumoFiles } from "../src/orders/file-repository.ts";
+
+const PORTAL_DIR = fileURLToPath(new URL("../../", import.meta.url));
+const envFile = resolve(PORTAL_DIR, ".env");
+if (existsSync(envFile)) {
+  process.loadEnvFile(envFile);
+}
+
+function required(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    console.error(`${name} não definida (no ambiente ou em portal/.env).`);
+    process.exit(1);
+  }
+  return value;
+}
+
+const host = required("DATABRICKS_HOST")
+  .replace(/^https?:\/\//, "")
+  .replace(/\/+$/, "");
+const client = createDatabricksClient({
+  baseUrl: `https://${host}`,
+  warehouseId: required("DATABRICKS_WAREHOUSE_ID"),
+  token: required("DATABRICKS_TOKEN"),
+});
+const catalogSchema = process.env.DATABRICKS_CATALOG_SCHEMA?.trim() || "workspace.silver";
+const dataDir = resolve(PORTAL_DIR, process.env.DATA_DIR?.trim() || "dados");
+const files = consumoFiles(dataDir);
+
+async function exportTable(table: ConsumoTable) {
+  const startedAt = performance.now();
+  const target = files[table];
+  const temporary = `${target}.parcial`;
+  const result = await client.queryCsv(
+    selectStatement(catalogSchema, table, EXPORT_COLUMNS[table]),
+  );
+  try {
+    await pipeline(Readable.from(result.chunks()), createWriteStream(temporary));
+    await rename(temporary, target);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
+  const { size } = await stat(target);
+  const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
+  const megabytes = (size / 1024 / 1024).toFixed(1);
+  console.log(
+    `${CONSUMO_TABLES[table]}: ${result.totalRows.toLocaleString("pt-BR")} linhas, ` +
+      `${result.columns.length} colunas, ${megabytes} MB, ${seconds} s → ${target}`,
+  );
+}
+
+function selectedTables(): ConsumoTable[] {
+  const all = Object.keys(CONSUMO_TABLES) as ConsumoTable[];
+  const asked = process.argv.slice(2);
+  if (asked.length === 0) {
+    return all;
+  }
+  const unknown = asked.filter((name) => !all.includes(name as ConsumoTable));
+  if (unknown.length > 0) {
+    console.error(`Tabela desconhecida: ${unknown.join(", ")}. Use: ${all.join(", ")}.`);
+    process.exit(1);
+  }
+  return all.filter((table) => asked.includes(table));
+}
+
+try {
+  const startedAt = performance.now();
+  await mkdir(dataDir, { recursive: true });
+  console.log(`Exportando ${catalogSchema}.consumo_* para ${dataDir}`);
+  for (const table of selectedTables()) {
+    await exportTable(table);
+  }
+  console.log(`Concluído em ${((performance.now() - startedAt) / 1000).toFixed(1)} s.`);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+}
