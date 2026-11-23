@@ -64,6 +64,7 @@ Tarefas em [Issues](../../issues) e andamento em [Milestones](../../milestones).
 
 | Documento | Conteúdo |
 |---|---|
+| [Pacote de entrega (PDF)](docs/entrega/) | Documentação geral, Relatório Ágil, reunião de handover e documentação de cada frente, na identidade IPNET |
 | [Relatório Ágil](docs/relatorio-agil.md) | Dailies D1 a D10, planejado x realizado, decisões e retrospectiva |
 | [Planejamento](docs/planejamento.md) | Escopo, responsabilidades, dependências, cronograma e acordos |
 | [Riscos](docs/riscos.md) | Matriz de riscos com a situação de cada um |

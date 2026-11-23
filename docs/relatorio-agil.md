@@ -95,7 +95,7 @@ Status geral: **atenção** (dashboard v1 atrasado)
 |---|---|---|---|
 | Stephanie | Andamento geral ao grupo; replanejamento de D6–D7 sem mover o code freeze | Reunião de alinhamento da apresentação | — |
 | Mateus | **Gold concluída** (+1 dia) | Atrasos de transporte | — |
-| Marco | PR #32: Silver v2, FAQ fechada (18 trechos no Chroma), atendimento em linguagem simples; 49 testes | Aceite com o portal | — |
+| Marco | PR #32: Silver v2, FAQ fechada (18 trechos no Chroma), atendimento em linguagem simples; 49 testes (52 na versão final) | Aceite com o portal | — |
 | Matheus | PR #31: portal com `consumo_*`, chat e agente em Docker; rotas, sessão e visões cliente x colaborador | Área do colaborador | — |
 | Marcelo | Dashboard v1 em construção | Entregar v1 | **Atrasado 1 dia** |
 
