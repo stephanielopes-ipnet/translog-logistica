@@ -95,7 +95,7 @@ Status geral: **atenção** (dashboard v1 atrasado)
 |---|---|---|---|
 | Stephanie | Andamento geral ao grupo; replanejamento de D6–D7 sem mover o code freeze | Reunião de alinhamento da apresentação | — |
 | Mateus | **Gold concluída** (+1 dia) | Atrasos de transporte | — |
-| Marco | PR #32: Silver v2, FAQ fechada (18 trechos no Chroma), atendimento em linguagem simples; 49 testes | Aceite com o portal | — |
+| Marco | PR #32: Silver v2, FAQ fechada (18 trechos no Chroma), atendimento em linguagem simples; 49 testes (52 na versão final) | Aceite com o portal | — |
 | Matheus | PR #31: portal com `consumo_*`, chat e agente em Docker; rotas, sessão e visões cliente x colaborador | Área do colaborador | — |
 | Marcelo | Dashboard v1 em construção | Entregar v1 | **Atrasado 1 dia** |
 
@@ -145,8 +145,8 @@ Status geral: **no prazo**
 
 | Pessoa | Feito | Próximo | Bloqueio |
 |---|---|---|---|
-| Stephanie | Painel de diagnóstico refeito com a OBT (só dados da Gold); este relatório, riscos, auditoria e documentação | Banca | — |
-| Mateus | Subir os notebooks no GitHub **[pendente]** | — | — |
+| Stephanie | Painel de diagnóstico refeito com a OBT (só dados da Gold); este relatório, riscos, auditoria e documentação (PR #36); pacote de documentação para o Drive | Banca | — |
+| Mateus | Pipeline completo, testes e documentação no GitHub (PR #37) | — | — |
 | Marco | — | — | — |
 | Matheus | — | — | — |
 | Marcelo | Subir o export do dashboard e as consultas no GitHub **[pendente]** | — | — |
@@ -176,9 +176,9 @@ Entrega da apresentação, demonstração ao vivo e deste relatório.
 
 | Indicador | Valor |
 |---|---|
-| Commits (sem merges) | 54, 93% no padrão `tipo(area): descrição` |
-| Pull requests | 6, todas integradas |
-| Issues | 29 criadas, com dono, prazo e marco |
+| Commits (sem merges) | 78, 88% no padrão `tipo(area): descrição` |
+| Pull requests | 8, todas integradas |
+| Issues | 29 criadas, com dono, prazo e marco; 10 fechadas |
 | Marcos no prazo | 7 de 9 (Gold e dashboard v1 com +1 dia) |
 | Data final | Mantida |
 
