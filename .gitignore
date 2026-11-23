@@ -3,15 +3,26 @@
 *.env
 secrets/
 *token*
+CLAUDE.md
+AGENT_RULES.md
+ARCHITECTURE_REVIEW.md
+dashboards/
 
 # Dados (CSV completo do Kaggle não vai para o Git)
 data/raw/
+# Exportação das tabelas de consumo baixada do Databricks (02j)
+data/exportacao/
+# Dados locais da Engenharia de Dados (brutos, de-para, dicionário): nenhum vai para o Git
+
+pipeline/data/
+# Cópia exportada do Databricks (só para comparar com pipeline/notebooks/)
+pipeline/notebooks_databricks/
 DataCoSupplyChainDataset*.csv
 *.zip
 chroma_db/
 *.duckdb
 *.sqlite
-
+.databricks/
 # Python
 __pycache__/
 .venv/
@@ -25,6 +36,10 @@ dist/
 # SO
 .DS_Store
 
+<<<<<<< HEAD
+# Documentacao privada local (nao versionar)
+docs_internos/
+=======
 # Contexto local de desenvolvimento do portal (não versionar)
 portal/_contexto/
 
@@ -33,3 +48,4 @@ portal/dados/
 
 # Mockup antigo do portal: só referência local, tem repositório Git próprio (não versionar)
 portal/prototipos/TransLog_old/
+>>>>>>> origin/main

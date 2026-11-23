@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel TransLog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo:wght@400;600;700;800&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Layout: protótipo no estilo de um dashboard AI/BI (tela clara de ferramenta de dados): barra do app, abas de página, filtros globais e grade de widgets. Visual claro único, como a ferramenta. */
+:root {
+  --canvas: #141414;
+  --card: #1c1822;
+  --borda: #2f2b36;
+  --texto: #f5f5f5;
+  --suave: #c9c4d1;
+  --apagado: #a8a4ae;
+  --app: #0f0d13;
+  --azul: #82d400;
+  --verde: #82d400;
+  --verde-claro: #daff71;
+  --ambar: #f5a524;
+  --vermelho: #ff6b8a;
+  --ouro: #e8c35a;
+  --prata: #c6ccd3;
+  --bronze: #c58a4b;
+  --sim: #bd4aff;
+  --roxo: #660099;
+  --cinza-barra: #5e5868;
+  --grade: #1f1f1f;
+  --font-titulo: "Exo", "Segoe UI", system-ui, sans-serif;
+  --font-texto: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-dado: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--canvas); color: var(--texto); font-family: var(--font-texto); font-size: 15px; background-image: linear-gradient(var(--grade) 1px, transparent 1px), linear-gradient(90deg, var(--grade) 1px, transparent 1px); background-size: 64px 64px; }
+:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
+button, select { font: inherit; color: inherit; }
+
+.app { background: var(--app); color: var(--texto); border-bottom: 1px solid var(--borda); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.app img { height: 34px; width: auto; display: block; }
+.app .nome { font-family: var(--font-titulo); font-weight: 600; font-size: 15px; padding-left: 14px; border-left: 1px solid var(--borda); }
+.app .caminho { color: var(--apagado); font-size: 12.5px; font-family: var(--font-dado); }
+.app .acoes { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.pill { font-size: 12px; border-radius: 999px; padding: 4px 10px; border: 1px solid var(--borda); color: var(--suave); white-space: nowrap; }
+.pill.pub { background: var(--verde); border-color: var(--verde); color: #141414; font-weight: 600; }
+.aviso { background: rgba(245,165,36,.12); color: #ffd28a; border-bottom: 1px solid rgba(245,165,36,.35); font-size: 13px; padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.aviso b { font-weight: 600; }
+
+.cab { position: relative; overflow: hidden; background: radial-gradient(ellipse at 15% -60%, rgba(130,212,0,.22), transparent 55%), radial-gradient(ellipse at 95% 160%, rgba(102,0,153,.45), transparent 55%), var(--canvas); border-bottom: 1px solid var(--borda); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 0; display: grid; gap: 12px; }
+.titulo { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.titulo h1 { margin: 0; font-family: var(--font-titulo); font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: -.01em; }
+.titulo span { color: var(--apagado); font-size: 12.5px; }
+.abas { display: flex; gap: 2px; overflow-x: auto; }
+.aba { cursor: pointer; background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 14px 10px; color: var(--apagado); font-family: var(--font-titulo); font-weight: 600; white-space: nowrap; }
+.aba[aria-selected="true"] { color: var(--azul); border-bottom-color: var(--azul); }
+.filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.filtro { display: grid; gap: 4px; }
+.filtro label { font-size: 11.5px; color: var(--suave); font-weight: 500; }
+.filtro select { background: var(--card); color: var(--texto); border: 1px solid var(--borda); border-radius: 8px; padding: 6px 28px 6px 10px; min-width: 150px; }
+
+main { padding-block: 0 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.pagina { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+.pagina[hidden] { display: none; }
+.manchete { grid-column: span 12; background: var(--card); border: 1px solid var(--borda); border-left: 4px solid var(--azul); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; }
+.manchete b { font-family: var(--font-titulo); font-size: 20px; font-weight: 800; text-transform: uppercase; text-wrap: balance; }
+.manchete.dt { grid-template-columns: minmax(0, .9fr) minmax(0, 1.5fr) minmax(0, 1.2fr); gap: 0; padding: 0; overflow: hidden; }
+.dt > div { padding: 16px 18px; display: grid; gap: 6px; align-content: start; border-right: 1px solid var(--borda); }
+.dt > div:last-child { border-right: none; background: rgba(130,212,0,.06); }
+.dt small { font-family: var(--font-dado); font-size: 10.5px; letter-spacing: .14em; color: var(--verde); }
+.dt .perg { font-family: var(--font-titulo); font-size: 17px; font-weight: 600; color: var(--suave); }
+.dt .resp { font-family: var(--font-titulo); font-size: 21px; font-weight: 800; text-transform: uppercase; line-height: 1.12; text-wrap: balance; }
+.dt .dai { font-size: 15px; color: var(--texto); line-height: 1.45; }
+.publico { font-family: var(--font-dado); font-size: 11.5px; color: var(--apagado); }
+#mapa-atraso { height: 380px; }
+.jvm-tooltip { background: #0f0d13 !important; border: 1px solid var(--borda) !important; color: var(--texto) !important; font-family: var(--font-texto) !important; font-size: 13px !important; padding: 8px 10px !important; border-radius: 8px !important; }
+.escala { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; font-size: 12px; color: var(--suave); }
+.faixa-m { width: 22px; height: 10px; border-radius: 3px; display: inline-block; }
+.escala span.barra { flex: 0 0 180px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #3a2a33, #ff6b8a); }
+.fluxo { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.no-f { flex: 1 1 140px; border: 1px solid var(--borda); border-radius: 10px; padding: 12px; display: grid; gap: 4px; background: rgba(255,255,255,.02); }
+.no-f b { font-family: var(--font-titulo); font-size: 15px; }
+.no-f span { font-size: 12.5px; color: var(--suave); line-height: 1.4; }
+.no-f.ouro { border-color: var(--ouro); } .no-f.sim { border: 1px dashed var(--sim); }
+.seta { align-self: center; color: var(--verde); font-weight: 700; }
+.escada { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: end; }
+.degrau { border-radius: 10px; padding: 12px; display: grid; gap: 4px; align-content: end; border: 1px solid var(--borda); }
+.degrau b { font-family: var(--font-titulo); font-size: 15px; }
+.degrau span { font-size: 12.5px; color: var(--suave); line-height: 1.35; }
+.degrau em { font-style: normal; font-family: var(--font-dado); font-size: 10.5px; letter-spacing: .1em; }
+.degrau.feito { background: rgba(130,212,0,.10); border-color: rgba(130,212,0,.5); } .degrau.feito em { color: var(--verde); }
+.degrau.parcial { background: rgba(245,165,36,.08); border-color: rgba(245,165,36,.45); } .degrau.parcial em { color: var(--ambar); }
+.degrau.proximo { border-style: dashed; } .degrau.proximo em { color: var(--apagado); }
+.testes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; font-size: 13px; color: var(--suave); }
+.testes span::before { content: "✓"; color: var(--verde); font-weight: 700; margin-right: 8px; }
+.funil { display: grid; gap: 8px; }
+.funil .et { display: grid; grid-template-columns: 170px minmax(0, 1fr) 80px minmax(0, 260px); gap: 12px; align-items: center; }
+.funil .nome { font-family: var(--font-titulo); font-weight: 600; font-size: 14px; }
+.funil .barra-f { height: 26px; border-radius: 6px; display: block; }
+.funil .sim-f { background: repeating-linear-gradient(45deg, rgba(189,74,255,.55) 0 6px, rgba(189,74,255,.25) 6px 12px); border: 1px dashed var(--sim); }
+.funil .num { font-family: var(--font-titulo); font-weight: 800; font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+.funil .obs { font-size: 12.5px; color: var(--suave); }
+.funil .obs b { color: var(--verde-claro); font-weight: 600; }
+.funil .fora { display: flex; flex-wrap: wrap; gap: 8px 24px; padding-top: 8px; border-top: 1px dashed var(--borda); font-size: 13px; color: var(--apagado); }
+.funil .fora b { color: var(--texto); }
+@media (max-width: 900px) { .funil .et { grid-template-columns: 1fr 70px; } .funil .barra-f { grid-column: 1 / -1; order: 3; } .funil .obs { grid-column: 1 / -1; order: 4; } }
+.trilha { display: grid; gap: 6px; }
+.trilha div { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; font-size: 13px; color: var(--suave); }
+.trilha .bar { height: 12px; border-radius: 6px; }
+svg{-ms-touch-action:none;touch-action:none}image,text,.jvm-zoomin,.jvm-zoomout{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.jvm-container{-ms-touch-action:none;touch-action:none;position:relative;overflow:hidden;height:100%;width:100%}.jvm-tooltip{border-radius:3px;background-color:#5c5cff;font-family:sans-serif,Verdana;font-size:smaller;box-shadow:1px 2px 12px rgba(0,0,0,0.2);padding:3px 5px;white-space:nowrap;position:absolute;display:none;color:#FFF}.jvm-tooltip.active{display:block}.jvm-zoom-btn{border-radius:3px;background-color:#292929;padding:3px;box-sizing:border-box;position:absolute;line-height:10px;cursor:pointer;color:#FFF;height:15px;width:15px;left:10px}.jvm-zoom-btn.jvm-zoomout{top:30px}.jvm-zoom-btn.jvm-zoomin{top:10px}.jvm-series-container{right:15px;position:absolute}.jvm-series-container.jvm-series-h{bottom:15px}.jvm-series-container.jvm-series-v{top:15px}.jvm-series-container .jvm-legend{background-color:#fff;border:1px solid #e5e7eb;margin-left:.75rem;border-radius:.25rem;border-color:#e5e7eb;padding:.6rem;box-shadow:0 1px 2px 0 rgba(0,0,0,0.05);float:left}.jvm-series-container .jvm-legend .jvm-legend-title{line-height:1;border-bottom:1px solid #e5e7eb;padding-bottom:.5rem;margin-bottom:.575rem;text-align:left}.jvm-series-container .jvm-legend .jvm-legend-inner{overflow:hidden}.jvm-series-container .jvm-legend .jvm-legend-inner .jvm-legend-tick{overflow:hidden;min-width:40px}.jvm-series-container .jvm-legend .jvm-legend-inner .jvm-legend-tick:not(:first-child){margin-top:.575rem}.jvm-series-container .jvm-legend .jvm-legend-inner .jvm-legend-tick .jvm-legend-tick-sample{border-radius:4px;margin-right:.65rem;height:16px;width:16px;float:left}.jvm-series-container .jvm-legend .jvm-legend-inner .jvm-legend-tick .jvm-legend-tick-text{font-size:12px;text-align:center;float:left}.jvm-line[animation="true"]{-webkit-animation:jvm-line-animation 10s linear forwards infinite;animation:jvm-line-animation 10s linear forwards infinite}@-webkit-keyframes jvm-line-animation{from{stroke-dashoffset:250}}@keyframes jvm-line-animation{from{stroke-dashoffset:250}}
+
+.manchete span { color: var(--suave); font-size: 13px; }
+.w { background: rgba(28,24,34,.92); border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; position: relative; }
+.w.sim { border: 1px dashed var(--sim); }
+.w h2 { margin: 0; font-family: var(--font-titulo); font-size: 14.5px; font-weight: 600; }
+.w .sub { color: var(--apagado); font-size: 12px; margin-top: -4px; }
+.c2 { grid-column: span 2; } .c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; } .c7 { grid-column: span 7; } .c8 { grid-column: span 8; } .c12 { grid-column: span 12; }
+.kpi .v { font-family: var(--font-titulo); font-size: 32px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.kpi .d { font-size: 12px; color: var(--suave); }
+.selo { position: absolute; top: 12px; right: 12px; font-family: var(--font-dado); font-size: 10.5px; letter-spacing: .08em; color: var(--sim); border: 1px dashed var(--sim); border-radius: 4px; padding: 2px 6px; background: rgba(189,74,255,.12); }
+.grafico { position: relative; height: 260px; }
+.grafico.baixo { height: 200px; }
+.grafico.alto { height: 320px; }
+.faixa { display: flex; height: 34px; border-radius: 6px; overflow: hidden; }
+.faixa div { display: grid; place-items: center; color: #141414; font-weight: 600; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--suave); }
+.leg i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-weight: 600; color: var(--apagado); font-size: 12px; padding: 8px; border-bottom: 1px solid var(--borda); background: rgba(255,255,255,.03); font-family: var(--font-dado); letter-spacing: .04em; }
+td { padding: 8px; border-bottom: 1px solid var(--borda); color: var(--suave); }
+td.n, th.n { text-align: right; }
+.tab-wrap { overflow-x: auto; }
+.chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.chip.ouro { background: rgba(232,195,90,.18); color: #f3d98b; } .chip.prata { background: rgba(198,204,211,.16); color: #dfe3e8; } .chip.bronze { background: rgba(197,138,75,.2); color: #e8b98a; }
+.chip.ruim { background: rgba(255,107,138,.16); color: #ffb3c2; } .chip.bom { background: rgba(130,212,0,.16); color: var(--verde-claro); }
+.calor { display: grid; grid-template-columns: 120px repeat(5, minmax(0, 1fr)); gap: 3px; font-size: 12px; }
+.calor div { padding: 9px 4px; text-align: center; border-radius: 3px; font-variant-numeric: tabular-nums; }
+.calor .h { background: none; color: var(--suave); font-weight: 600; padding: 4px; }
+.calor .r { text-align: left; color: var(--texto); font-weight: 500; background: none; }
+.rec { display: grid; gap: 6px; }
+.rec b { font-family: var(--font-titulo); font-size: 16px; }
+.rec p { margin: 0; color: var(--suave); font-size: 13px; line-height: 1.45; }
+.rec .imp { font-family: var(--font-dado); font-size: 12px; color: var(--verde); }
+.grande { font-family: var(--font-titulo); font-size: 26px; font-weight: 800; letter-spacing: -.01em; }
+
+@media (max-width: 900px) {
+  .manchete.dt { grid-template-columns: 1fr; }
+  .dt > div { border-right: none; border-bottom: 1px solid var(--borda); }
+  .escada, .testes { grid-template-columns: 1fr 1fr; }
+  #mapa-atraso { height: 260px; }
+  .c2, .c3, .c4, .c5, .c6, .c7, .c8 { grid-column: span 12; }
+  .kpi.c3 { grid-column: span 6; }
+  .calor { grid-template-columns: 90px repeat(5, minmax(0, 1fr)); font-size: 11px; }
+}
+
+.nota-real { font-family: var(--font-dado); font-size: 11.5px; color: var(--apagado); line-height: 1.5; }
+.texto-w p { margin: 0; color: var(--suave); font-size: 14px; line-height: 1.5; }
+.texto-w p + p { margin-top: 8px; }
+.texto-w b { color: var(--texto); }
+.sim-bar { background: repeating-linear-gradient(45deg, rgba(189,74,255,.55) 0 6px, rgba(189,74,255,.25) 6px 12px); }
+.alerta-modal { border-left: 4px solid var(--ambar); } .alerta-modal h2 { color: #ffd28a; }
+.destaque-w { border-left: 4px solid var(--verde); }
+.tag-causa { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.tag-causa.pi { background: rgba(189,74,255,.16); color: #d9a6ff; } .tag-causa.op { background: rgba(245,165,36,.14); color: #ffd28a; }
+.tag-fonte { display: inline-block; font-family: var(--font-dado); font-size: 10.5px; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px; }
+.tag-fonte.real { color: var(--verde); border: 1px solid rgba(130,212,0,.5); } .tag-fonte.sim { color: #d9a6ff; border: 1px dashed var(--sim); }
+.achado { display: grid; gap: 6px; align-content: start; }
+.achado .n { font-family: var(--font-dado); font-size: 11px; letter-spacing: .12em; color: var(--verde); }
+.achado .big { font-family: var(--font-titulo); font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+.achado b { font-family: var(--font-titulo); font-size: 17px; line-height: 1.25; }
+.achado p { margin: 0; color: var(--suave); font-size: 13.5px; line-height: 1.45; }
+.rec-res { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--borda); }
+.rec-res:first-of-type { border-top: none; }
+.rec-res .i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-dado); font-weight: 600; border: 2px solid var(--verde); color: var(--verde); }
+.rec-res b { font-family: var(--font-titulo); font-size: 16px; } .rec-res p { margin: 2px 0 0; color: var(--suave); font-size: 13.5px; line-height: 1.4; }
+.rec-res .imp-n { text-align: right; font-family: var(--font-titulo); font-weight: 800; font-size: 20px; color: var(--verde-claro); white-space: nowrap; } .rec-res .imp-n small { display: block; font-family: var(--font-texto); font-weight: 400; font-size: 11.5px; color: var(--apagado); }
+.escopo { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12.5px; color: var(--suave); }
+.escopo span::before { content: "·"; margin-right: 8px; color: var(--verde); }
+.dist { display: grid; gap: 14px; }
+.dist-l { display: grid; grid-template-columns: 120px repeat(7, minmax(0,1fr)); gap: 4px; align-items: end; }
+.dist-l .nm { font-family: var(--font-titulo); font-weight: 600; font-size: 13.5px; align-self: center; }
+.dist-l .nm small { display: block; font-family: var(--font-texto); font-weight: 400; color: var(--apagado); font-size: 11.5px; }
+.dist-l .c { position: relative; height: 62px; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; border-bottom: 1px solid var(--borda); }
+.dist-l .c i { display: block; border-radius: 3px 3px 0 0; }
+.dist-l .c span { font-size: 10.5px; color: var(--suave); text-align: center; font-variant-numeric: tabular-nums; }
+.dist-l .c.prom { box-shadow: inset 2px 0 0 0 transparent; }
+.dist-l .c.prom::after { content: "promete"; position: absolute; top: -2px; right: -3px; font-family: var(--font-dado); font-size: 9.5px; color: var(--verde); border-right: 2px dashed var(--verde); height: 66px; padding-right: 3px; }
+.dist-eixo { display: grid; grid-template-columns: 120px repeat(7, minmax(0,1fr)); gap: 4px; font-family: var(--font-dado); font-size: 11px; color: var(--apagado); text-align: center; }
+.strip { display: grid; gap: 4px; }
+.strip-l { display: grid; grid-template-columns: 170px minmax(0,1fr) 110px; gap: 12px; align-items: center; font-size: 13px; }
+.strip-l .nm { color: var(--texto); font-weight: 600; } .strip-l .nm small { display: block; color: var(--apagado); font-weight: 400; font-size: 11.5px; }
+.strip-l svg { width: 100%; height: 30px; display: block; }
+.strip-l .faixa-t { font-family: var(--font-dado); font-size: 12px; color: var(--suave); text-align: right; }
+.cenario { display: grid; gap: 10px; }
+.cen-l { display: grid; grid-template-columns: 230px minmax(0,1fr) 150px; gap: 12px; align-items: center; }
+.cen-l .nm b { display: block; font-family: var(--font-titulo); font-size: 15px; } .cen-l .nm span { font-size: 12px; color: var(--apagado); }
+.cen-l .barra { height: 30px; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; font-family: var(--font-titulo); font-weight: 800; color: #141414; font-size: 15px; min-width: 52px; }
+.cen-l .ef { font-size: 12.5px; color: var(--suave); text-align: right; } .cen-l .ef b { display: block; color: var(--verde-claro); font-family: var(--font-titulo); font-size: 16px; }
+.roadmap { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.fase-r { border: 1px solid var(--borda); border-radius: 12px; padding: 14px; display: grid; gap: 8px; align-content: start; background: rgba(255,255,255,.02); }
+.fase-r em { font-style: normal; font-family: var(--font-dado); font-size: 11px; letter-spacing: .12em; color: var(--verde); }
+.fase-r b { font-family: var(--font-titulo); font-size: 16px; }
+.fase-r ul { margin: 0; padding-left: 16px; color: var(--suave); font-size: 13px; line-height: 1.45; display: grid; gap: 4px; }
+.lim { margin: 0; padding-left: 18px; color: var(--suave); font-size: 13.5px; line-height: 1.5; display: grid; gap: 6px; } .lim b { color: var(--texto); }
+@media (max-width: 900px) { .roadmap { grid-template-columns: 1fr; } .strip-l, .cen-l { grid-template-columns: 1fr; } .rec-res { grid-template-columns: 34px 1fr; } .rec-res .imp-n { grid-column: 2; text-align: left; } }
+
+.amp { display: grid; gap: 6px; }
+.amp-l { display: grid; grid-template-columns: 190px minmax(0,1fr) 330px; gap: 14px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--borda); font-size: 13px; }
+.amp-l .nm { font-weight: 600; color: var(--texto); } .amp-l .nm small { display: block; font-weight: 400; color: var(--apagado); font-size: 11.5px; }
+.amp-b { display: flex; align-items: center; gap: 8px; }
+.amp-b i { display: block; height: 18px; border-radius: 4px; background: #6b6474; }
+.amp-b b { font-family: var(--font-titulo); font-size: 14px; color: var(--suave); white-space: nowrap; }
+.amp-t { color: var(--suave); font-size: 12.5px; } .amp-t b { color: var(--texto); }
+.amp-p { background: rgba(255,107,138,.07); border-radius: 8px; padding: 10px 8px; border-bottom: none; }
+.amp-p .amp-b i { background: var(--vermelho); height: 22px; } .amp-p .amp-b b { color: var(--vermelho); font-size: 18px; }
+@media (max-width: 900px) { .amp-l { grid-template-columns: 1fr; } }
+</style>
+</head><body>
+<div class="app">
+  <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjgxNCAzNjAgMjc2IDE0OCI+PHBhdGggZD0iTSA4NzIuNDIxODc1IDQyOC40ODgyODEgQyA4NzIuMDUwNzgxIDQyOC41NTA3ODEgODcxLjg2MzI4MSA0MjguNzUgODcxLjY1MjM0NCA0MjguODkwNjI1IEMgODY3LjI1MzkwNiA0MzEuODIwMzEyIDg2Mi40MzM1OTQgNDMzLjYyMTA5NCA4NTcuMTkxNDA2IDQzNC4yNDYwOTQgQyA4NDAuNDE3OTY5IDQzNi4yNDYwOTQgODI0Ljg3MTA5NCA0MjUuNDM3NSA4MjAuODQzNzUgNDA5LjAwNzgxMiBDIDgyMC40MTc5NjkgNDA3LjI3MzQzOCA4MjAuMTkxNDA2IDQwNS41MDM5MDYgODIwLjAwMzkwNiA0MDMuNzMwNDY5IEMgODE5LjgyODEyNSA0MDIuMTIxMDk0IDgyMS4wNjY0MDYgNDAxLjE2MDE1NiA4MjIuMzcxMDk0IDQwMS4xODM1OTQgQyA4MjUuNTE1NjI1IDQwMS4yMzA0NjkgODI4LjY2MDE1NiA0MDEuMTkxNDA2IDgzMS44MDQ2ODggNDAxLjIwMzEyNSBDIDgzMy4xMjUgNDAxLjIwNzAzMSA4MzMuOTE0MDYyIDQwMS44NjcxODggODM0LjA4NTkzOCA0MDMuMTY3OTY5IEMgODM0LjM1MTU2MiA0MDUuMTYwMTU2IDgzNC43ODEyNSA0MDcuMTAxNTYyIDgzNS42MzY3MTkgNDA4LjkyNTc4MSBDIDgzOC41NjY0MDYgNDE1LjE5MTQwNiA4NDMuNDMzNTk0IDQxOS4wMzkwNjIgODUwLjI1MzkwNiA0MjAuMTY3OTY5IEMgODYwLjU3ODEyNSA0MjEuODcxMDk0IDg3MC4zNjcxODggNDE0Ljc2NTYyNSA4NzIuMTMyODEyIDQwNC40NjA5MzggQyA4NzIuMzAwNzgxIDQwMy40ODQzNzUgODcyLjM5NDUzMSA0MDIuNTA3ODEyIDg3Mi40MjE4NzUgNDAxLjUyMzQzOCBDIDg3Mi42NTIzNDQgMzkyLjY5OTIxOSA4NzUuNzgxMjUgMzg1LjA2MjUgODgxLjk0NTMxMiAzNzguNzM0Mzc1IEMgODg2LjkyMTg3NSAzNzMuNjIxMDk0IDg5Mi45NjQ4NDQgMzcwLjQ0MTQwNiA5MDAuMDAzOTA2IDM2OS4yMTQ4NDQgQyA5MTIuMDkzNzUgMzY3LjEwOTM3NSA5MjMuOTkyMTg4IDM3MS43NzczNDQgOTMxLjUyNzM0NCAzODEuMDE5NTMxIEMgOTMxLjY2MDE1NiAzODEuMTgzNTk0IDkzMS43NjE3MTkgMzgxLjM3ODkwNiA5MzEuOTY0ODQ0IDM4MS40NTcwMzEgQyA5MzguNzkyOTY5IDM3My4yNTM5MDYgOTQ3LjQ2NDg0NCAzNjguNzQ2MDk0IDk1OC4yMTA5MzggMzY4Ljc1IEMgOTY4Ljk1NzAzMSAzNjguNzUgOTc3LjYxNzE4OCAzNzMuMjY1NjI1IDk4NC40Njg3NSAzODEuNDk2MDk0IEMgOTg1LjIxNDg0NCAzODAuNjEzMjgxIDk4NS45NDUzMTIgMzc5LjczMDQ2OSA5ODYuNzQyMTg4IDM3OC45MTAxNTYgQyA5OTEuOTI5Njg4IDM3My41ODk4NDQgOTk4LjE4NzUgMzcwLjI4MTI1IDEwMDUuNTIzNDM4IDM2OS4xMTcxODggQyAxMDIzLjA1ODU5NCAzNjYuMzI4MTI1IDEwMzkuODMyMDMxIDM3Ny45ODgyODEgMTA0My4zMjAzMTIgMzk1LjM1MTU2MiBDIDEwNDMuNzYxNzE5IDM5Ny41NDY4NzUgMTA0My45OTIxODggMzk5Ljc2OTUzMSAxMDQzLjk4NDM3NSA0MDIuMDExNzE5IEMgMTA0My45NzY1NjIgNDAzLjU1ODU5NCAxMDQzLjkzMzU5NCA0MDUuMTA1NDY5IDEwNDMuOTk2MDk0IDQwNi42NDQ1MzEgQyAxMDQ0LjA1NDY4OCA0MDguMDAzOTA2IDEwNDIuOTgwNDY5IDQwOS4wNDY4NzUgMTA0MS42MDkzNzUgNDA5LjAzOTA2MiBDIDEwMzIuMDkzNzUgNDA5LjAxMTcxOSAxMDIyLjU3ODEyNSA0MDkuMDIzNDM4IDEwMTMuMDY2NDA2IDQwOS4wMjM0MzggQyAxMDExLjUzMTI1IDQwOS4wMjM0MzggMTAxMC42OTkyMTkgNDA4LjIwMzEyNSAxMDEwLjY5NTMxMiA0MDYuNjU2MjUgQyAxMDEwLjY4MzU5NCA0MDMuNTQyOTY5IDEwMTAuNjgzNTk0IDQwMC40MjU3ODEgMTAxMC42OTUzMTIgMzk3LjMwODU5NCBDIDEwMTAuNjk5MjE5IDM5NS43NjE3MTkgMTAxMS41MjM0MzggMzk0Ljk2NDg0NCAxMDEzLjA3ODEyNSAzOTQuOTY0ODQ0IEwgMTAyOC40MDYyNSAzOTQuOTY0ODQ0IEMgMTAyOC41NTA3ODEgMzk0LjczMDQ2OSAxMDI4LjQwNjI1IDM5NC41NzAzMTIgMTAyOC4zMzU5MzggMzk0LjQxMDE1NiBDIDEwMjUuNTExNzE5IDM4OC4yODEyNSAxMDIwLjgzMjAzMSAzODQuNDE3OTY5IDEwMTQuMTkxNDA2IDM4My4xMzY3MTkgQyAxMDAzLjkzNzUgMzgxLjE2MDE1NiA5OTQuMTQwNjI1IDM4Ny44NTU0NjkgOTkxLjk0NTMxMiAzOTcuODk4NDM4IEMgOTkwLjc0MjE4OCA0MDMuMzk0NTMxIDk5Mi4wODU5MzggNDA4LjM3NSA5OTUuNDI5Njg4IDQxMi43OTY4NzUgQyA5OTguNjY0MDYyIDQxNy4wNzQyMTkgMTAwMy4wMDc4MTIgNDE5LjU1NDY4OCAxMDA4LjM0NzY1NiA0MjAuMjUzOTA2IEMgMTAwOC43MTQ4NDQgNDIwLjMwMDc4MSAxMDA5LjA5Mzc1IDQyMC4zMjgxMjUgMTAwOS40MzM1OTQgNDIwLjQ4ODI4MSBDIDEwMTAuMzI4MTI1IDQyMC45MTQwNjIgMTAxMC43MTQ4NDQgNDIxLjYyODkwNiAxMDEwLjcxMDkzOCA0MjIuNjA1NDY5IEMgMTAxMC42OTkyMTkgNDI1LjQwMjM0NCAxMDEwLjcxMDkzOCA0MjguMTk5MjE5IDEwMTAuNzEwOTM4IDQzMC45OTYwOTQgQyAxMDEwLjcxMDkzOCA0MzEuMzY3MTg4IDEwMTAuNzE0ODQ0IDQzMS43NDIxODggMTAxMC43MTA5MzggNDMyLjExMzI4MSBDIDEwMTAuNjkxNDA2IDQzMy41OTM3NSAxMDA5LjcxMDkzOCA0MzQuNTE5NTMxIDEwMDguMjU3ODEyIDQzNC40MDIzNDQgQyAxMDA0LjE4NzUgNDM0LjA4MjAzMSAxMDAwLjI4OTA2MiA0MzMuMDg1OTM4IDk5Ni41ODU5MzggNDMxLjM0Mzc1IEMgOTk0Ljk2ODc1IDQzMC41ODU5MzggOTkzLjQyNTc4MSA0MjkuNjk5MjE5IDk5MS45NDUzMTIgNDI4LjY5MTQwNiBDIDk5MS44NjMyODEgNDI4LjYzNjcxOSA5OTEuNzY5NTMxIDQyOC41ODU5MzggOTkxLjY5MTQwNiA0MjguNTM5MDYyIEMgOTkxLjQzNzUgNDI4LjY2NDA2MiA5OTEuNTQyOTY5IDQyOC44NzUgOTkxLjUzOTA2MiA0MjkuMDM5MDYyIEMgOTkxLjUzMTI1IDQzMC4xNjAxNTYgOTkxLjUzOTA2MiA0MzEuMjczNDM4IDk5MS41MzUxNTYgNDMyLjM5NDUzMSBDIDk5MS41MjM0MzggNDMzLjg1OTM3NSA5OTAuNjY0MDYyIDQzNC43MTg3NSA5ODkuMTkxNDA2IDQzNC43MjY1NjIgQyA5ODYuMDc0MjE5IDQzNC43MzA0NjkgOTgyLjk1MzEyNSA0MzQuNjk1MzEyIDk3OS44Mzk4NDQgNDM0Ljc0MjE4OCBDIDk3OC42MDU0NjkgNDM0Ljc2MTcxOSA5NzcuNDI1NzgxIDQzMy45MjE4NzUgOTc3LjQ0MTQwNiA0MzIuMzU5Mzc1IEMgOTc3LjQ4MDQ2OSA0MjguNDQxNDA2IDk3Ny40NTcwMzEgNDI0LjUyNzM0NCA5NzcuNDU3MDMxIDQyMC42MTMyODEgQyA5NzcuNDU3MDMxIDQxNC42NzU3ODEgOTc3LjQ2MDkzOCA0MDguNzM0Mzc1IDk3Ny40NTcwMzEgNDAyLjc5Njg3NSBDIDk3Ny40NTMxMjUgMzk5LjkyMTg3NSA5NzcuMDcwMzEyIDM5Ny4xMDU0NjkgOTc1Ljg2NzE4OCAzOTQuNDY4NzUgQyA5NzIuOTY0ODQ0IDM4OC4wODU5MzggOTY4LjA1ODU5NCAzODQuMTU2MjUgOTYxLjEzMjgxMiAzODMuMDMxMjUgQyA5NTAuODkwNjI1IDM4MS4zNjMyODEgOTQxLjE5OTIxOSAzODguMzI0MjE5IDkzOS4zMDg1OTQgMzk4LjUzNTE1NiBDIDkzOS4wMDM5MDYgNDAwLjE5MTQwNiA5MzguOTc2NTYyIDQwMS44NzEwOTQgOTM4Ljk2ODc1IDQwMy41NTA3ODEgQyA5MzguOTY4NzUgNDA0LjQwMjM0NCA5MzguOTkyMTg4IDQwNS4yNTM5MDYgOTM4Ljk5MjE4OCA0MDYuMTA1NDY5IEwgOTM4Ljk5MjE4OCA0MzEuOTk2MDk0IEMgOTM4Ljk5MjE4OCA0MzQuMDIzNDM4IDkzOC4yODUxNTYgNDM0Ljc0MjE4OCA5MzYuMjczNDM4IDQzNC43NDIxODggQyA5MzMuMzE2NDA2IDQzNC43NDIxODggOTMwLjM1OTM3NSA0MzQuNzAzMTI1IDkyNy40MDIzNDQgNDM0Ljc1NzgxMiBDIDkyNS45NTMxMjUgNDM0Ljc4NTE1NiA5MjQuODIwMzEyIDQzMy44MjgxMjUgOTI0Ljg5ODQzOCA0MzIuMjI2NTYyIEMgOTI0Ljk0NTMxMiA0MzEuMjUzOTA2IDkyNC45MTAxNTYgNDMwLjI3NzM0NCA5MjQuOTEwMTU2IDQyOS4xNzE4NzUgQyA5MjQuNTMxMjUgNDI5LjQyMTg3NSA5MjQuMjczNDM4IDQyOS41OTc2NTYgOTI0LjAxMTcxOSA0MjkuNzY1NjI1IEMgOTE5LjU5NzY1NiA0MzIuNjY3OTY5IDkxNC43NjE3MTkgNDM0LjQxNDA2MiA5MDkuNTIzNDM4IDQzNS4wNDY4NzUgQyA5MDkuMDc0MjE5IDQzNS4xMDE1NjIgOTA4LjYyMTA5NCA0MzUuMTMyODEyIDkwOC4xNzE4NzUgNDM1LjE3NTc4MSBDIDkwNi43Njk1MzEgNDM1LjMwMDc4MSA5MDUuNzI2NTYyIDQzNC4zOTA2MjUgOTA1LjcxMDkzOCA0MzIuOTgwNDY5IEMgOTA1LjY5MTQwNiA0MzEuMjc3MzQ0IDkwNS43MDcwMzEgNDI5LjU3MDMxMiA5MDUuNzA3MDMxIDQyNy44NjcxODggTCA5MDUuNzA3MDMxIDQyMy41NTQ2ODggQyA5MDUuNzA3MDMxIDQyMS45Njg3NSA5MDYuMzkwNjI1IDQyMS4yMTg3NSA5MDcuOTcyNjU2IDQyMS4wMzUxNTYgQyA5MTEuMzI4MTI1IDQyMC42NTYyNSA5MTQuMzc4OTA2IDQxOS40Njg3NSA5MTcuMDc0MjE5IDQxNy40NDUzMTIgQyA5MjEuNDE0MDYyIDQxNC4xODc1IDkyNC4wMTk1MzEgNDA5Ljg3NSA5MjQuNzQ2MDk0IDQwNC40ODA0NjkgQyA5MjYuMTEzMjgxIDM5NC4yODUxNTYgOTE5LjIzMDQ2OSAzODUuMTc5Njg4IDkwOS42OTE0MDYgMzgzLjE5OTIxOSBDIDg5OC44MjQyMTkgMzgwLjk0OTIxOSA4ODkuMDc4MTI1IDM4OC4wODU5MzggODg2Ljk2NDg0NCAzOTcuODkwNjI1IEMgODg2LjUzNTE1NiAzOTkuODc4OTA2IDg4Ni40MzM1OTQgNDAxLjg5MDYyNSA4ODYuNTAzOTA2IDQwMy45MTQwNjIgQyA4ODYuNTExNzE5IDQwNC4xMjg5MDYgODg2LjUwMzkwNiA0MDQuMzQzNzUgODg2LjUwMzkwNiA0MDQuNTU0Njg4IEwgODg2LjUwMzkwNiA0NTMuNTM1MTU2IEMgODg2LjUwMzkwNiA0NTMuODU1NDY5IDg4Ni41MjM0MzggNDU0LjE4MzU5NCA4ODYuNDU3MDMxIDQ1NC40ODgyODEgQyA4ODYuMjQ2MDk0IDQ1NS40NzY1NjIgODg1LjM5MDYyNSA0NTYuMTI1IDg4NC4yODUxNTYgNDU2LjEzMjgxMiBDIDg4Mi40NDUzMTIgNDU2LjE0NDUzMSA4ODAuNjA5Mzc1IDQ1Ni4xMzY3MTkgODc4Ljc2OTUzMSA0NTYuMTM2NzE5IEMgODc3LjQ2MDkzOCA0NTYuMTM2NzE5IDg3Ni4xNTYyNSA0NTYuMDkzNzUgODc0Ljg1MTU2MiA0NTYuMTQ0NTMxIEMgODczLjMzMjAzMSA0NTYuMjEwOTM4IDg3Mi40MTAxNTYgNDU1LjA0Njg3NSA4NzIuNDE3OTY5IDQ1My43MTQ4NDQgQyA4NzIuNDUzMTI1IDQ0NS42MjEwOTQgODcyLjQzNzUgNDM3LjUxOTUzMSA4NzIuNDM3NSA0MjkuNDI1NzgxIEwgODcyLjQzNzUgNDI4LjQ4MDQ2OSBaIE0gODcyLjQyMTg3NSA0MjguNDg4MjgxICIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTSAxMDYzLjIzMDQ2OSAzODIuNzYxNzE5IEwgMTA2My4yMzA0NjkgMzk0LjM0NzY1NiBDIDEwNjMuMjMwNDY5IDM5NC41MzEyNSAxMDYzLjI0MjE4OCAzOTQuNzE4NzUgMTA2My4yMzA0NjkgMzk0LjkwNjI1IEMgMTA2My4yMDcwMzEgMzk1LjIxODc1IDEwNjMuMzUxNTYyIDM5NS4zNDM3NSAxMDYzLjY1MjM0NCAzOTUuMzI0MjE5IEMgMTA2My44Mzk4NDQgMzk1LjMxNjQwNiAxMDY0LjAyNzM0NCAzOTUuMzI0MjE5IDEwNjQuMjE0ODQ0IDM5NS4zMjQyMTkgTCAxMDgyLjgzOTg0NCAzOTUuMzI0MjE5IEMgMTA4My4wNTA3ODEgMzk1LjMyNDIxOSAxMDgzLjI2NTYyNSAzOTUuMzE2NDA2IDEwODMuNDc2NTYyIDM5NS4zMjQyMTkgQyAxMDg0Ljg1NTQ2OSAzOTUuNDAyMzQ0IDEwODUuNjk1MzEyIDM5Ni4yNTc4MTIgMTA4NS42OTkyMTkgMzk3LjY0MDYyNSBDIDEwODUuNzE0ODQ0IDQwMC43ODEyNSAxMDg1LjY5NTMxMiA0MDMuOTI1NzgxIDEwODUuNzEwOTM4IDQwNy4wNjY0MDYgQyAxMDg1LjcxODc1IDQwOC40MzM1OTQgMTA4NC43ODkwNjIgNDA5LjQzMzU5NCAxMDgzLjI4OTA2MiA0MDkuNDI5Njg4IEMgMTA3Ni45NDkyMTkgNDA5LjM5ODQzOCAxMDcwLjYwOTM3NSA0MDkuNDE0MDYyIDEwNjQuMjY1NjI1IDQwOS40MTc5NjkgQyAxMDYzLjA3ODEyNSA0MDkuNDE3OTY5IDEwNjMuMjM4MjgxIDQwOS4zMTI1IDEwNjMuMjM4MjgxIDQxMC40Mjk2ODggQyAxMDYzLjIzMDQ2OSA0MTUuMDM1MTU2IDEwNjMuMjIyNjU2IDQxOS42NDQ1MzEgMTA2My4yMzgyODEgNDI0LjI1MzkwNiBDIDEwNjMuMjQ2MDk0IDQyNy44NzUgMTA2NC4xNDg0MzggNDMxLjI2OTUzMSAxMDY2LjA3ODEyNSA0MzQuMzM1OTM4IEMgMTA2OS4zMjQyMTkgNDM5LjQ3NjU2MiAxMDczLjk5NjA5NCA0NDIuNDgwNDY5IDEwODAuMDE1NjI1IDQ0My4zNTE1NjIgQyAxMDgxLjA5Mzc1IDQ0My41MTE3MTkgMTA4Mi4xOTE0MDYgNDQzLjU4MjAzMSAxMDgzLjI4NTE1NiA0NDMuNTExNzE5IEMgMTA4NC44Mzk4NDQgNDQzLjQwNjI1IDEwODUuNzM0Mzc1IDQ0NC41OTM3NSAxMDg1LjcxODc1IDQ0NS45MjU3ODEgQyAxMDg1LjY3OTY4OCA0NDkuMDE1NjI1IDEwODUuNzEwOTM4IDQ1Mi4xMDU0NjkgMTA4NS43MDMxMjUgNDU1LjE5NTMxMiBDIDEwODUuNjk5MjE5IDQ1Ni43MTA5MzggMTA4NC44Mzk4NDQgNDU3LjU2NjQwNiAxMDgzLjMzMjAzMSA0NTcuNTk3NjU2IEMgMTA2OC4wODk4NDQgNDU3Ljg4MjgxMiAxMDU0Ljc4OTA2MiA0NDguMTU2MjUgMTA1MC40OTIxODggNDMzLjU4MjAzMSBDIDEwNDkuNzk2ODc1IDQzMS4yMjY1NjIgMTA0OS4zOTQ1MzEgNDI4LjgyMDMxMiAxMDQ5LjIzODI4MSA0MjYuMzY3MTg4IEMgMTA0OS4xNTYyNSA0MjUuMDYyNSAxMDQ5LjE0NDUzMSA0MjMuNzU3ODEyIDEwNDkuMTQ0NTMxIDQyMi40NTcwMzEgTCAxMDQ5LjE0NDUzMSAzNzEuNDAyMzQ0IEMgMTA0OS4xNDQ1MzEgMzcxLjA1NDY4OCAxMDQ5LjEzNjcxOSAzNzAuNzA3MDMxIDEwNDkuMTkxNDA2IDM3MC4zNjcxODggQyAxMDQ5LjM3ODkwNiAzNjkuMjY1NjI1IDEwNTAuMTc1NzgxIDM2OC41ODIwMzEgMTA1MS4yOTY4NzUgMzY4LjU3MDMxMiBDIDEwNTIuNjI4OTA2IDM2OC41NTQ2ODggMTA1My45NTcwMzEgMzY4LjU2NjQwNiAxMDU1LjI4OTA2MiAzNjguNTY2NDA2IEMgMTA1Ny4xMDU0NjkgMzY4LjU2NjQwNiAxMDU4LjkxNzk2OSAzNjguNjMyODEyIDEwNjAuNzI2NTYyIDM2OC41NDY4NzUgQyAxMDYyLjI1MzkwNiAzNjguNDcyNjU2IDEwNjMuMjg1MTU2IDM2OS40NzY1NjIgMTA2My4yNTc4MTIgMzcxLjEwNTQ2OSBDIDEwNjMuMTg3NSAzNzQuOTkyMTg4IDEwNjMuMjM0Mzc1IDM3OC44ODI4MTIgMTA2My4yMzQzNzUgMzgyLjc2OTUzMSBaIE0gMTA2My4yMzA0NjkgMzgyLjc2MTcxOSAiIGZpbGw9IiNmZmZmZmYiIGZpbGwtcnVsZT0ibm9uemVybyIvPjxwYXRoIGQ9Ik0gMTAzNy42OTkyMTkgNDg3LjY5OTIxOSBDIDEwMzguNTM5MDYyIDQ4Ni4wMjM0MzggMTAzOS4zMjgxMjUgNDg0LjQ1NzAzMSAxMDQwLjEwOTM3NSA0ODIuODkwNjI1IEMgMTA0MS43MzQzNzUgNDc5LjYyNSAxMDQzLjM2NzE4OCA0NzYuMzY3MTg4IDEwNDQuOTYwOTM4IDQ3My4wOTM3NSBDIDEwNDUuNzM0Mzc1IDQ3MS41IDEwNDcuNjYwMTU2IDQ3MC40ODgyODEgMTA0OS42MDE1NjIgNDcxLjQ0NTMxMiBDIDEwNTAuNDgwNDY5IDQ3MS44ODI4MTIgMTA1MS4zOTQ1MzEgNDcyLjI1MzkwNiAxMDUyLjI5Njg3NSA0NzIuNjU2MjUgQyAxMDU0LjIxODc1IDQ3My41MTU2MjUgMTA1NC44NzUgNDc1LjM1NTQ2OSAxMDUzLjg2NzE4OCA0NzcuMjE0ODQ0IEMgMTA1Mi44Nzg5MDYgNDc5LjAzNTE1NiAxMDUxLjgzNTkzOCA0ODAuODMyMDMxIDEwNTAuODE2NDA2IDQ4Mi42NDA2MjUgQyAxMDQ4LjAyNzM0NCA0ODcuNTc0MjE5IDEwNDUuMjM0Mzc1IDQ5Mi41MDM5MDYgMTA0Mi40NjA5MzggNDk3LjQ0MTQwNiBDIDEwNDEuODg2NzE5IDQ5OC40Njg3NSAxMDQxLjEwOTM3NSA0OTkuMjA3MDMxIDEwMzkuOTY0ODQ0IDQ5OS41MzkwNjIgQyAxMDM5LjY1MjM0NCA0OTkuNjI4OTA2IDEwMzkuMzQzNzUgNDk5LjY2Nzk2OSAxMDM5LjAyMzQzOCA0OTkuNjY3OTY5IEMgMTAzOC4xOTUzMTIgNDk5LjY2Nzk2OSAxMDM3LjM3MTA5NCA0OTkuNjYwMTU2IDEwMzYuNTQ2ODc1IDQ5OS42Njc5NjkgQyAxMDM0Ljk1NzAzMSA0OTkuNjgzNTk0IDEwMzMuNzg1MTU2IDQ5OC45NzI2NTYgMTAzMy4wMTE3MTkgNDk3LjYxNzE4OCBDIDEwMzEuODIwMzEyIDQ5NS41MzkwNjIgMTAzMC42NTIzNDQgNDkzLjQ0NTMxMiAxMDI5LjQ3MjY1NiA0OTEuMzYzMjgxIEMgMTAyNi44NzEwOTQgNDg2Ljc1MzkwNiAxMDI0LjI3MzQzOCA0ODIuMTQwNjI1IDEwMjEuNjY0MDYyIDQ3Ny41MzEyNSBDIDEwMjEuMjM4MjgxIDQ3Ni43NzczNDQgMTAyMC45MjE4NzUgNDc2LjAwNzgxMiAxMDIxLjA3NDIxOSA0NzUuMTA1NDY5IEMgMTAyMS4yNTc4MTIgNDc0LjAzMTI1IDEwMjEuODI0MjE5IDQ3My4yMzgyODEgMTAyMi44MTY0MDYgNDcyLjc4MTI1IEMgMTAyMy44NTE1NjIgNDcyLjI5Njg3NSAxMDI0Ljg5MDYyNSA0NzEuODI0MjE5IDEwMjUuOTQ1MzEyIDQ3MS4zNzEwOTQgQyAxMDI3LjY3NTc4MSA0NzAuNjMyODEyIDEwMjkuNDcyNjU2IDQ3MS4yODkwNjIgMTAzMC4zMzU5MzggNDcyLjk4ODI4MSBDIDEwMzEuMzkwNjI1IDQ3NS4wNzQyMTkgMTAzMi40MjE4NzUgNDc3LjE3NTc4MSAxMDMzLjQ2MDkzOCA0NzkuMjczNDM4IEMgMTAzNC43OTY4NzUgNDgxLjk2NDg0NCAxMDM2LjEzMjgxMiA0ODQuNjU2MjUgMTAzNy40Njg3NSA0ODcuMzQ3NjU2IEMgMTAzNy41MTU2MjUgNDg3LjQ0MTQwNiAxMDM3LjU4NTkzOCA0ODcuNTIzNDM4IDEwMzcuNjk5MjE5IDQ4Ny42OTUzMTIgWiBNIDEwMzcuNjk5MjE5IDQ4Ny42OTkyMTkgIiBmaWxsPSIjZmZmZmZmIiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNIDk4Ny4wMzEyNSA0ODcuNjMyODEyIEMgOTg3LjU3MDMxMiA0ODYuNTYyNSA5ODguMTA5Mzc1IDQ4NS40OTYwOTQgOTg4LjY0MDYyNSA0ODQuNDI5Njg4IEMgOTkwLjUxNTYyNSA0ODAuNjY0MDYyIDk5Mi4zOTQ1MzEgNDc2LjkxMDE1NiA5OTQuMjUzOTA2IDQ3My4xNDA2MjUgQyA5OTQuNzgxMjUgNDcyLjA2MjUgOTk1LjU4MjAzMSA0NzEuMzcxMDk0IDk5Ni43NjU2MjUgNDcxLjEyNSBDIDk5Ny40MjE4NzUgNDcwLjk4ODI4MSA5OTguMDM5MDYyIDQ3MS4wODIwMzEgOTk4LjYzNjcxOSA0NzEuMzQzNzUgQyA5OTkuNzEwOTM4IDQ3MS44MDg1OTQgMTAwMC43ODEyNSA0NzIuMjc3MzQ0IDEwMDEuODM5ODQ0IDQ3Mi43NzczNDQgQyAxMDAzLjMxMjUgNDczLjQ2ODc1IDEwMDMuOTc2NTYyIDQ3NS4wNTQ2ODggMTAwMy40NDUzMTIgNDc2LjU4NTkzOCBDIDEwMDMuMzMyMDMxIDQ3Ni45MTAxNTYgMTAwMy4xNzE4NzUgNDc3LjIxODc1IDEwMDMuMDAzOTA2IDQ3Ny41MTk1MzEgQyA5OTkuMjUgNDg0LjE2Nzk2OSA5OTUuNDg4MjgxIDQ5MC44MTI1IDk5MS43NDIxODggNDk3LjQ2NDg0NCBDIDk5MC45MTAxNTYgNDk4Ljk0NTMxMiA5ODkuNjk1MzEyIDQ5OS43MjI2NTYgOTg3Ljk3MjY1NiA0OTkuNjcxODc1IEMgOTg3LjI1MzkwNiA0OTkuNjQ0NTMxIDk4Ni41MzUxNTYgNDk5LjY2MDE1NiA5ODUuODE2NDA2IDQ5OS42NzE4NzUgQyA5ODQuMjI2NTYyIDQ5OS42ODc1IDk4My4wNzAzMTIgNDk4Ljk0OTIxOSA5ODIuMjk2ODc1IDQ5Ny41OTM3NSBDIDk4MS4xODM1OTQgNDk1LjY1MjM0NCA5ODAuMDkzNzUgNDkzLjcwMzEyNSA5NzkgNDkxLjc1NzgxMiBDIDk3Ni4zNDc2NTYgNDg3LjA1NDY4OCA5NzMuNjg3NSA0ODIuMzUxNTYyIDk3MS4wMzUxNTYgNDc3LjY0ODQzOCBDIDk3MC43NzczNDQgNDc3LjE4NzUgOTcwLjUxNTYyNSA0NzYuNzI2NTYyIDk3MC40MTAxNTYgNDc2LjE5MTQwNiBDIDk3MC4xNDA2MjUgNDc0LjgyODEyNSA5NzAuNzUzOTA2IDQ3My40NDUzMTIgOTcxLjk5MjE4OCA0NzIuODQzNzUgQyA5NzMuMTE3MTg4IDQ3Mi4yOTY4NzUgOTc0LjI1NzgxMiA0NzEuNzgxMjUgOTc1LjQxNDA2MiA0NzEuMzE2NDA2IEMgOTc3LjA2NjQwNiA0NzAuNjQ4NDM4IDk3OC44MDg1OTQgNDcxLjM1NTQ2OSA5NzkuNjQwNjI1IDQ3My4wMTE3MTkgQyA5ODAuNzkyOTY5IDQ3NS4yOTI5NjkgOTgxLjkxNzk2OSA0NzcuNTg1OTM4IDk4My4wNTA3ODEgNDc5Ljg3MTA5NCBDIDk4NC4yMzQzNzUgNDgyLjI1MzkwNiA5ODUuNDE0MDYyIDQ4NC42MzY3MTkgOTg2LjYwNTQ2OSA0ODcuMDE5NTMxIEMgOTg2LjcwNzAzMSA0ODcuMjI2NTYyIDk4Ni43NjU2MjUgNDg3LjQ3MjY1NiA5ODcuMDI3MzQ0IDQ4Ny42MzI4MTIgWiBNIDk4Ny4wMzEyNSA0ODcuNjMyODEyICIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTSAxMDE3LjI4OTA2MiA0ODUuNTc4MTI1IEMgMTAxNy4yODkwNjIgNDg5LjExNzE4OCAxMDE3LjI5Njg3NSA0OTIuNjU2MjUgMTAxNy4yODkwNjIgNDk2LjE5NTMxMiBDIDEwMTcuMjg1MTU2IDQ5Ny44MTY0MDYgMTAxNi4yNzczNDQgNDk5LjEyODkwNiAxMDE0LjczODI4MSA0OTkuNTU4NTk0IEMgMTAxNC41MTE3MTkgNDk5LjYyMTA5NCAxMDE0LjI2NTYyNSA0OTkuNjYwMTU2IDEwMTQuMDMxMjUgNDk5LjY2NDA2MiBDIDEwMTIuOTQxNDA2IDQ5OS42NzU3ODEgMTAxMS44NDc2NTYgNDk5LjcwMzEyNSAxMDEwLjc1NzgxMiA0OTkuNjY0MDYyIEMgMTAwOC45Mzc1IDQ5OS42MDE1NjIgMTAwNy41NjY0MDYgNDk4LjI1NzgxMiAxMDA3LjQxMDE1NiA0OTYuNDMzNTk0IEMgMTAwNy4zOTQ1MzEgNDk2LjIyMjY1NiAxMDA3LjM5ODQzOCA0OTYuMDA3ODEyIDEwMDcuMzk4NDM4IDQ5NS43OTI5NjkgQyAxMDA3LjM5ODQzOCA0ODguOTgwNDY5IDEwMDcuMzk4NDM4IDQ4Mi4xNjc5NjkgMTAwNy4zOTQ1MzEgNDc1LjM1MTU2MiBDIDEwMDcuMzk0NTMxIDQ3NC42MjEwOTQgMTAwNy40NzY1NjIgNDczLjkxNDA2MiAxMDA3Ljg0Mzc1IDQ3My4yNzczNDQgQyAxMDA4LjQ5MjE4OCA0NzIuMTUyMzQ0IDEwMDkuNDUzMTI1IDQ3MS41MTk1MzEgMTAxMC43NjE3MTkgNDcxLjQ4ODI4MSBDIDEwMTEuNzk2ODc1IDQ3MS40NjQ4NDQgMTAxMi44MzU5MzggNDcxLjQ2NDg0NCAxMDEzLjg3ODkwNiA0NzEuNDg4MjgxIEMgMTAxNS44MzU5MzggNDcxLjUzMTI1IDEwMTcuMjg1MTU2IDQ3Mi45OTYwOTQgMTAxNy4yOTI5NjkgNDc0Ljk2NDg0NCBDIDEwMTcuMzA4NTk0IDQ3OC41MDM5MDYgMTAxNy4yOTY4NzUgNDgyLjA0Mjk2OSAxMDE3LjI5Njg3NSA0ODUuNTgyMDMxIFogTSAxMDE3LjI4OTA2MiA0ODUuNTc4MTI1ICIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTSA4MTkuNTAzOTA2IDM4MC45MDYyNSBDIDgxOS41MDM5MDYgMzc5LjQ0NTMxMiA4MTkuNDk2MDk0IDM3Ny45ODA0NjkgODE5LjUwMzkwNiAzNzYuNTE5NTMxIEMgODE5LjUxOTUzMSAzNzQuMTQwNjI1IDgyMC45ODQzNzUgMzcyLjQyMTg3NSA4MjMuMzI4MTI1IDM3Mi4wMzEyNSBDIDgyNC4zMTI1IDM3MS44NjcxODggODI1LjIzMDQ2OSAzNzIuMTEzMjgxIDgyNi4wODU5MzggMzcyLjU5NzY1NiBDIDgyNy43NDYwOTQgMzczLjU0Mjk2OSA4MjkuNDA2MjUgMzc0LjUwMzkwNiA4MzEuMDY2NDA2IDM3NS40NjA5MzggQyA4MzIuMTI4OTA2IDM3Ni4wNzQyMTkgODMzLjIwMzEyNSAzNzYuNjYwMTU2IDgzNC4yMzgyODEgMzc3LjMxMjUgQyA4MzUuNTcwMzEyIDM3OC4xNDg0MzggODM2LjI4OTA2MiAzNzkuMzYzMjgxIDgzNi4yOTY4NzUgMzgwLjk2MDkzOCBDIDgzNi4zMDQ2ODggMzgyLjU3ODEyNSA4MzUuNjQ0NTMxIDM4My44NTE1NjIgODM0LjI2MTcxOSAzODQuNzAzMTI1IEMgODMzLjE1NjI1IDM4NS4zOTA2MjUgODMyLjAxMTcxOSAzODYuMDE5NTMxIDgzMC44ODI4MTIgMzg2LjY3MTg3NSBDIDgyOS4yNjk1MzEgMzg3LjYwMTU2MiA4MjcuNjY0MDYyIDM4OC41NDI5NjkgODI2LjAzOTA2MiAzODkuNDUzMTI1IEMgODI0Ljc4MTI1IDM5MC4xNjAxNTYgODIzLjQ0OTIxOSAzOTAuMjY1NjI1IDgyMi4xMzI4MTIgMzg5LjY1MjM0NCBDIDgyMC40NjQ4NDQgMzg4Ljg4MjgxMiA4MTkuNTU4NTk0IDM4Ny41NDY4NzUgODE5LjUxNTYyNSAzODUuNjk1MzEyIEMgODE5LjQ3NjU2MiAzODQuMTAxNTYyIDgxOS41MDc4MTIgMzgyLjUwMzkwNiA4MTkuNTA3ODEyIDM4MC45MDYyNSBaIE0gODE5LjUwMzkwNiAzODAuOTA2MjUgIiBmaWxsPSIjZmZmZmZmIiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNIDEwMTcuOTY4NzUgNDYyLjk0OTIxOSBDIDEwMTcuOTg4MjgxIDQ2Ni4wNzgxMjUgMTAxNS40OTIxODggNDY4LjYxNzE4OCAxMDEyLjM4MjgxMiA0NjguNjM2NzE5IEMgMTAwOS4yNDIxODggNDY4LjY1NjI1IDEwMDYuNzE4NzUgNDY2LjE3OTY4OCAxMDA2LjY5MTQwNiA0NjMuMDU0Njg4IEMgMTAwNi42NjQwNjIgNDU5Ljg3ODkwNiAxMDA5LjE2Nzk2OSA0NTcuMzI0MjE5IDEwMTIuMzEyNSA0NTcuMzE2NDA2IEMgMTAxNS40MjE4NzUgNDU3LjMwNDY4OCAxMDE3Ljk0OTIxOSA0NTkuODI4MTI1IDEwMTcuOTY4NzUgNDYyLjk0OTIxOSBaIE0gMTAxNy45Njg3NSA0NjIuOTQ5MjE5ICIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTSA5NjIuMDM5MDYyIDQ4My4xMjg5MDYgQyA5NjEuNTMxMjUgNDg0LjQzMzU5NCA5NjEuMDgyMDMxIDQ4NS41OTc2NTYgOTYwLjYyNSA0ODYuNzUzOTA2IEMgOTU4Ljk5NjA5NCA0OTAuODgyODEyIDk1Ny4zNjMyODEgNDk1LjAxMTcxOSA5NTUuNzM4MjgxIDQ5OS4xNDA2MjUgQyA5NTUuNzA3MDMxIDQ5OS4yMTQ4NDQgOTU1LjY4MzU5NCA0OTkuMjg5MDYyIDk1NS42NTIzNDQgNDk5LjM2MzI4MSBDIDk1NC43MTA5MzggNTAxLjg2MzI4MSA5NTMuMjczNDM4IDUwMi4xODc1IDk1MS4xOTE0MDYgNTAyLjE0ODQzOCBDIDk1MC45MTAxNTYgNTAyLjE0MDYyNSA5NTAuNzMwNDY5IDUwMi4wODU5MzggOTUwLjc0MjE4OCA1MDEuNzUzOTA2IEMgOTUwLjc1NzgxMiA1MDEuMzI0MjE5IDk1MC43NTc4MTIgNTAwLjg5ODQzOCA5NTAuNzQyMTg4IDUwMC40NzY1NjIgQyA5NTAuNzM0Mzc1IDUwMC4xOTkyMTkgOTUwLjg1NTQ2OSA1MDAuMDg5ODQ0IDk1MS4xMjEwOTQgNTAwLjEwOTM3NSBDIDk1MS4yMDMxMjUgNTAwLjExNzE4OCA5NTEuMjgxMjUgNTAwLjEwOTM3NSA5NTEuMzYzMjgxIDUwMC4xMDkzNzUgQyA5NTIuODYzMjgxIDUwMC4wNzgxMjUgOTUzLjE1MjM0NCA0OTkuODg2NzE5IDk1My43MTg3NSA0OTguNDU3MDMxIEMgOTU0LjQ3NjU2MiA0OTYuNTM5MDYyIDk1NC40NjQ4NDQgNDk3LjI4MTI1IDk1My43MzA0NjkgNDk1LjM5MDYyNSBDIDk1Mi4yNSA0OTEuNTc0MjE5IDk1MC43MzA0NjkgNDg3Ljc3MzQzOCA5NDkuMjM0Mzc1IDQ4My45NjQ4NDQgQyA5NDkuMTQ0NTMxIDQ4My43MjY1NjIgOTQ4Ljk2ODc1IDQ4My40OTYwOTQgOTQ5LjA0Mjk2OSA0ODMuMTc5Njg4IEMgOTQ5LjY5NTMxMiA0ODMuMDc0MjE5IDk1MC4zNTkzNzUgNDgzLjE1NjI1IDk1MS4wMTk1MzEgNDgzLjEzMjgxMiBDIDk1MS4zMzU5MzggNDgzLjExNzE4OCA5NTEuNDEwMTU2IDQ4My4zNDc2NTYgOTUxLjQ5NjA5NCA0ODMuNTcwMzEyIEMgOTUyLjczMDQ2OSA0ODYuODU1NDY5IDk1NC4wODk4NDQgNDkwLjA4OTg0NCA5NTUuMDg5ODQ0IDQ5My40NjA5MzggQyA5NTUuMTc1NzgxIDQ5My43NSA5NTUuMTQwNjI1IDQ5NC4yMzgyODEgOTU1LjQ5MjE4OCA0OTQuMjU3ODEyIEMgOTU1Ljk0NTMxMiA0OTQuMjgxMjUgOTU1Ljg5MDYyNSA0OTMuNzUzOTA2IDk1NS45NzY1NjIgNDkzLjQ1MzEyNSBDIDk1Ni45NjQ4NDQgNDkwLjEwNTQ2OSA5NTguMzE2NDA2IDQ4Ni44OTg0MzggOTU5LjUzOTA2MiA0ODMuNjM2NzE5IEMgOTU5LjY3MTg3NSA0ODMuMjk2ODc1IDk1OS44Mzk4NDQgNDgzLjEwOTM3NSA5NjAuMjMwNDY5IDQ4My4xMjUgQyA5NjAuNzg1MTU2IDQ4My4xNDg0MzggOTYxLjMzOTg0NCA0ODMuMTMyODEyIDk2Mi4wMzkwNjIgNDgzLjEzMjgxMiBaIE0gOTYyLjAzOTA2MiA0ODMuMTI4OTA2ICIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTSAxMDcwLjE0ODQzOCA0OTEuMjM0Mzc1IEMgMTA2Ny4wMTU2MjUgNDkxLjIzNDM3NSAxMDY0LjQ1NzAzMSA0ODguNjc1NzgxIDEwNjQuNDcyNjU2IDQ4NS41NDY4NzUgQyAxMDY0LjQ4NDM3NSA0ODIuNDMzNTk0IDEwNjcuMDg1OTM4IDQ3OS44NjMyODEgMTA3MC4xOTE0MDYgNDc5Ljg5MDYyNSBDIDEwNzMuMjg5MDYyIDQ3OS45MjE4NzUgMTA3NS44MTY0MDYgNDgyLjQ2MDkzOCAxMDc1LjgyNDIxOSA0ODUuNTU0Njg4IEMgMTA3NS44MjgxMjUgNDg4LjY5NTMxMiAxMDczLjI4OTA2MiA0OTEuMjQyMTg4IDEwNzAuMTQ4NDM4IDQ5MS4yMzgyODEgWiBNIDEwNzAuMDgyMDMxIDQ3MS4xNzE4NzUgQyAxMDYyLjE0ODQzOCA0NzEuMjM4MjgxIDEwNTUuNzM0Mzc1IDQ3Ny42NDA2MjUgMTA1NS43NSA0ODUuNTg1OTM4IEMgMTA1NS43NjE3MTkgNDkzLjU3NDIxOSAxMDYyLjE4NzUgNDk5Ljk4MDQ2OSAxMDcwLjE4MzU5NCA0OTkuOTcyNjU2IEMgMTA3OC4xNDA2MjUgNDk5Ljk2NDg0NCAxMDg0LjYyODkwNiA0OTMuNDg0Mzc1IDEwODQuNTY2NDA2IDQ4NS41MTk1MzEgQyAxMDg0LjUwMzkwNiA0NzcuMDcwMzEyIDEwNzcuNTcwMzEyIDQ3MS4xMDE1NjIgMTA3MC4wODIwMzEgNDcxLjE3MTg3NSAiIGZpbGw9IiNmZmZmZmYiIGZpbGwtcnVsZT0ibm9uemVybyIvPjxwYXRoIGQ9Ik0gOTQ0Ljg4NjcxOSA0OTIuNTYyNSBDIDk0NC4xNjQwNjIgNDk0LjIxNDg0NCA5NDIuODA0Njg4IDQ5NC44OTQ1MzEgOTQxLjAzOTA2MiA0OTQuODc1IEMgOTM5LjI5Njg3NSA0OTQuODU1NDY5IDkzOC4wMzUxNTYgNDk0LjEwMTU2MiA5MzcuMzA4NTk0IDQ5Mi40OTIxODggQyA5MzYuOTU3MDMxIDQ5MS43MTA5MzggOTM2LjgwODU5NCA0OTAuODM5ODQ0IDkzNi44MjQyMTkgNDg5LjQ1NzAzMSBDIDkzNi44MTY0MDYgNDg4Ljg1MTU2MiA5MzYuOTUzMTI1IDQ4Ny45NjA5MzggOTM3LjM0Mzc1IDQ4Ny4xMjUgQyA5MzguMDg5ODQ0IDQ4NS41MjM0MzggOTM5LjQwMjM0NCA0ODQuODAwNzgxIDk0MS4xMjEwOTQgNDg0LjgwMDc4MSBDIDk0Mi44MzU5MzggNDg0LjgwMDc4MSA5NDQuMTg3NSA0ODUuNTAzOTA2IDk0NC44ODY3MTkgNDg3LjEyODkwNiBDIDk0NS42NjAxNTYgNDg4LjkyMTg3NSA5NDUuNjY0MDYyIDQ5MC43NjU2MjUgOTQ0Ljg4NjcxOSA0OTIuNTU4NTk0IFogTSA5NDcuMjI2NTYyIDQ4Ni42OTkyMTkgQyA5NDUuNzc3MzQ0IDQ4Mi41NTg1OTQgOTQwLjQ1MzEyNSA0ODEuNDc2NTYyIDkzNy40ODQzNzUgNDg0LjY4NzUgQyA5MzcuNDQ1MzEyIDQ4NC43MzA0NjkgOTM3LjQxNzk2OSA0ODQuNzczNDM4IDkzNy4zNzg5MDYgNDg0LjgwODU5NCBDIDkzNy4yNzM0MzggNDg0LjkxNzk2OSA5MzcuMTc5Njg4IDQ4NS4wODIwMzEgOTM2Ljk4ODI4MSA0ODQuOTk2MDk0IEMgOTM2Ljg0Mzc1IDQ4NC45Mjk2ODggOTM2Ljg2NzE4OCA0ODQuNzczNDM4IDkzNi44NjMyODEgNDg0LjY0NDUzMSBDIDkzNi44NTkzNzUgNDg0LjM3ODkwNiA5MzYuODYzMjgxIDQ4NC4xMTMyODEgOTM2Ljg2MzI4MSA0ODMuODQzNzUgQyA5MzYuODYzMjgxIDQ4MS43NDIxODggOTM2Ljg2NzE4OCA0NzkuNjQwNjI1IDkzNi44NjMyODEgNDc3LjUzNTE1NiBDIDkzNi44NjMyODEgNDc2LjkxNDA2MiA5MzYuODUxNTYyIDQ3Ni45MTQwNjIgOTM2LjI0MjE4OCA0NzYuODk0NTMxIEMgOTM1Ljg5ODQzOCA0NzYuODg2NzE5IDkzNS41NTA3ODEgNDc2LjkxMDE1NiA5MzUuMjAzMTI1IDQ3Ni44OTA2MjUgQyA5MzQuODE2NDA2IDQ3Ni44NjcxODggOTM0LjU3ODEyNSA0NzYuOTYwOTM4IDkzNC42MzY3MTkgNDc3LjQxNDA2MiBDIDkzNC42NjAxNTYgNDc3LjYwMTU2MiA5MzQuNjQwNjI1IDQ3Ny43ODkwNjIgOTM0LjY0MDYyNSA0NzcuOTc2NTYyIEwgOTM0LjY0MDYyNSA0OTUuMDYyNSBDIDkzNC42NDA2MjUgNDk2LjY4NzUgOTM0LjY0MDYyNSA0OTYuNjc1NzgxIDkzNi4yNjU2MjUgNDk2LjYwMTU2MiBDIDkzNi42Njc5NjkgNDk2LjU4MjAzMSA5MzYuODU1NDY5IDQ5Ni40NTcwMzEgOTM2LjgzOTg0NCA0OTYuMDM5MDYyIEMgOTM2LjgyMDMxMiA0OTUuNTc0MjE5IDkzNi44MzU5MzggNDk1LjEwNTQ2OSA5MzYuODM1OTM4IDQ5NC41NzQyMTkgQyA5MzcuMjE4NzUgNDk0LjY1MjM0NCA5MzcuMzI0MjE5IDQ5NC44MTY0MDYgOTM3LjQzNzUgNDk0Ljk2MDkzOCBDIDkzOS43MTQ4NDQgNDk3LjgyMDMxMiA5NDUuNzY1NjI1IDQ5Ny42Nzk2ODggOTQ3LjI4NTE1NiA0OTIuODEyNSBDIDk0Ny45MjU3ODEgNDkwLjc2OTUzMSA5NDcuOTMzNTk0IDQ4OC43MTQ4NDQgOTQ3LjIzMDQ2OSA0ODYuNjk5MjE5IFogTSA5NDcuMjI2NTYyIDQ4Ni42OTkyMTkgIiBmaWxsPSIjZmZmZmZmIiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48L3N2Zz4=" alt="IPNET by Vivo"><span class="nome">TransLog · Diagnóstico de Pontualidade Logística</span>
+  <span class="caminho">Fonte: gold.obt_pedidos_logistica · 36.866 pedidos · jan/2015 a jan/2018</span>
+  <div class="acoes"><span class="pill">Despacho = dado real</span><span class="pill" style="border-style:dashed;color:#d9a6ff">Entrega = simulação</span></div>
+</div>
+<div class="cab">
+  <div class="titulo"><h1>Onde a TransLog perde o prazo</h1><span class="publico">Público: Diretoria de Operações e Atendimento · Unidade de análise: pedido pago e despachado</span></div>
+  <div class="abas" role="tablist" aria-label="Páginas do painel">
+    <button class="aba" role="tab" aria-selected="true" data-p="0">Resumo executivo</button>
+    <button class="aba" role="tab" aria-selected="false" data-p="1">1 · Quanto atrasa</button>
+    <button class="aba" role="tab" aria-selected="false" data-p="2">2 · Por que atrasa</button>
+    <button class="aba" role="tab" aria-selected="false" data-p="3">3 · O que não explica</button>
+    <button class="aba" role="tab" aria-selected="false" data-p="4">4 · Impacto no cliente</button>
+    <button class="aba" role="tab" aria-selected="false" data-p="5">5 · Plano de ação</button>
+    <button class="aba" role="tab" aria-selected="false" data-p="6">6 · Dados e premissas</button>
+  </div>
+</div>
+<main style="padding-top:14px">
+
+  <section class="pagina" data-pagina="0">
+    <div class="manchete dt"><div><small>A PERGUNTA</small><span class="perg">Por que a TransLog não cumpre o prazo que promete?</span></div><div><small>A RESPOSTA</small><span class="resp">A TransLog não atrasa na estrada. Atrasa antes de sair do armazém</span></div><div><small>O QUE ESTÁ EM JOGO</small><span class="dai">57,3% dos pedidos saem atrasados, e US$ 11,8 milhões em vendas passaram por esse atraso.</span></div></div>
+    <div class="w c4 achado"><span class="n">ACHADO 1 · <span class="tag-fonte real">DADO REAL</span></span><span class="big" style="color:var(--vermelho)">57,3%</span><b>dos pedidos saem do armazém depois do prazo prometido</b><p>Atraso estável há 3 anos, em todo mercado, mês e tipo de cliente. É processo, não acaso.</p></div>
+    <div class="w c4 achado"><span class="n">ACHADO 2 · <span class="tag-fonte real">DADO REAL</span></span><span class="big" style="color:#d9a6ff">45%</span><b>do atraso é promessa errada, não falha da operação</b><p>First Class promete 1 dia e despacha sempre em 2. Same Day promete 0 e despacha em 0 ou 1.</p></div>
+    <div class="w c4 achado"><span class="n">ACHADO 3 · <span class="tag-fonte real">DADO REAL</span></span><span class="big" style="color:var(--ambar)">4,0 dias</span><b>é o despacho médio da Second Class, igual ao da Standard</b><p>O cliente paga por velocidade e não recebe. O armazém não dá prioridade a nenhuma modalidade.</p></div>
+    <div class="w c8"><h2>O que recomendamos</h2><span class="sub">da ação mais rápida à mais estrutural</span>
+      <div class="rec-res"><span class="i">1</span><div><b>Prometer o prazo que a operação cumpre</b><p>First Class 2 dias, Same Day 1, Second e Standard 4. Sem investimento.</p></div><div class="imp-n">57,3% → 31,4%<small>despacho atrasado</small></div></div>
+      <div class="rec-res"><span class="i">2</span><div><b>Despachar tudo em até 4 dias, com fila de prioridade</b><p>Atacar os 11.578 despachos de 5 a 6 dias e dar à Second Class a velocidade que ela vende.</p></div><div class="imp-n">11.578<small>despachos de 5 a 6 dias</small></div></div>
+      <div class="rec-res"><span class="i">3</span><div><b>Medir o armazém e avisar o cliente antes</b><p>Registrar separação, embalagem e coleta. Portal e LogBot informam a nova previsão.</p></div><div class="imp-n">8.388<small>casos críticos com aviso</small></div></div>
+    </div>
+    <div class="w c4 texto-w"><h2>Escopo da análise</h2><span class="sub">o que está e o que não está nos dados</span>
+      <div class="escopo" style="flex-direction:column;gap:6px"><span>36.866 pedidos pagos e despachados (gold.obt_pedidos_logistica)</span><span>jan/2015 a jan/2018 · 5 mercados · 4 modalidades</span><span>Despacho: dado real da operação</span><span>Entrega e extravio: cenário simulado, marcado em cada tela</span></div>
+      <p style="margin-top:10px">Pedidos não pagos e cancelados ficam fora da conta de atraso, porque o prazo não começou a contar.</p></div>
+  </section>
+
+  <section class="pagina" data-pagina="1" hidden>
+    <div class="manchete dt"><div><small>PERGUNTA DE NEGÓCIO</small><span class="perg">Quanto a TransLog atrasa, e quanto isso pesa?</span></div><div><small>CONCLUSÃO</small><span class="resp">Mais da metade dos pedidos sai atrasada, em média 1,6 dia além do prometido</span></div><div><small>IMPACTO NO NEGÓCIO</small><span class="dai">57% da receita bruta e 57% do lucro passaram por um despacho atrasado.</span></div></div>
+    <div class="w kpi c3"><h2>Pedidos pagos e despachados</h2><span class="v">36.866</span><span class="d">um pedido por linha na Gold</span></div>
+    <div class="w kpi c3"><h2>Despacho atrasado</h2><span class="v" style="color:var(--vermelho)">57,3%</span><span class="d">21.127 pedidos · média de 1,6 dia de atraso</span></div>
+    <div class="w kpi c3"><h2>Receita com despacho atrasado</h2><span class="v">US$ 11,8 mi</span><span class="d">de US$ 20,6 mi de receita bruta</span></div>
+    <div class="w kpi c3"><h2>Lucro com despacho atrasado</h2><span class="v">US$ 1,3 mi</span><span class="d">de US$ 2,3 mi de lucro · margem de 11%</span></div>
+    <div class="w c7"><h2>Em quantos dias a TransLog despacha</h2><span class="sub">% dos pedidos, por dias entre a compra e a saída do armazém · <span class="tag-fonte real">DADO REAL</span></span><div class="grafico"><canvas id="g-dias" aria-label="Distribuição dos dias até o despacho"></canvas></div>
+      <span class="nota-real">Quase um terço sai em 2 dias. Do 3º ao 6º dia, a distribuição é plana: cerca de 16% em cada dia, sem um padrão de prioridade.</span></div>
+    <div class="w c5"><h2>A régua certa: correção da regra de atraso</h2><span class="sub">itens marcados como atrasados · <span class="tag-fonte real">DADO REAL</span></span>
+      <div class="grafico"><canvas id="g-correcao" aria-label="Itens atrasados antes e depois da correção"></canvas></div>
+      <span class="nota-real">A base original contava como atraso até pedido não pago. Corrigido na Silver: 98.976 → 57.810 itens.</span></div>
+  </section>
+
+  <section class="pagina" data-pagina="2" hidden>
+    <div class="manchete dt"><div><small>PERGUNTA DE NEGÓCIO</small><span class="perg">Por que o despacho atrasa?</span></div><div><small>CONCLUSÃO</small><span class="resp">Dois problemas: promessa errada nas modalidades rápidas e operação sem prioridade</span></div><div><small>IMPACTO NO NEGÓCIO</small><span class="dai">Com o prazo honesto, o atraso cai de 57,3% para 31,4%. O que sobra são despachos de 5 a 6 dias.</span></div></div>
+    <div class="w c7"><h2>Promessa x capacidade: em que dia cada modalidade despacha</h2><span class="sub">% dos pedidos por dia de despacho · verde = dentro do prometido · vermelho = atrasado · <span class="tag-fonte real">DADO REAL</span></span>
+      <div class="dist"><div class="dist-l"><div class="nm">First Class<small>promete 1 dia</small></div><div class="c"><span></span><i style="height:0px;background:var(--verde)"></i></div><div class="c prom"><span></span><i style="height:0px;background:var(--verde)"></i></div><div class="c"><span>100,0%</span><i style="height:58px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div></div><div class="dist-l"><div class="nm">Same Day<small>promete 0 dia</small></div><div class="c prom"><span>51,6%</span><i style="height:30px;background:var(--verde)"></i></div><div class="c"><span>48,4%</span><i style="height:28px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--vermelho)"></i></div></div><div class="dist-l"><div class="nm">Second Class<small>promete 2 dias</small></div><div class="c"><span></span><i style="height:0px;background:var(--verde)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--verde)"></i></div><div class="c prom"><span>20,2%</span><i style="height:12px;background:var(--verde)"></i></div><div class="c"><span>20,2%</span><i style="height:12px;background:var(--vermelho)"></i></div><div class="c"><span>20,2%</span><i style="height:12px;background:var(--vermelho)"></i></div><div class="c"><span>19,6%</span><i style="height:11px;background:var(--vermelho)"></i></div><div class="c"><span>19,9%</span><i style="height:12px;background:var(--vermelho)"></i></div></div><div class="dist-l"><div class="nm">Standard<small>promete 4 dias</small></div><div class="c"><span></span><i style="height:0px;background:var(--verde)"></i></div><div class="c"><span></span><i style="height:0px;background:var(--verde)"></i></div><div class="c"><span>20,2%</span><i style="height:12px;background:var(--verde)"></i></div><div class="c"><span>20,1%</span><i style="height:12px;background:var(--verde)"></i></div><div class="c prom"><span>19,9%</span><i style="height:12px;background:var(--verde)"></i></div><div class="c"><span>19,8%</span><i style="height:11px;background:var(--vermelho)"></i></div><div class="c"><span>19,9%</span><i style="height:12px;background:var(--vermelho)"></i></div></div><div class="dist-eixo"><span></span><span>0 d</span><span>1 d</span><span>2 d</span><span>3 d</span><span>4 d</span><span>5 d</span><span>6 d</span></div></div>
+      <span class="nota-real">First Class: 100% em 2 dias, prometendo 1. Second e Standard: a mesma distribuição de 2 a 6 dias, apesar de prometerem 2 e 4.</span></div>
+    <div class="w c5"><h2>Atraso: promessa atual x prazo honesto</h2><span class="sub">% de despacho atrasado · prazo honesto: First 2, Same Day 1, Second 4, Standard 4</span><div class="grafico alto"><canvas id="g-modal" aria-label="Atraso atual e com prazo honesto"></canvas></div></div>
+    <div class="w c4 texto-w"><h2>First Class e Same Day</h2><span class="sub"><span class="tag-causa pi">Promessa irreal</span></span>
+      <p>A operação é <b>previsível</b>: First Class sai sempre em 2 dias, Same Day em 0 ou 1. O erro está no prazo vendido.</p><p>Corrigir a promessa zera o atraso de <b>6.655 pedidos</b> dessas duas modalidades.</p></div>
+    <div class="w c4 destaque-w texto-w"><h2>Second Class: o achado</h2><span class="sub"><span class="tag-causa op">Operacional</span></span>
+      <p>Promete 2 dias, mas despacha <b>igual à Standard</b>: de 2 a 6 dias, média de 4,0. Atrasa 79,8%.</p><p>A TransLog precisa escolher: <b>dar prioridade real</b> no armazém para cumprir o prazo que vende, ou <b>reposicionar</b> a Second Class junto da Standard.</p></div>
+    <div class="w c4 alerta-modal texto-w"><h2>Por que não olhar o modal</h2><span class="sub">aéreo expresso, consolidado, rodoviário</span>
+      <p>O modal é <b>atribuído por regra a partir da modalidade</b>: todo Same Day e First Class vira aéreo expresso, que por isso "atrasa" 86,7%.</p><p>O modal descreve o trajeto, mas <b>não explica o atraso</b>.</p></div>
+  </section>
+
+  <section class="pagina" data-pagina="3" hidden>
+    <div class="manchete dt"><div><small>PERGUNTA DE NEGÓCIO</small><span class="perg">O atraso se concentra em algum lugar, época ou tipo de cliente?</span></div><div><small>CONCLUSÃO</small><span class="resp">Não. O atraso só muda de verdade quando muda a modalidade</span></div><div><small>IMPACTO NO NEGÓCIO</small><span class="dai">Não adianta atacar uma região ou um período. A causa é o processo de despacho, e a solução vale para a operação inteira.</span></div></div>
+    <div class="w c12"><h2>Quanto o atraso muda de um grupo para outro, em cada recorte</h2><span class="sub">diferença entre o grupo que mais atrasa e o que menos atrasa, em pontos percentuais · <span class="tag-fonte real">DADO REAL</span></span>
+      <div class="amp" style="margin-top:8px"><div class="amp-l amp-p"><div class="nm">Modalidade<small>4 grupos</small></div><div class="amp-b"><i style="width:100.0%"></i><b>60,3 p.p.</b></div><div class="amp-t">de <b>39,7%</b> (Standard) a <b>100,0%</b> (First Class)</div></div><div class="amp-l"><div class="nm">Região de destino<small>23 grupos</small></div><div class="amp-b"><i style="width:14.4%"></i><b>8,7 p.p.</b></div><div class="amp-t">de <b>51,7%</b> (Canadá) a <b>60,4%</b> (Ásia Central)</div></div><div class="amp-l"><div class="nm">Mês do pedido<small>36 grupos</small></div><div class="amp-b"><i style="width:8.5%"></i><b>5,1 p.p.</b></div><div class="amp-t">de <b>55,1%</b> (jan/2015) a <b>60,2%</b> (mar/2016)</div></div><div class="amp-l"><div class="nm">País (15 maiores)<small>15 grupos</small></div><div class="amp-b"><i style="width:7.3%"></i><b>4,4 p.p.</b></div><div class="amp-t">de <b>55,2%</b> (Honduras) a <b>59,7%</b> (Indonésia)</div></div><div class="amp-l"><div class="nm">Mercado<small>5 grupos</small></div><div class="amp-b"><i style="width:4.5%"></i><b>2,7 p.p.</b></div><div class="amp-t">de <b>55,8%</b> (África) a <b>58,5%</b> (Ásia-Pacífico)</div></div><div class="amp-l"><div class="nm">Departamento (8 maiores)<small>8 grupos</small></div><div class="amp-b"><i style="width:4.6%"></i><b>2,8 p.p.</b></div><div class="amp-t">de <b>56,0%</b> (Outdoors) a <b>58,8%</b> (Fitness)</div></div><div class="amp-l"><div class="nm">Dia da semana<small>7 grupos</small></div><div class="amp-b"><i style="width:3.2%"></i><b>1,9 p.p.</b></div><div class="amp-t">de <b>56,3%</b> (sábado) a <b>58,2%</b> (terça)</div></div><div class="amp-l"><div class="nm">Segmento de cliente<small>3 grupos</small></div><div class="amp-b"><i style="width:1.5%"></i><b>0,9 p.p.</b></div><div class="amp-t">de <b>57,1%</b> (Corporativo) a <b>57,9%</b> (Home Office)</div></div><div class="amp-l"><div class="nm">Itens no pedido<small>5 grupos</small></div><div class="amp-b"><i style="width:2.0%"></i><b>1,2 p.p.</b></div><div class="amp-t">de <b>56,5%</b> (4 itens) a <b>57,8%</b> (1 item)</div></div><div class="amp-l"><div class="nm">Tipo de rota<small>2 grupos</small></div><div class="amp-b"><i style="width:1.2%"></i><b>0,2 p.p.</b></div><div class="amp-t">de <b>57,3%</b> (internacional) a <b>57,5%</b> (doméstica)</div></div></div>
+      <span class="nota-real">Exemplo: entre os 5 mercados, o atraso vai de 55,8% a 58,5%, uma diferença de só 2,7 pontos. Entre as modalidades, vai de 39,7% a 100%: 60,3 pontos.</span></div>
+    <div class="w c4 texto-w"><h2>Hipóteses descartadas</h2><span class="sub">o que um diretor perguntaria primeiro</span>
+      <p><b>"É a alta de fim de ano."</b> Não: novembro e dezembro atrasam 58,1%, contra 57,1% no resto do ano.</p><p><b>"É a rota internacional."</b> Não: doméstica 57,5%, internacional 57,3%.</p></div>
+    <div class="w c4 texto-w"><h2>&nbsp;</h2><span class="sub">&nbsp;</span>
+      <p><b>"São pedidos grandes."</b> Não: de 1 a 5 itens, o atraso fica entre 56,5% e 57,8%.</p><p><b>"É um mercado problemático."</b> Não: os 5 mercados ficam entre 55,8% e 58,5%.</p></div>
+    <div class="w c4 destaque-w texto-w"><h2>O que sobra</h2><span class="sub">a única variável que muda o atraso</span>
+      <p>A <b>modalidade</b>: de 39,7% na Standard a 100% na First Class. Ou seja, a relação entre o prazo prometido e a capacidade do armazém.</p></div>
+  </section>
+
+  <section class="pagina" data-pagina="4" hidden>
+    <div class="manchete dt" style="border-left-color:var(--sim)"><div><small>PERGUNTA DE NEGÓCIO</small><span class="perg">Como o atraso do armazém chega ao cliente?</span></div><div><small>CONCLUSÃO</small><span class="resp">Despacho atrasado aumenta em 60% a chance de a entrega atrasar</span></div><div><small>IMPACTO NO NEGÓCIO</small><span class="dai">O transporte absorve parte do atraso, mas não em rotas curtas. Cenário simulado: valida a lógica, não os valores.</span></div></div>
+    <div class="w kpi c3 sim"><span class="selo">SIMULAÇÃO</span><h2>Entregue no prazo</h2><span class="v">60,0%</span><span class="d">22.014 pedidos com desfecho</span></div>
+    <div class="w kpi c3 sim"><span class="selo">SIMULAÇÃO</span><h2>Transporte recuperou o atraso</h2><span class="v">70,0%</span><span class="d">11.847 de 16.913 despachos atrasados entregues</span></div>
+    <div class="w kpi c3 sim"><span class="selo">SIMULAÇÃO</span><h2>Entregas atrasadas que nasceram no armazém</h2><span class="v">68,1%</span><span class="d">das 7.435 entregas com atraso</span></div>
+    <div class="w kpi c3 sim"><span class="selo">SIMULAÇÃO</span><h2>Casos críticos para a central</h2><span class="v">8.388</span><span class="d">extravio ou atraso de 3 dias ou mais</span></div>
+    <div class="w c5 sim"><span class="selo">SIMULAÇÃO</span><h2>Despacho no prazo x atrasado: o que acontece na entrega</h2><span class="sub">% dos pedidos com desfecho</span><div class="grafico"><canvas id="g-efeito" aria-label="Efeito do despacho atrasado na entrega"></canvas></div><span class="nota-real">Entrega atrasada: 15,1% quando o despacho sai no prazo, 24,1% quando sai atrasado.</span></div>
+    <div class="w c3 sim destaque-w texto-w"><span class="selo">SIMULAÇÃO</span><h2>Rotas curtas não têm folga</h2><span class="sub">entrega no prazo, por tipo de rota</span>
+      <p><span class="grande">42,9%</span><br>doméstica nos EUA</p><p><span class="grande">62,5%</span><br>internacional</p><p>Com 1 a 3 dias de trânsito, não há tempo para recuperar o atraso do armazém. Pedido doméstico precisa sair primeiro.</p></div>
+    <div class="w c4 sim"><span class="selo">SIMULAÇÃO</span><h2>Onde a carga se perde</h2><span class="sub">% dos extravios, por etapa</span><div class="grafico"><canvas id="g-extravio" aria-label="Extravios por etapa"></canvas></div><span class="nota-real">A alfândega concentra 40% dos extravios, só em rotas internacionais.</span></div>
+  </section>
+
+  <section class="pagina" data-pagina="5" hidden>
+    <div class="manchete dt" style="border-left-color:var(--verde-claro)"><div><small>PERGUNTA DE NEGÓCIO</small><span class="perg">O que fazer, em que ordem, e quanto isso vale?</span></div><div><small>CONCLUSÃO</small><span class="resp">O prazo honesto leva o atraso de 57,3% para 31,4%. O resto são despachos de 5 a 6 dias</span></div><div><small>IMPACTO NO NEGÓCIO</small><span class="dai">9.549 pedidos e US$ 5,3 milhões em vendas deixam de atrasar. Os 11.578 restantes somam US$ 6,4 milhões.</span></div></div>
+    <div class="w c7"><h2>Despacho atrasado: hoje x com prazo honesto</h2><span class="sub">calculado sobre os 36.866 pedidos da Gold</span>
+      <div class="cenario" style="margin-top:6px"><div class="cen-l"><div class="nm"><b>Hoje</b><span>promessa atual</span></div><div><div class="barra" style="width:100.0%;background:var(--vermelho)">57,3%</div></div><div class="ef"><b>21.127</b>pedidos atrasados</div></div><div class="cen-l"><div class="nm"><b>Com prazo honesto</b><span>regra S1 da Gold</span></div><div><div class="barra" style="width:54.8%;background:var(--ambar)">31,4%</div></div><div class="ef"><b>−9.549</b>pedidos · US$ 5,3 mi</div></div></div>
+      <div class="cen-l" style="margin-top:4px"><div class="nm"><b>O que sobra</b><span>meta S2 da Gold</span></div><div class="texto-w"><p>Com o prazo honesto, os pedidos que continuam atrasados são <b>exatamente os 11.578 despachos de 5 ou 6 dias</b> (flag de meta S2 da Gold). Despachar em até 4 dias resolve o restante.</p></div><div class="ef"><b>US$ 6,4 mi</b>em vendas</div></div><span class="nota-real">Prazo honesto (regra S1 da Gold): First 2 dias, Same Day 1, Second 4, Standard 4.</span></div>
+    <div class="w c5"><h2>Indicadores para acompanhar</h2><span class="sub">linha de base medida na Gold</span>
+      <div class="tab-wrap"><table><thead><tr><th>Indicador</th><th class="n">Hoje</th><th class="n">Com prazo honesto</th></tr></thead><tbody>
+        <tr><td>Despacho no prazo</td><td class="n">42,7%</td><td class="n" style="color:var(--verde-claro)">68,6%</td></tr>
+        <tr><td>Despachos de 5 ou 6 dias (meta S2)</td><td class="n">31,4%</td><td class="n">31,4%</td></tr>
+        <tr><td>Despacho médio da Second Class</td><td class="n">4,0 dias</td><td class="n">4,0 dias</td></tr>
+        <tr><td>Despacho atrasado na First Class</td><td class="n">100%</td><td class="n" style="color:var(--verde-claro)">0%</td></tr>
+        <tr><td>Casos críticos para a central</td><td class="n">8.388</td><td class="n">acompanhar</td></tr>
+      </tbody></table></div><span class="nota-real">As metas de redução serão definidas com a TransLog a partir desta linha de base.</span></div>
+    <div class="w c12"><h2>Plano em três fases</h2><span class="sub">o que muda, quem faz e quando</span>
+      <div class="roadmap">
+        <div class="fase-r"><em>FASE 1 · QUICK WIN</em><b>Prometer o que se cumpre</b><ul><li>Atualizar o prazo de First Class (2 dias), Same Day (1) e Second Class (4) no checkout</li><li>Comunicar a mudança aos clientes</li><li>Portal e LogBot já informam a nova previsão</li></ul></div>
+        <div class="fase-r"><em>FASE 2 · OPERAÇÃO</em><b>Despachar em até 4 dias</b><ul><li>Fila de prioridade no armazém: Second Class e pedidos domésticos primeiro</li><li>Atacar os 11.578 despachos de 5 a 6 dias</li><li>Decidir o futuro da Second Class: prioridade real ou reposicionamento</li></ul></div>
+        <div class="fase-r"><em>FASE 3 · ESTRUTURA</em><b>Medir para prever</b><ul><li>Registrar separação, embalagem e coleta com data e hora</li><li>Ingerir os eventos reais de transporte no lugar da simulação</li><li>Modelo preditivo de atraso antes do despacho</li></ul></div>
+      </div></div>
+  </section>
+
+  <section class="pagina" data-pagina="6" hidden>
+    <div class="manchete dt" style="border-left-color:var(--verde)"><div><small>PERGUNTA DE NEGÓCIO</small><span class="perg">Até onde dá para confiar nestes números?</span></div><div><small>CONCLUSÃO</small><span class="resp">Despacho é dado real e testado. Entrega é cenário, marcado em cada tela</span></div><div><small>IMPACTO NO NEGÓCIO</small><span class="dai">As decisões das telas 1, 2, 3 e 5 se apoiam só em dado real. A tela 4 mostra a lógica, a validar com dados reais de transporte.</span></div></div>
+    <div class="w kpi c3"><h2>Testes automatizados</h2><span class="v" style="color:var(--verde)">74</span><span class="d">44 na Silver e 30 nos eventos de rastreio</span></div>
+    <div class="w kpi c3"><h2>Dados pessoais expostos</h2><span class="v" style="color:var(--verde)">0</span><span class="d">nome, e-mail, senha e endereço removidos</span></div>
+    <div class="w kpi c3"><h2>Itens reclassificados</h2><span class="v">41.166</span><span class="d">pela regra de atraso corrigida</span></div>
+    <div class="w kpi c3"><h2>Rótulo por coluna</h2><span class="v" style="color:var(--verde)">100%</span><span class="d">cada coluna da Gold diz se é real ou simulada</span></div>
+    <div class="w c6 texto-w"><h2>Premissas e limitações</h2><span class="sub">o que a banca deve saber</span>
+      <ul class="lim">
+        <li><b>Base:</b> gold.obt_pedidos_logistica, 36.866 pedidos pagos e despachados (DataCo). Data de referência: 06/02/2018.</li>
+        <li><b>Entrega simulada:</b> a base termina no despacho. O trajeto foi simulado de forma determinística, sempre depois da data real de saída.</li>
+        <li><b>Extravio de 19,7%:</b> vem dos parâmetros do cenário simulado. Serve para testar o fluxo, não como estimativa da operação.</li>
+        <li><b>Janeiro de 2018:</b> mês parcial, marcado na Gold e fora das séries.</li>
+        <li><b>Motivo do atraso operacional:</b> a base não registra. Por isso a recomendação de medir o armazém.</li>
+      </ul></div>
+    <div class="w c6"><h2>Maturidade analítica</h2><span class="sub">estágio atual e próximos passos</span>
+      <div class="escada">
+        <div class="degrau feito" style="min-height:90px"><em>ENTREGUE</em><b>Descritivo</b><span>O que aconteceu</span></div>
+        <div class="degrau feito" style="min-height:130px"><em>ENTREGUE</em><b>Diagnóstico</b><span>Por que aconteceu</span></div>
+        <div class="degrau parcial" style="min-height:170px"><em>PARCIAL</em><b>Prescritivo</b><span>Prazo honesto e cenários</span></div>
+        <div class="degrau proximo" style="min-height:210px"><em>PRÓXIMO PASSO</em><b>Preditivo</b><span>Prever o atraso antes do despacho</span></div>
+      </div></div>
+    <div class="w c12"><h2>Linhagem dos dados</h2><span class="sub">a mesma base alimenta o painel, o agente de IA e o portal</span>
+      <div class="fluxo">
+        <div class="no-f"><b>DataCo</b><span>base pública de pedidos</span></div><span class="seta" aria-hidden="true">→</span>
+        <div class="no-f" style="border-color:#c58a4b"><b>Bronze</b><span>dado como chegou</span></div><span class="seta" aria-hidden="true">→</span>
+        <div class="no-f" style="border-color:#c6ccd3"><b>Silver</b><span>limpa, sem dados pessoais, regra de atraso oficial</span></div><span class="seta" aria-hidden="true">→</span>
+        <div class="no-f sim"><b>Rastreio simulado</b><span>trajeto depois do despacho, marcado</span></div><span class="seta" aria-hidden="true">→</span>
+        <div class="no-f ouro"><b>Gold</b><span>obt_pedidos_logistica · 36.866 pedidos, 101.009 itens</span></div><span class="seta" aria-hidden="true">→</span>
+        <div class="no-f"><b>Painel · Agente · Portal</b><span>uma única versão da verdade</span></div>
+      </div></div>
+  </section>
+</main>
+<script>
+const cor = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const grade = { color: "#2a2631" };
+const pct = v => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+if (window.Chart) { Chart.defaults.font.family = "Source Sans 3, Segoe UI, system-ui, sans-serif"; Chart.defaults.color = "#c9c4d1"; Chart.defaults.borderColor = "#2f2b36"; Chart.defaults.maintainAspectRatio = false; Chart.defaults.plugins.legend.labels.boxWidth = 10; }
+const rot = (fmt, horiz) => ({ id: "rot", afterDatasetsDraw(ch) { const c = ch.ctx; c.save(); c.fillStyle = "#f5f5f5"; c.font = "600 12px Source Sans 3, sans-serif";
+  ch.data.datasets.forEach((ds, k) => ch.getDatasetMeta(k).data.forEach((b, i) => { const v = ds.data[i]; if (v == null) return;
+    if (horiz) { c.textAlign = "left"; c.textBaseline = "middle"; c.fillText(fmt(v), b.x + 6, b.y); } else { c.textAlign = "center"; c.textBaseline = "bottom"; c.fillText(fmt(v), b.x, b.y - 4); } })); c.restore(); } });
+const criar = {
+  1() {
+    new Chart(document.getElementById("g-dias"), { type: "bar", data: { labels: ["0 dia", "1 dia", "2 dias", "3 dias", "4 dias", "5 dias", "6 dias"], datasets: [{ data: [2.8, 2.6, 31.5, 16.0, 15.8, 15.7, 15.8], backgroundColor: ["#aed74b", "#aed74b", "#aed74b", "#aed74b", "#aed74b", cor("--vermelho"), cor("--vermelho")] }] },
+      options: { layout: { padding: { top: 18 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => pct(c.raw) + " dos pedidos" } } }, scales: { x: { grid: { display: false } }, y: { max: 36, grid: grade, ticks: { callback: v => v + "%" } } } }, plugins: [rot(pct)] });
+    new Chart(document.getElementById("g-correcao"), { type: "bar", data: { labels: ["Regra original", "Regra corrigida"], datasets: [{ data: [98976, 57810], backgroundColor: [cor("--cinza-barra"), cor("--vermelho")] }] },
+      options: { layout: { padding: { top: 18 } }, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: grade, ticks: { callback: v => (v / 1000) + " mil" } } } }, plugins: [rot(v => v.toLocaleString("pt-BR"))] });
+  },
+  2() { new Chart(document.getElementById("g-modal"), { type: "bar",
+      data: { labels: ["First Class", "Second Class", "Same Day", "Standard"], datasets: [
+        { label: "Promessa atual", data: [100, 79.8, 48.4, 39.7], backgroundColor: cor("--vermelho") },
+        { label: "Prazo honesto", data: [0, 39.4, 0, 39.7], backgroundColor: cor("--verde") }] },
+      options: { indexAxis: "y", plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: c => c.dataset.label + ": " + pct(c.raw) } } },
+        scales: { x: { min: 0, max: 115, grid: grade, ticks: { callback: v => v <= 100 ? v + "%" : "" } }, y: { grid: { display: false } } } }, plugins: [rot(pct, true)] }); },
+  4() {
+    new Chart(document.getElementById("g-efeito"), { type: "bar", data: { labels: ["Despacho no prazo", "Despacho atrasado"], datasets: [
+        { label: "Entregue no prazo", data: [64.9, 56.4], backgroundColor: cor("--verde") },
+        { label: "Entregue com atraso", data: [15.1, 24.1], backgroundColor: cor("--ambar") },
+        { label: "Extraviado", data: [20.0, 19.5], backgroundColor: cor("--sim") }] },
+      options: { plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: c => c.dataset.label + ": " + pct(c.raw) } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, max: 100, grid: grade, ticks: { callback: v => v + "%" } } } } });
+    new Chart(document.getElementById("g-extravio"), { type: "bar", data: { labels: ["Alfândega", "Última milha", "Voo", "Transferência", "Coleta"], datasets: [{ data: [40.3, 21.7, 18.5, 13.7, 5.7], backgroundColor: cor("--sim") }] },
+      options: { indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => pct(c.raw) + " dos extravios" } } }, scales: { x: { max: 52, grid: grade, ticks: { callback: v => v + "%" } }, y: { grid: { display: false } } } }, plugins: [rot(pct, true)] });
+  },
+  0() {}, 3() {}, 5() {}, 6() {}
+};
+const feitas = new Set();
+function mostrar(p) {
+  document.querySelectorAll(".pagina").forEach(s => s.hidden = s.dataset.pagina !== p);
+  document.querySelectorAll(".aba").forEach(b => b.setAttribute("aria-selected", b.dataset.p === p));
+  if (!feitas.has(p) && window.Chart) { try { criar[p](); } catch (e) { console.error(e); } feitas.add(p); }
+}
+document.querySelectorAll(".aba").forEach(b => b.addEventListener("click", () => mostrar(b.dataset.p)));
+mostrar("0");
+</script>
+</body></html>
