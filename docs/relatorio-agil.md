@@ -145,8 +145,8 @@ Status geral: **no prazo**
 
 | Pessoa | Feito | Próximo | Bloqueio |
 |---|---|---|---|
-| Stephanie | Painel de diagnóstico refeito com a OBT (só dados da Gold); este relatório, riscos, auditoria e documentação | Banca | — |
-| Mateus | Subir os notebooks no GitHub **[pendente]** | — | — |
+| Stephanie | Painel de diagnóstico refeito com a OBT (só dados da Gold); este relatório, riscos, auditoria e documentação (PR #36); pacote de documentação para o Drive | Banca | — |
+| Mateus | Pipeline completo, testes e documentação no GitHub (PR #37) | — | — |
 | Marco | — | — | — |
 | Matheus | — | — | — |
 | Marcelo | Subir o export do dashboard e as consultas no GitHub **[pendente]** | — | — |
@@ -176,9 +176,9 @@ Entrega da apresentação, demonstração ao vivo e deste relatório.
 
 | Indicador | Valor |
 |---|---|
-| Commits (sem merges) | 54, 93% no padrão `tipo(area): descrição` |
-| Pull requests | 6, todas integradas |
-| Issues | 29 criadas, com dono, prazo e marco |
+| Commits (sem merges) | 78, 88% no padrão `tipo(area): descrição` |
+| Pull requests | 8, todas integradas |
+| Issues | 29 criadas, com dono, prazo e marco; 10 fechadas |
 | Marcos no prazo | 7 de 9 (Gold e dashboard v1 com +1 dia) |
 | Data final | Mantida |
 
